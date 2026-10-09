@@ -22,57 +22,67 @@ function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(M
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
 
 // ---------- مواصفات الاختبار حسب الصف (وثيقة تقويم تعلم الطلبة) ----------
-function spec(total){
+// جدول مواصفات الاختبار القصير الرسمي (الصفوف 5–12)
+function spec(){
   var g=gnum(course.grade);
-  if(g>=11)return {total:10,targets:{AO1:3,AO2:7},mcq:{AO1:1,AO2:1},mcqCount:2,long:{count:1,marks:[4,5]},minItems:5,fixed:true};
-  total=+total||(g===5?10:15);
-  var k=Math.round(total*.4),a=Math.round(total*.4),r=total-k-a,t={'معرفة':k,'تطبيق':a,'استدلال':r};
-  if(g===5)return {total:total,targets:t,mcqCount:Math.max(2,Math.round(total*.4)),long:{count:1,marks:[2,3]},minItems:5};
-  return {total:total,targets:t,mcqCount:total>=15?3:2,long:{count:1,marks:[3,4]},minItems:5};
+  if(g>=11)return {total:10,targets:{AO1:3,AO2:7},mcq:{AO1:1,AO2:1},mcqCount:2,long:{count:1,marks:[4,5]},shortMax:3,items:[5,99],label:'11–12'};
+  if(g===10)return {total:10,targets:{'معرفة':4,'تطبيق':4,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:1,marks:[3,4]},shortMax:2,items:[5,7],label:'10'};
+  if(g===9)return {total:15,targets:{'معرفة':6,'تطبيق':6,'استدلال':3},mcqCount:3,mcqAos:2,long:{count:1,marks:[3,4]},shortMax:2,items:[9,12],label:'9'};
+  return {total:15,targets:{'معرفة':6,'تطبيق':6,'استدلال':3},mcqCount:3,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[9,12],label:'5–8'};
+}
+// في الصفوف 5–8 لا توجد مفردة طويلة: المفردات الطويلة بدرجتين تُستخدم كمفردات قصيرة
+function prepPool(pool,sp){
+  return pool.map(function(x){if(!sp.long.count&&x.type==='long'&&x.marks<=sp.shortMax){var y=clone(x);y.type='short';return y;}return x;})
+    .filter(function(x){return x.type==='mcq'||(x.type==='short'&&x.marks<=sp.shortMax)||(x.type==='long'&&sp.long.count&&sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة');});
 }
 
-// ---------- تكوين الاختبار تلقائيًا ----------
+// ---------- تكوين الاختبار تلقائيًا (بحث دقيق يطابق جدول المواصفات) ----------
+function subsets(items,target,maxSol){ // مجموعات عشوائية من المفردات مجموع درجاتها = target
+  var out=[],arr=shuffle(items),seen={};
+  (function dfs(k,sum,cur){
+    if(out.length>=maxSol)return;
+    if(sum===target){var key=cur.map(function(x){return x.qid;}).sort().join(',');if(!seen[key]){seen[key]=1;out.push(cur.slice());}return;}
+    for(var i=k;i<arr.length&&out.length<maxSol;i++){if(sum+arr[i].marks<=target){cur.push(arr[i]);dfs(i+1,sum+arr[i].marks,cur);cur.pop();}}
+  })(0,0,[]);
+  return out;
+}
 function assemble(pool,sp,lessonIds){
+  pool=prepPool(pool,sp);
   var order={};lessonIds.forEach(function(id,i){order[id]=i;});
-  var best=null,bestScore=1e9;
-  for(var att=0;att<700;att++){
-    var rem=clone(sp.targets),chosen=[],used={},useL={};
-    var take=function(it){chosen.push(it);used[it.qid]=1;rem[it.ao]=(rem[it.ao]||0)-it.marks;useL[it.lesson_id]=(useL[it.lesson_id]||0)+1;};
-    var leastUsed=function(c){var mn=1e9;c.forEach(function(x){mn=Math.min(mn,useL[x.lesson_id]||0);});return c.filter(function(x){return (useL[x.lesson_id]||0)===mn;});};
-    // 1) مفردة الإجابة الطويلة
-    var longs=pool.filter(function(x){return x.type==='long'&&sp.long.marks.indexOf(x.marks)>=0&&(rem[x.ao]||0)>=x.marks;});
-    if(!longs.length)longs=pool.filter(function(x){return x.type==='long'&&(rem[x.ao]||0)>=x.marks;});
-    if(longs.length)take(pick(longs));
-    // 2) الاختيار من متعدد
-    if(sp.mcq){Object.keys(sp.mcq).forEach(function(ao){for(var n=0;n<sp.mcq[ao];n++){var c=pool.filter(function(x){return x.type==='mcq'&&x.ao===ao&&!used[x.qid];});if(c.length)take(pick(leastUsed(c)));}});}
-    else{for(var n=0;n<sp.mcqCount;n++){var c=pool.filter(function(x){return x.type==='mcq'&&!used[x.qid]&&(rem[x.ao]||0)>=1&&x.ao!=='استدلال';});if(!c.length)c=pool.filter(function(x){return x.type==='mcq'&&!used[x.qid]&&(rem[x.ao]||0)>=1;});if(c.length)take(pick(leastUsed(c)));}}
-    // 3) بقية الدرجات بمفردات قصيرة
-    for(var guard=0;guard<40;guard++){
-      var left=Object.keys(rem).filter(function(k){return rem[k]>0;});if(!left.length)break;
-      var c=pool.filter(function(x){return x.type==='short'&&!used[x.qid]&&(rem[x.ao]||0)>=x.marks;});
-      if(!c.length)break;
-      take(pick(leastUsed(c)));
+  var aos=Object.keys(sp.targets),mcqs=pool.filter(function(x){return x.type==='mcq';}),longs=pool.filter(function(x){return x.type==='long';}),shorts=pool.filter(function(x){return x.type==='short';});
+  var best=null,bestScore=-1e9;
+  for(var att=0;att<60;att++){
+    // اختيار الاختيار من متعدد
+    var mc=[],usedQ={};
+    if(sp.mcq){Object.keys(sp.mcq).forEach(function(ao){var c=shuffle(mcqs.filter(function(x){return x.ao===ao;}));for(var n=0;n<sp.mcq[ao]&&c.length;n++)mc.push(c.shift());});}
+    else{var c0=shuffle(mcqs);for(var n=0;n<c0.length&&mc.length<sp.mcqCount;n++){var x=c0[n];var dist={};mc.concat([x]).forEach(function(y){dist[y.ao]=1;});if(mc.length===sp.mcqCount-1&&Object.keys(dist).length<2)continue;mc.push(x);}}
+    if(mc.length!==sp.mcqCount)continue;
+    var lg=[];if(sp.long.count){if(!longs.length)continue;lg=[pick(longs)];}
+    var need={};aos.forEach(function(a){need[a]=sp.targets[a];});
+    mc.concat(lg).forEach(function(x){need[x.ao]-=x.marks;usedQ[x.qid]=1;});
+    if(aos.some(function(a){return need[a]<0;}))continue;
+    var opts=aos.map(function(a){return need[a]===0?[[]]:subsets(shorts.filter(function(x){return x.ao===a;}),need[a],12);});
+    if(opts.some(function(o){return !o.length;}))continue;
+    for(var t=0;t<25;t++){
+      var pickd=mc.concat(lg);opts.forEach(function(o){pickd=pickd.concat(pick(o));});
+      var nI=pickd.length;if(nI<sp.items[0]||nI>sp.items[1])continue;
+      var cov={};pickd.forEach(function(x){cov[x.lesson_id]=(cov[x.lesson_id]||0)+1;});
+      var spread=Object.keys(cov).length*10-Math.max.apply(null,Object.keys(cov).map(function(k){return cov[k];}))+Math.random();
+      if(spread>bestScore){bestScore=spread;best=pickd;}
     }
-    if(!sp.fixed){ // الصفوف 5–10: الدرجة الكلية مضبوطة، وتوزيع الأهداف بتفاوت درجة واحدة
-      for(var g2=0;g2<20;g2++){
-        var tr=0;Object.keys(rem).forEach(function(k){tr+=rem[k];});if(tr<=0)break;
-        var c2=pool.filter(function(x){return (x.type==='short'||x.type==='mcq')&&!used[x.qid]&&x.marks<=tr&&(rem[x.ao]||0)-x.marks>=-1;});
-        if(!c2.length)break;take(pick(leastUsed(c2)));
-      }
-    }
-    var dev=0;
-    if(sp.fixed)Object.keys(rem).forEach(function(k){dev+=Math.abs(rem[k]);});
-    else{var tr2=0;Object.keys(rem).forEach(function(k){tr2+=rem[k];dev+=Math.max(0,Math.abs(rem[k])-1)+Math.abs(rem[k])*0.2;});dev+=Math.abs(tr2)*2;}
-    var uncovered=lessonIds.filter(function(id){return !useL[id];}).length;
-    var mc=chosen.filter(function(x){return x.type==='mcq';}).length,lc=chosen.filter(function(x){return x.type==='long';}).length;
-    var score=dev*20+uncovered*3+(chosen.length<sp.minItems?8:0)+Math.abs(mc-(sp.mcqCount||2))*6+(lc?0:6)+Math.max(0,chosen.length-8);
-    if(score<bestScore){bestScore=score;best=chosen;}
-    if(score<0.5)break;
+    if(best&&Object.keys(best.reduce(function(m,x){m[x.lesson_id]=1;return m;},{})).length>=Math.min(lessonIds.length,best.length)&&att>8)break;
   }
-  best=(best||[]).slice().sort(function(a,b){return (order[a.lesson_id]-order[b.lesson_id])||(tOrd(a)-tOrd(b));});
-  // الطويلة في آخر الاختبار مثل النماذج الرسمية
+  if(!best)best=fallbackAssemble(pool,sp);
+  best=best.slice().sort(function(a,b){return (order[a.lesson_id]-order[b.lesson_id])||(tOrd(a)-tOrd(b));});
   var longs2=best.filter(function(x){return x.type==='long';});best=best.filter(function(x){return x.type!=='long';}).concat(longs2);
   return best.map(clone);
+}
+function fallbackAssemble(pool,sp){ // إن لم يوجد حل مطابق تمامًا (مثل درس واحد فقط) نأخذ أقرب اختبار
+  var rem=clone(sp.targets),out=[],used={};
+  shuffle(pool).forEach(function(x){if(used[x.qid])return;var mcN=out.filter(function(y){return y.type==='mcq';}).length,lgN=out.filter(function(y){return y.type==='long';}).length;
+    if(x.type==='mcq'&&mcN>=sp.mcqCount)return;if(x.type==='long'&&lgN>=sp.long.count)return;
+    if((rem[x.ao]||0)>=x.marks){out.push(x);used[x.qid]=1;rem[x.ao]-=x.marks;}});
+  return out;
 }
 function tOrd(x){return {mcq:0,short:1,long:2}[x.type]||1;}
 
@@ -157,27 +167,27 @@ function ctrlHtml(i){
 
 // ---------- مطابقة الوثيقة ----------
 function checks(d){
-  var out=[],items=d.items,tot=sumMarks(items),mc=items.filter(function(x){return x.type==='mcq';}),lg=items.filter(function(x){return x.type==='long';});
+  var out=[],items=d.items,tot=sumMarks(items),mc=items.filter(function(x){return x.type==='mcq';}),lg=items.filter(function(x){return x.type==='long';}),sh=items.filter(function(x){return x.type==='short';});
   var ao={};items.forEach(function(x){ao[x.ao]=(ao[x.ao]||0)+(+x.marks||0);});
   if(d.kind==='review'){out.push([true,items.length+' مفردة، المجموع '+tot+' درجة']);return out;}
-  var sp=d.spec||spec(d.total);
+  var sp=spec();
   out.push([tot===sp.total,'الدرجة الكلية '+tot+' من '+sp.total]);
-  aoList().forEach(function(k){var t=sp.targets[k]||0,v=ao[k]||0;out.push([isHi()?v===t:Math.abs(v-t)<=1,(isHi()?k:k)+': '+v+' درجة (المطلوب '+t+')']);});
+  aoList().forEach(function(k){var t=sp.targets[k]||0,v=ao[k]||0;out.push([v===t,k+': '+v+' درجة (المطلوب '+t+')']);});
+  out.push([items.length>=sp.items[0]&&items.length<=sp.items[1],'عدد المفردات '+items.length+(sp.items[1]<99?' (من '+sp.items[0]+' إلى '+sp.items[1]+')':' (لا يقل عن '+sp.items[0]+')')]);
   if(isHi()){
-    out.push([items.length>=5,'عدد المفردات '+items.length+' (لا يقل عن 5)']);
     var m1=mc.filter(function(x){return x.ao==='AO1';}).length,m2=mc.filter(function(x){return x.ao==='AO2';}).length;
-    out.push([mc.length===2&&m1>=1&&m2>=1,'اختيار من متعدد: '+mc.length+' (مفردتان تغطيان AO1 وAO2)']);
-    out.push([lg.length>=1&&lg.every(function(x){return x.marks>=4&&x.marks<=5;}),'إجابة طويلة: '+lg.length+(lg.length?' ('+lg.map(function(x){return x.marks;}).join('، ')+' درجات)':'')+' — مفردة من 4 إلى 5 درجات']);
+    out.push([mc.length===2&&m1>=1&&m2>=1,'اختيار من متعدد: '+mc.length+' (مفردتان: واحدة AO1 والأخرى AO2)']);
   }else{
-    out.push([items.length>=5,'عدد المفردات '+items.length]);
-    out.push([mc.length>=1,'اختيار من متعدد: '+mc.length]);
-    out.push([lg.length>=1,'إجابة طويلة/مركّبة: '+lg.length]);
+    var a={};mc.forEach(function(x){a[x.ao]=1;});
+    out.push([mc.length===sp.mcqCount&&Object.keys(a).length>=2,'اختيار من متعدد: '+mc.length+' (المطلوب '+sp.mcqCount+' تغطي هدفي تقويم على الأقل)']);
   }
+  if(sp.long.count)out.push([lg.length===1&&lg.every(function(x){return sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة';}),'إجابة طويلة: '+lg.length+(lg.length?' ('+lg.map(function(x){return x.marks;}).join('، ')+' درجات)':'')+' — مفردة واحدة من '+sp.long.marks[0]+' إلى '+sp.long.marks[sp.long.marks.length-1]+' درجات'+(isHi()?'':' وليست من مستوى المعرفة')]);
+  else out.push([lg.length===0,'إجابة طويلة: '+lg.length+' (لا توجد في الصفوف 5–8)']);
+  out.push([sh.every(function(x){return x.marks<=sp.shortMax;}),'الإجابة القصيرة: '+sh.length+' مفردة، كل منها من 1 إلى '+sp.shortMax+' درجة']);
   var ls={};items.forEach(function(x){ls[x.lesson_id]=1;});var n=Object.keys(ls).length;
-  out.push([n>=2&&n<=5,'يغطي '+n+' دروس (الوثيقة: من 2 إلى 5 دروس)']);
+  out.push([n>=2&&n<=5,'يغطي '+n+' دروس (من 2 إلى 5 دروس)']);
   return out;
 }
-
 // ---------- الواجهة ----------
 function renderSide(){
   var h='<section class="qcard"><h3>1. الصف والمادة</h3><select id="courseSel" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'"'+(course&&c.key===course.key?' selected':'')+'>'+esc(c.subject)+' — الصف '+esc(c.grade)+(c.quiz_items?'':' (بدون بنك أسئلة)')+'</option>';}).join('')+'</select>'+
@@ -193,7 +203,7 @@ function renderSide(){
       h+='</div>';
     });
     h+='</div></section><section class="qcard"><h3>3. الإعدادات</h3><label class="qrow">رقم الاختبار <select id="qnoSel" class="qsel sm">'+QNO.map(function(q){return '<option'+(cfg.quizNo===q?' selected':'')+'>'+q+'</option>';}).join('')+'</select></label>'+
-      (isHi()?'<p class="muted small">الصفان 11 و12: الدرجة 10 (AO1 = 3، AO2 = 7)، مفردتا اختيار من متعدد، ومفردة طويلة من 4 إلى 5 درجات، حسب وثيقة التقويم.</p>':'<label class="qrow">الدرجة الكلية <select id="totSel" class="qsel sm">'+[10,15,20].map(function(t){return '<option'+(+cfg.total===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></label><p class="muted small">التوزيع: 40% معرفة، 40% تطبيق، 20% استدلال.</p>')+
+      '<p class="muted small">'+specText()+'</p>'+
       '<button type="button" class="btn primary go-btn" id="makeBtn">كوّن الاختبار</button></section>';
   }else{
     h+='<section class="qcard"><h3>2. الوحدة</h3><select id="unitSel" class="qsel">'+units.map(function(u){return '<option value="'+esc(u.unit)+'"'+(cfg.unit===u.unit?' selected':'')+'>الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</option>';}).join('')+'</select>'+
@@ -206,6 +216,8 @@ function renderSide(){
     '<section class="qcard"><h3>اختباراتي المحفوظة</h3><ul class="saved" id="savedList"><li class="muted">جارٍ التحميل…</li></ul></section>';
   $('qside').innerHTML=h;bindSide();loadSaved();
 }
+function specText(){var sp=spec(),t=Object.keys(sp.targets).map(function(k){return k+' '+sp.targets[k];}).join('، ');
+  return 'حسب جدول مواصفات الاختبار القصير (الصف '+sp.label+'): '+sp.total+' درجة ('+t+')، '+(sp.items[1]<99?'من '+sp.items[0]+' إلى '+sp.items[1]:'لا يقل عن '+sp.items[0])+' مفردات، '+sp.mcqCount+' اختيار من متعدد، '+(sp.long.count?'ومفردة طويلة واحدة ('+sp.long.marks.join('–')+' درجات)':'بدون مفردة طويلة')+'، والباقي إجابة قصيرة (1–'+sp.shortMax+').';}
 function unitsList(){
   var m={},order=[];bank.lessons.forEach(function(l){var k=String(l.unit);if(!m[k]){m[k]={unit:k,name:l.unit_name||'',lessons:[]};order.push(k);}m[k].lessons.push(l);});
   return order.sort(function(a,b){return parseInt(a,10)-parseInt(b,10);}).map(function(k){return m[k];});
@@ -283,7 +295,7 @@ function renderDoc(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-act]'),function(b){b.onclick=function(){itemAct(b.getAttribute('data-act'),+b.getAttribute('data-i'));};});
   $('docTitle').onchange=function(){doc.title=this.value.trim();dirty=true;};
   $('printBtn').onclick=printDoc;$('wordBtn').onclick=wordDoc;$('saveBtn').onclick=saveDoc;$('addBtn').onclick=addItem;
-  if($('remakeBtn'))$('remakeBtn').onclick=function(){var ids=doc.lessons&&doc.lessons.length?doc.lessons:Object.keys(cfg.lessons).map(Number);var it=assemble(poolFor(ids),doc.spec||spec(doc.total),ids);if(it.length){doc.items=it;dirty=true;renderDoc();toast('نسخة جديدة من الاختبار نفسه');}};
+  if($('remakeBtn'))$('remakeBtn').onclick=function(){var ids=doc.lessons&&doc.lessons.length?doc.lessons:Object.keys(cfg.lessons).map(Number);var it=assemble(poolFor(ids),spec(),ids);if(it.length){doc.items=it;dirty=true;renderDoc();toast('نسخة جديدة من الاختبار نفسه');}};
 }
 function itemAct(a,i){
   var it=doc.items[i];if(!it)return;
@@ -423,7 +435,7 @@ window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   me=r[0];$('who').textContent=me.name;if(me.role==='admin'&&$('adminLink'))$('adminLink').hidden=false;
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
-  courses=(r[1].courses||[]).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
+  courses=(r[1].courses||[]).filter(function(c){return !/انجليز|إنجليز|English/i.test(c.subject);}).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
   var last=lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses.filter(function(x){return x.quiz_items;})[0]||courses[0];
   selectCourse(c.key);

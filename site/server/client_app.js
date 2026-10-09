@@ -3,6 +3,10 @@
 guard();
 var GRADE_ORDER=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function ckey(l){return (l.subject||'')+'|'+l.grade;}
+function isEn(l){return /انجليز|إنجليز|English/i.test(l.subject||'');}
+var group=null;try{group=localStorage.getItem('tahdir_group');}catch(e){}
+function groups(){var g={};lessons.forEach(function(l){g[isEn(l)?'en':'sci']=1;});return Object.keys(g);}
+function inGroup(l){var gs=groups();if(gs.length<2)return true;return (isEn(l)?'en':'sci')===group;}
 var me=null,lessons=[],currentId=null,openGrades={},openUnits={},viewed={};
 var DEF_SETTINGS={level:['التذكُّر','الإبداع'],strategies:['التعلم التعاوني','التعلم التشاركي','التعلم الذاتي'],resources:['الكتاب','السبورة التقليدية','جهاز عرض البيانات','الوسائط المتعددة (سمعية - بصرية)']};
 var settings=JSON.parse(JSON.stringify(DEF_SETTINGS));
@@ -16,7 +20,8 @@ var ESSENTIAL=[
   {key:'formative',label:'التقويم التكويني',icon:'cell'},
   {key:'closing',label:'التقويم الختامي',icon:'leaf'},
   {key:'homework',label:'الأنشطة والمهام المنزلية',icon:'flask'},
-  {key:'outcomes',label:'المخرجات التعليمية',icon:'dna',note:'تُعلَّم كلها تلقائيًا في نور'}
+  {key:'outcomes',label:'المخرجات التعليمية',icon:'dna',note:'تُعلَّم كلها تلقائيًا في نور'},
+  {key:'weekly',label:'ملاحظات ضمن خطة الدراسة الأسبوعية',icon:'seed',note:'يشاهدها الطالب وولي الأمر'}
 ];
 var EXTRA=[
   {key:'strategies',label:'الاستراتيجيات كما وردت في ملف التحضير'},
@@ -37,7 +42,7 @@ function icon(n){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
 function track(type,l,detail){
   try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,lesson_id:l&&l.id,detail:detail||''})});}catch(e){}
 }
-function grades(){var s={},out=[];lessons.forEach(function(l){var k=ckey(l);if(!s[k]){s[k]=1;out.push(k);}});
+function grades(){var s={},out=[];lessons.forEach(function(l){if(!inGroup(l))return;var k=ckey(l);if(!s[k]){s[k]=1;out.push(k);}});
   return out.sort(function(a,b){var x=a.split('|'),y=b.split('|');var gi=GRADE_ORDER.indexOf(x[1]),gj=GRADE_ORDER.indexOf(y[1]);return (gi-gj)||x[0].localeCompare(y[0],'ar');});}
 function multiSubj(){var s={};lessons.forEach(function(l){s[l.subject||'']=1;});return Object.keys(s).length>1;}
 function unitsOf(g){var s={};lessons.forEach(function(l){if(ckey(l)===g)s[l.unit]=1;});return Object.keys(s).sort(function(a,b){return parseInt(a,10)-parseInt(b,10);});}
@@ -45,7 +50,10 @@ function lessonsOf(g,u){return lessons.filter(function(l){return ckey(l)===g&&St
 function isEmpty(l){return !(l.pre_learning||l.outcomes||l.activities_teach);}
 
 function renderTree(){
-  var tree=$('tree');tree.innerHTML='<h2 class="tree-h">الكتاب المدرسي</h2>';
+  var tree=$('tree'),gs=groups();
+  if(gs.length>1&&gs.indexOf(group)<0)group=gs[0]==='sci'||gs.indexOf('sci')>=0?'sci':gs[0];
+  tree.innerHTML=(gs.length>1?'<div class="subj-sw" role="tablist"><button type="button" data-grp="sci" class="'+(group==='sci'?'on':'')+'">🧬 الأحياء والعلوم</button><button type="button" data-grp="en" class="'+(group==='en'?'on':'')+'">🔤 English</button></div>':'')+'<h2 class="tree-h">الكتاب المدرسي</h2>';
+  Array.prototype.forEach.call(tree.querySelectorAll('[data-grp]'),function(b){b.onclick=function(){group=b.getAttribute('data-grp');try{localStorage.setItem('tahdir_group',group);}catch(e){}renderTree();};});
   grades().forEach(function(g){
     var gDiv=document.createElement('div');gDiv.className='g-block';
     var count=lessons.filter(function(l){return ckey(l)===g;}).length,gp=g.split('|');
@@ -84,21 +92,22 @@ function fieldBlock(l,f,ess){
   return '<section class="sec'+(ess?' ess':' extra')+'">'+
     '<div class="sec-head"><h3>'+(ess?icon(f.icon):'')+'<span>'+esc(f.label)+'</span></h3>'+(f.note?'<span class="sec-note">'+esc(f.note)+'</span>':'')+
     ((l.ai_filled||[]).indexOf(f.key)>=0?'<span class="sugg" title="كتبها المساعد لاكتمال التحضير">مقترح</span>':'')+'</div>'+
-    '<textarea class="field" id="f_'+f.key+'" spellcheck="false">'+esc(l[f.key]||'')+'</textarea>'+linksOf(l[f.key])+
+    '<textarea class="field" dir="auto" id="f_'+f.key+'" spellcheck="false">'+esc(l[f.key]||'')+'</textarea>'+linksOf(l[f.key])+
     '<div class="sec-actions"><button type="button" class="btn small primary" data-copy="'+f.key+'">نسخ</button>'+
     '<button type="button" class="btn small" data-save="'+f.key+'">'+(admin?'حفظ للجميع':'حفظ على جهازي')+'</button></div></section>';
 }
 function buildCopyAll(l){
   var out='العنوان:\n'+(l.title||'')+'\n\n';
   out+='المستوى: '+settings.level.join('، ')+'\nالاستراتيجيات: '+settings.strategies.join('، ')+'\nالمصادر التعليمية: '+settings.resources.join('، ')+'\n\n';
-  ESSENTIAL.forEach(function(f){out+='— '+f.label+' —\n'+(l[f.key]||'')+'\n\n';});
+  ESSENTIAL.forEach(function(f){if(f.key==='weekly'&&!l.weekly)return;out+='— '+f.label+' —\n'+(l[f.key]||'')+'\n\n';});
   return out.trim();
 }
 function buildCopyJson(l){
   var c=function(k){return hwVal(l,k);};
   var pre=c('pre_learning'),preOnly=(pre.match(/(^|\n)\s*التعلم القبلي\s*[:：][^\n]*/)||[''])[0].trim();
   var objective='';
-  if(l.grade==='الخامس'){ // عبارات «أستطيع أن» تُكتب في خانة «إضافة مخرج تعليمي آخر»
+  if(isEn(l)){objective=c('outcomes').split('\n').map(function(x){return x.replace(/^[•◆\-\s]+/,'').trim();}).filter(Boolean).join('\n');}
+  else if(l.grade==='الخامس'){ // عبارات «أستطيع أن» تُكتب في خانة «إضافة مخرج تعليمي آخر»
     var ol=c('outcomes').split('\n').map(function(x){return x.trim();}).filter(Boolean);
     var main=ol.filter(function(x){return !/^5E/i.test(x);});if(!main.length)main=ol;
     objective=main.map(function(x){return x.replace(/^[0-9A-Za-z]+\s*[:：]\s*/,'');}).join('\n');
@@ -106,8 +115,8 @@ function buildCopyJson(l){
   return JSON.stringify({source:'tahdir-al-aali',kind:'prep',title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),unit_name:l.unit_name||'',lesson_no:lessonNo(l),term:+l.term||1,
     objective:objective,
     fields:{lesson_vocabulary:c('concepts'),description:pre,pre_learning:preOnly||pre,thinking_skills:c('activities_teach'),
-    formative_assessment:c('formative'),closing_assessment:c('closing'),activities:c('homework')},tick_all_outcomes:true,
-    selects:{taxonomies:settings.level,strategies:settings.strategies,teaching_aids:settings.resources}});
+    formative_assessment:c('formative'),closing_assessment:c('closing'),activities:c('homework'),weekly_study_plan_comments:c('weekly')},tick_all_outcomes:true,
+    selects:{taxonomies:settings.level,strategies:(l.sel_strategies&&l.sel_strategies.length)?l.sel_strategies:settings.strategies,teaching_aids:(l.sel_resources&&l.sel_resources.length)?l.sel_resources:settings.resources}});
 }
 function saveField(l,k,v,btn){
   if(me.role==='admin'){
@@ -126,9 +135,9 @@ function hwBlock(l){
     '<div class="hw-mark"><label for="hwMark">درجة كل سؤال</label><input id="hwMark" type="number" min="0" step="0.5" value="'+esc(settings.hwMark==null?1:settings.hwMark)+'"></div><div class="secs">';
   [1,2].forEach(function(n){
     h+='<section class="sec ess"><div class="sec-head"><h3>'+icon(n===1?'seed':'leaf')+'<span>السؤال '+n+'</span></h3><span class="sugg" title="كتبه المساعد من محتوى الدرس">مقترح</span></div>'+
-      '<textarea class="field" id="f_hw_q'+n+'" spellcheck="false">'+esc(l['hw_q'+n]||'')+'</textarea>'+
+      '<textarea class="field" dir="auto" id="f_hw_q'+n+'" spellcheck="false">'+esc(l['hw_q'+n]||'')+'</textarea>'+
       '<div class="sec-head" style="margin-top:10px"><h3 style="font-size:.86rem;color:var(--mute)"><span>'+(mcq?'الاختيارات الأربعة: السطر الأول هو الإجابة الصحيحة (يُخلط ترتيبها تلقائيًا عند الإرسال)':'الإجابة النموذجية')+'</span></h3></div>'+
-      '<textarea class="field" id="f_hw_a'+n+'" spellcheck="false">'+esc(l['hw_a'+n]||'')+'</textarea>'+
+      '<textarea class="field" dir="auto" id="f_hw_a'+n+'" spellcheck="false">'+esc(l['hw_a'+n]||'')+'</textarea>'+
       '<div class="sec-actions"><button type="button" class="btn small primary" data-copy="hw_q'+n+'">نسخ السؤال</button>'+
       '<button type="button" class="btn small" data-save="hw_q'+n+'">'+(admin?'حفظ السؤال للجميع':'حفظ السؤال')+'</button>'+
       '<button type="button" class="btn small" data-save="hw_a'+n+'">'+(mcq?(admin?'حفظ الاختيارات للجميع':'حفظ الاختيارات'):(admin?'حفظ الإجابة للجميع':'حفظ الإجابة'))+'</button></div></section>';
@@ -145,7 +154,7 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
 function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
-var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST=2.7,IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
+var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST=2.9,IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
   var v=toolVersion(),ok=parseFloat(v)>=TOOL_LATEST;
@@ -175,7 +184,7 @@ function sendHw(l){
   if(sendToNour('hw',buildHwJson(l),'أُرسل الواجب ✓ تابع في نور',isMcq(l)?2.6:2.3,function(){copyText(buildHwJson(l));track('copy_hw',l);}))track('send_hw',l,'send');
 }
 function sendPrep(l){
-  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',2.3,function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
+  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',isEn(l)?2.9:2.3,function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
 }
 function buildHwText(l){var L='أبجدهو';return 'واجب: '+(l.title||'')+'\n\n'+hwItems(l).map(function(x,i){return (i+1)+'- '+x.text+(x.choices?'\n'+x.choices.map(function(c,k){return '   '+L[k]+') '+c;}).join('\n'):'');}).join('\n\n');}
 function renderLesson(l){
@@ -189,7 +198,7 @@ function renderLesson(l){
     '<div id="hwPane"'+(lessonTab==='hw'?'':' hidden')+'>'+hwBlock(l)+'</div><div id="prepPane"'+(lessonTab==='prep'?'':' hidden')+'>'+
     '<div class="copybar"><div class="copybar-text"><strong>التحضير إلى نور</strong><span>اضغط «إرسال التحضير إلى نور» ونور مفتوحة: تُفتح «إضافة تحضير» لهذا الصف ويُختار الدرس وتُملأ الأركان. يبقى لك التواريخ وزر «إضافة».</span></div>'+
     '<div class="copybar-btns"><button type="button" class="btn primary" id="sendPrepBtn">إرسال التحضير إلى نور</button><button type="button" class="btn" id="copyJsonBtn">نسخ للأداة</button><button type="button" class="btn" id="copyAllBtn">نسخ كنص</button></div></div><div class="secs">';
-  ESSENTIAL.forEach(function(f){h+=fieldBlock(l,f,true);});
+  ESSENTIAL.forEach(function(f){if(f.key==='weekly'&&!l.weekly&&!isEn(l))return;h+=fieldBlock(l,f,true);});
   h+='</div><button type="button" class="extra-toggle" id="extraToggle" aria-expanded="false"><span>عناصر مرجعية من ملف التحضير الأصلي</span><span class="muted">لا تُنسخ إلى نور</span></button><div class="extra-body" id="extraBody" hidden>';
   EXTRA.forEach(function(f){h+=fieldBlock(l,f,false);});
   h+='</div></div></article>';

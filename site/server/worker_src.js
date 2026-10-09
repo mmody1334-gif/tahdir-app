@@ -19,7 +19,7 @@ const SESSION_DAYS = 30;
 const MAX_FAILS = 5;
 const LOCK_MIN = 15;
 const PBKDF2_ITER = 100000;
-const LESSON_FIELDS = ['title','unit_name','hw_type','hw_q1','hw_a1','hw_q2','hw_a2','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
+const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, salt TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'teacher', active INTEGER NOT NULL DEFAULT 1, max_devices INTEGER NOT NULL DEFAULT 2, created_at INTEGER NOT NULL)`,

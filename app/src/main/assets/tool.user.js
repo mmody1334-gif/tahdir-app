@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      2.8.0
+// @version      2.9.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/teacher/*
@@ -19,7 +19,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '2.8.0';
+  const VERSION = '2.9.0';
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -281,6 +281,9 @@
       let u = null, n = null;
       if (m) { u = m[1]; n = m[2]; text = m[3]; }
       if (u && data.unit && data.lesson_no && String(+u) === String(+data.unit) && String(+n) === String(+data.lesson_no)) num = 1;
+      const em = o.text.match(/Unit\s*(\d+)\s*:\s*Lesson\s*(\d+)/i);
+      if (em && data.lesson_no && +em[1] === +data.unit && +em[2] === +data.lesson_no) num = 1;
+      if (/^\s*Starter/i.test(o.text) && String(data.unit) === '0') num = 1;
       const sc = num + Math.max(nameScore(text, data.base_title || data.title), nameScore(text, data.title));
       if (sc >= bestScore) { bestScore = sc; best = o; } // عند التساوي: الأحدث (الأخير في القائمة)
     });
@@ -368,13 +371,18 @@
     nodes.forEach((n, i) => {
       let text = stripTags(n.text), bonus = 0;
       if (mode === 'unit') {
-        if (i === (+data.unit) - 1) bonus = 1;
+        const um = text.match(/^Unit\s*(\d+)/i);
+        if (um) { if (+um[1] === +data.unit) bonus = 1.2; }
+        else if (/^Starter/i.test(text)) { if (+data.unit === 0) bonus = 1.2; }
+        else if (i === (+data.unit) - 1) bonus = 1;
         text = text.replace(/^الوحدة\s+\S+\s*[:：-]?\s*/, '');
         const sc = bonus + nameScore(text, data.unit_name || '');
         if (sc > bestScore) { bestScore = sc; best = n; }
       } else {
-        const m = text.match(/^\s*(\d+)\s*[-–_.\/]\s*(\d+)\s*(.*)$/);
+        const m = text.match(/^\s*(\d+)\s*[-–_.\/]\s*(\d+)\s*(.*)$/), em = text.match(/Unit\s*(\d+)\s*:\s*Lesson\s*(\d+)/i);
         if (m) { text = m[3]; if (+m[1] === +data.unit && +m[2] === +data.lesson_no) bonus = 1; }
+        else if (em) { if (+em[1] === +data.unit && +em[2] === +data.lesson_no) bonus = 1.2; }
+        else if (nodes.length === 1) bonus = 0.7;
         const sc = bonus + nameScore(text, data.title || '');
         if (sc > bestScore) { bestScore = sc; best = n; }
       }
@@ -399,7 +407,7 @@
     if (T) {
       const root = T.get_node(T.get_node('#').children[0]);
       const terms = await treeKids(T, root.id, 3000);
-      const termRe = +data.term === 2 ? /الثاني/ : /الأول/;
+      const termRe = +data.term === 2 ? /الثاني|Second/i : /الأول|First/i;
       const term = terms.find(t => termRe.test(stripTags(t.text))) || terms[0];
       if (term) {
         await selectNode(T, term);
@@ -437,7 +445,7 @@
     } else warn.push('شجرة الدروس لم تظهر');
     if (!lessonOk) { setVal(document.getElementById('PreparationTitle'), data.title || ''); }
     const obj = document.getElementById('PreparationObjective');
-    if (obj && data.objective && !obj.value.trim()) { setVal(obj, data.objective); report.push('عبارات «أستطيع أن»'); }
+    if (obj && data.objective && !obj.value.trim()) { setVal(obj, data.objective); report.push('المخرجات الإضافية'); }
     const ed = fillEditors(data.fields || {});
     const sel = fillChosenSelects(data.selects || {});
     if (ed.ok) report.push('الأركان'); else warn.push('المحررات: ' + ed.error);
@@ -449,7 +457,7 @@
   }
 
   // ---------- التحضير: صفحة إضافة تحضير ----------
-  const EDITOR_MAP = ['lesson_vocabulary', 'description', 'pre_learning', 'thinking_skills', 'formative_assessment', 'closing_assessment', 'activities'];
+  const EDITOR_MAP = ['lesson_vocabulary', 'description', 'pre_learning', 'thinking_skills', 'formative_assessment', 'closing_assessment', 'activities', 'weekly_study_plan_comments'];
   function runPrep() {
     const data = readPayload('prep');
     if (!data) return;
@@ -487,6 +495,7 @@
       if (val === undefined || val === null) return;
       const inst = uw.CKEDITOR.instances[id];
       if (inst) { inst.setData(String(val).split('\n').map(escHtml).join('<br>')); any = true; }
+      else { const ta = document.getElementById(id); if (ta && String(val)) { setVal(ta, String(val)); any = true; } }
     });
     return any ? { ok: true } : { ok: false, error: 'لم يتم إيجاد محررات النص' };
   }

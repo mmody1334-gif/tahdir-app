@@ -104,11 +104,10 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // ---- admin: grades 9 & 10 compliance
   await ap.goto(B + '/quiz'); await ap.waitForSelector('#courseSel');
   for (const g of ['الأحياء|التاسع', 'الأحياء|العاشر']) {
-    for (const tot of ['15', '10']) {
+    for (const tot of ['x']) {
       await ap.selectOption('#courseSel', g); await ap.waitForSelector('[data-lid]'); await ap.waitForTimeout(200);
       const ids = await ap.$$eval('[data-lid]:not([disabled])', e => e.slice(0, 3).map(x => x.getAttribute('data-lid')));
       for (const id of ids) await ap.check(`[data-lid="${id}"]`);
-      await ap.selectOption('#totSel', tot);
       await ap.click('#makeBtn'); await ap.waitForSelector('#paper .qi');
       const ok = await ap.evaluate(async () => { let ok = 0, bad = ''; for (let i = 0; i < 30; i++) { document.getElementById('remakeBtn').click(); await new Promise(r => setTimeout(r, 20)); if (document.querySelector('.checks.ok')) ok++; else bad = document.querySelector('.checks').innerText; } return ok + ' ' + bad.replace(/\s+/g, ' ').slice(0, 300); });
       console.log(g, tot, 'compliant:', ok);

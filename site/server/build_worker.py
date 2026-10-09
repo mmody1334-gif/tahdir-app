@@ -157,6 +157,12 @@ extra_css = '''
 .bar span{display:block;width:100%;background:var(--main);border-radius:3px 3px 0 0;min-height:3px}
 .bar:hover span{background:var(--accent)}
 
+/* ---------- subject switch ---------- */
+.subj-sw{display:flex;gap:4px;margin:0 2px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px}
+.subj-sw button{flex:1;font:inherit;font-size:.86rem;font-weight:700;border:0;border-radius:9px;padding:8px 6px;background:transparent;color:var(--mute);cursor:pointer}
+.subj-sw button.on{background:var(--main);color:#fff}
+.field[dir=auto]{text-align:start}
+
 /* ---------- nav to assessment ---------- */
 .btn.quiz-link{background:#fff4d6;border-color:#f2c66d;color:#5b3d00;font-weight:700}
 .btn.quiz-link:hover{background:#ffe9ad}
