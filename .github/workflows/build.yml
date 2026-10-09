@@ -16,7 +16,7 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.13'
       - name: Signing key (from secret or repo)
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
@@ -26,7 +26,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           if [ -f app/tahdir.keystore ]; then
-            gradle assembleRelease --no-daemon && cp app/build/outputs/apk/release/app-release.apk tahdir.apk
+            gradle assembleRelease bundleRelease --no-daemon && cp app/build/outputs/apk/release/app-release.apk tahdir.apk && cp app/build/outputs/bundle/release/app-release.aab tahdir.aab
           else
             echo "::warning::no signing key yet - building a debug APK (test only)"
             gradle assembleDebug --no-daemon && cp app/build/outputs/apk/debug/app-debug.apk tahdir.apk
@@ -35,10 +35,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: tahdir-apk
-          path: tahdir.apk
+          path: |
+            tahdir.apk
+            tahdir.aab
       - name: Publish APK to the dist branch
         run: |
-          mkdir -p /tmp/dist && cp tahdir.apk /tmp/dist/ && echo "${{ github.sha }} run ${{ github.run_number }}" > /tmp/dist/BUILD.txt
+          mkdir -p /tmp/dist && cp tahdir.apk /tmp/dist/ && (cp tahdir.aab /tmp/dist/ 2>/dev/null || true) && echo "${{ github.sha }} run ${{ github.run_number }}" > /tmp/dist/BUILD.txt
           cd /tmp/dist && git init -q -b dist && git add . \
             && git -c user.name=build-bot -c user.email=build-bot@users.noreply.github.com commit -qm "APK build ${{ github.run_number }}" \
             && git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" dist

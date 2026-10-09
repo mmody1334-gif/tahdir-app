@@ -2,11 +2,11 @@ plugins { id 'com.android.application' }
 
 android {
     namespace 'om.tahdir.app'
-    compileSdk 34
+    compileSdk 36
     defaultConfig {
         applicationId 'om.tahdir.app'
         minSdk 24
-        targetSdk 34
+        targetSdk 36
         versionCode = Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
         versionName = '1.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
     }

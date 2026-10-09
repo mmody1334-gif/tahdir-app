@@ -6,7 +6,11 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.window.OnBackInvokedDispatcher;
+import android.webkit.WebResourceError;
+import android.view.WindowInsets;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -58,10 +62,27 @@ public class MainActivity extends Activity {
         refreshTool();
 
         CookieManager.getInstance().setAcceptCookie(true);
+        // نفس الشكل على كل الإصدارات: التطبيق يمتد خلف الأشرطة، والمسافات نضبطها بأنفسنا
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        if (Build.VERSION.SDK_INT < 35) { getWindow().setStatusBarColor(Color.TRANSPARENT); getWindow().setNavigationBarColor(GREEN); }
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        root.setBackgroundColor(GREEN);
+        // أندرويد 15+ يرسم التطبيق خلف شريط الحالة: نترك مسافة بقدر الأشرطة ولوحة المفاتيح
+        root.setOnApplyWindowInsetsListener((v, ins) -> {
+            int l, t, r, btm;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets i = ins.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime() | WindowInsets.Type.displayCutout());
+                l = i.left; t = i.top; r = i.right; btm = i.bottom;
+            } else {
+                l = ins.getSystemWindowInsetLeft(); t = ins.getSystemWindowInsetTop(); r = ins.getSystemWindowInsetRight(); btm = ins.getSystemWindowInsetBottom();
+            }
+            v.setPadding(l, t, r, btm);
+            return ins;
+        });
 
         LinearLayout bar = new LinearLayout(this);
         bar.setBackgroundColor(GREEN);
@@ -95,6 +116,15 @@ public class MainActivity extends Activity {
 
         site.loadUrl(SITE);
         show(site);
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::goBack);
+        }
+    }
+
+    void goBack() {
+        if (current != null && current.canGoBack()) current.goBack();
+        else if (current == nour) show(site);
+        else finish();
     }
 
     Button tab(String text) {
@@ -147,6 +177,16 @@ public class MainActivity extends Activity {
             }
             @Override
             public void onPageFinished(WebView view, String url) { inject(view); }
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
+                if (!req.isForMainFrame()) return;
+                String u = req.getUrl().toString().replace("'", "%27");
+                view.loadDataWithBaseURL(null, "<html dir='rtl'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                    + "<body style='font-family:sans-serif;text-align:center;padding:60px 24px;color:#163'>"
+                    + "<h2>لا يوجد اتصال بالإنترنت</h2><p>تأكد من الاتصال ثم اضغط إعادة المحاولة.</p>"
+                    + "<button style='background:#0E7C66;color:#fff;border:0;border-radius:10px;padding:12px 26px;font-size:16px' onclick=\"location.href='" + u + "'\">إعادة المحاولة</button></body></html>",
+                    "text/html", "utf-8", u);
+            }
         });
         w.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -225,11 +265,8 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public void onBackPressed() {
-        if (current != null && current.canGoBack()) current.goBack();
-        else if (current == nour) show(site);
-        else super.onBackPressed();
-    }
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() { goBack(); }
 
     @Override
     protected void onPause() {
