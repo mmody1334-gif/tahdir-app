@@ -7,8 +7,8 @@ android {
         applicationId 'om.tahdir.app'
         minSdk 24
         targetSdk 34
-        versionCode (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
-        versionName "1." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+        versionCode = Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName = '1.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
     }
     signingConfigs {
         release {
