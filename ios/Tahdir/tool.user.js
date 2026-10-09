@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      2.6.0
+// @version      2.7.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/teacher/*
@@ -19,7 +19,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '2.6.0';
+  const VERSION = '2.7.0';
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -396,18 +396,30 @@
       const term = terms.find(t => /الأول/.test(stripTags(t.text))) || terms[0];
       if (term) {
         await selectNode(T, term);
+        await ajaxIdle(6000);
         const units = await treeKids(T, term.id);
         const unit = pickNode(units, data, 'unit');
         if (unit) {
           await selectNode(T, unit);
+          await ajaxIdle(6000);
           const lessons = await treeKids(T, unit.id);
+          await ajaxIdle(6000); // ننتظر طلبات الفصل والوحدة حتى لا تستبدل مخرجات الدرس بعد تعليمها
           const lesson = pickNode(lessons, data, 'lesson');
           if (lesson) {
             await selectNode(T, lesson);
             await ajaxIdle(8000);
             for (let i = 0; i < 40 && !document.querySelector('#criteria-checkbox input[type=checkbox]'); i++) await sleep(150);
             await ajaxIdle(3000);
-            const cbs = Array.from(document.querySelectorAll('#criteria-checkbox input[type=checkbox]'));
+            const nid = lesson.li_attr && lesson.li_attr.node_id;
+            const lid = document.getElementById('lesson-id');
+            if (nid && lid && String(lid.value) !== String(nid)) { await selectNode(T, lesson); await ajaxIdle(8000); }
+            let cbs = [];
+            for (let round = 0; round < 4; round++) { // نعيد التأكد لو نور أعاد رسم القائمة
+              cbs = Array.from(document.querySelectorAll('#criteria-checkbox input[type=checkbox]'));
+              cbs.forEach(cb => { if (!cb.checked) cb.click(); });
+              await sleep(500); await ajaxIdle(2000);
+            }
+            cbs = Array.from(document.querySelectorAll('#criteria-checkbox input[type=checkbox]'));
             cbs.forEach(cb => { if (!cb.checked) cb.click(); });
             report.push('الدرس: ' + stripTags(lesson.text));
             if (cbs.length) report.push('المخرجات (' + cbs.length + ')'); else warn.push('لم تظهر مخرجات لهذا الدرس');
@@ -417,6 +429,8 @@
       } else warn.push('لم أجد الفصل الدراسي الأول');
     } else warn.push('شجرة الدروس لم تظهر');
     if (!lessonOk) { setVal(document.getElementById('PreparationTitle'), data.title || ''); }
+    const obj = document.getElementById('PreparationObjective');
+    if (obj && data.objective && !obj.value.trim()) { setVal(obj, data.objective); report.push('عبارات «أستطيع أن»'); }
     const ed = fillEditors(data.fields || {});
     const sel = fillChosenSelects(data.selects || {});
     if (ed.ok) report.push('الأركان'); else warn.push('المحررات: ' + ed.error);
@@ -428,11 +442,13 @@
   }
 
   // ---------- التحضير: صفحة إضافة تحضير ----------
-  const EDITOR_MAP = ['lesson_vocabulary', 'pre_learning', 'thinking_skills', 'formative_assessment', 'closing_assessment', 'activities'];
+  const EDITOR_MAP = ['lesson_vocabulary', 'description', 'pre_learning', 'thinking_skills', 'formative_assessment', 'closing_assessment', 'activities'];
   function runPrep() {
     const data = readPayload('prep');
     if (!data) return;
     if (data.title) setVal(document.getElementById('PreparationTitle'), data.title);
+    const objEl = document.getElementById('PreparationObjective');
+    if (objEl && data.objective && !objEl.value.trim()) setVal(objEl, data.objective);
     const outcomesOk = data.tick_all_outcomes ? tickAllOutcomes() : null;
     const ed = fillEditors(data.fields || {});
     const sel = fillChosenSelects(data.selects || {});
