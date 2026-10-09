@@ -23,6 +23,7 @@ var ESSENTIAL=[
   {key:'outcomes',label:'المخرجات التعليمية',icon:'dna',note:'تُعلَّم كلها تلقائيًا في نور'},
   {key:'weekly',label:'ملاحظات ضمن خطة الدراسة الأسبوعية',icon:'seed',note:'يشاهدها الطالب وولي الأمر'}
 ];
+var EN_LABEL={strategies:'Strategies',resources:'Teaching aids & resources'};
 var EXTRA=[
   {key:'strategies',label:'الاستراتيجيات كما وردت في ملف التحضير'},
   {key:'resources',label:'الوسائل ومصادر التعلم'},
@@ -87,18 +88,26 @@ function linksOf(t){
   var u=[];m.forEach(function(x){x=x.replace(/[.,،]+$/,'');if(u.indexOf(x)<0)u.push(x);});
   return '<div class="links">'+u.map(function(x){var host=x.replace(/^https?:\/\//,'').split('/')[0].replace(/^www\./,'');return '<a href="'+esc(x)+'" target="_blank" rel="noopener noreferrer">فتح الرابط: '+esc(host)+'</a>';}).join('')+'</div>';
 }
+var EN_LABEL={concepts:'Concepts',pre_learning:'Warm-up',activities_teach:'Lesson Procedures',formative:'Formative Assessment',closing:'Closing Assessment',homework:'Homework',outcomes:'Objectives',weekly:'Weekly Study Plan Comments (Arabic, for parents)',strategies:'Strategies',resources:'Resources',enrich:'Enrichment / Remedial',misconceptions:'Common Mistakes'};
 function fieldBlock(l,f,ess){
+  if(isEn(l)&&EN_LABEL[f.key])f={key:f.key,icon:f.icon,note:f.key==='outcomes'?'Noor ticks all lesson outcomes automatically':f.key==='weekly'?'':f.note,label:EN_LABEL[f.key]+' · '+f.label};
   var admin=me.role==='admin';
   return '<section class="sec'+(ess?' ess':' extra')+'">'+
-    '<div class="sec-head"><h3>'+(ess?icon(f.icon):'')+'<span>'+esc(f.label)+'</span></h3>'+(f.note?'<span class="sec-note">'+esc(f.note)+'</span>':'')+
+    '<div class="sec-head"><h3>'+(ess?icon(f.icon):'')+'<span>'+esc(isEn(l)&&EN_LABEL[f.key]?EN_LABEL[f.key]:f.label)+'</span></h3>'+(f.note?'<span class="sec-note">'+esc(f.note)+'</span>':'')+
     ((l.ai_filled||[]).indexOf(f.key)>=0?'<span class="sugg" title="كتبها المساعد لاكتمال التحضير">مقترح</span>':'')+'</div>'+
     '<textarea class="field" dir="auto" id="f_'+f.key+'" spellcheck="false">'+esc(l[f.key]||'')+'</textarea>'+linksOf(l[f.key])+
     '<div class="sec-actions"><button type="button" class="btn small primary" data-copy="'+f.key+'">نسخ</button>'+
     '<button type="button" class="btn small" data-save="'+f.key+'">'+(admin?'حفظ للجميع':'حفظ على جهازي')+'</button></div></section>';
 }
 function buildCopyAll(l){
+  if(isEn(l)){ // تحضير الإنجليزي بالإنجليزية بالكامل
+    var e='Title:\n'+(l.title||'')+'\n\nStrategies: '+(l.strategies||'')+'\nResources: '+(l.resources||'')+'\n\n';
+    [['concepts','Concepts'],['pre_learning','Warm-up'],['activities_teach','Lesson Procedures'],['formative','Formative Assessment'],['closing','Closing Assessment'],['homework','Homework'],['outcomes','Objectives']].forEach(function(f){e+='— '+f[1]+' —\n'+(l[f[0]]||'')+'\n\n';});
+    return e.trim();
+  }
   var out='العنوان:\n'+(l.title||'')+'\n\n';
-  out+='المستوى: '+settings.level.join('، ')+'\nالاستراتيجيات: '+settings.strategies.join('، ')+'\nالمصادر التعليمية: '+settings.resources.join('، ')+'\n\n';
+  if(isEn(l))out+='Strategies: '+(l.strategies||'')+'\nResources: '+(l.resources||'')+'\n\n';
+  else out+='المستوى: '+settings.level.join('، ')+'\nالاستراتيجيات: '+settings.strategies.join('، ')+'\nالمصادر التعليمية: '+settings.resources.join('، ')+'\n\n';
   ESSENTIAL.forEach(function(f){if(f.key==='weekly'&&!l.weekly)return;out+='— '+f.label+' —\n'+(l[f.key]||'')+'\n\n';});
   return out.trim();
 }
