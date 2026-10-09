@@ -32,6 +32,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS courses(key TEXT PRIMARY KEY, subject TEXT NOT NULL, grade TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS quizzes(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, grade TEXT, subject TEXT, kind TEXT, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS qz_user ON quizzes(user_id, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS exports(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT, format TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
   `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`
@@ -288,6 +289,23 @@ function genPass() {
   return [...r].map(x => a[x % a.length]).join('');
 }
 
+// ---------- exports (Word / print pages) ----------
+// رابط غير قابل للتخمين وصالح 6 ساعات: يعمل في التطبيق والمتصفح الخارجي بدون تسجيل دخول
+async function exportFile(req, env, id) {
+  const r = await env.DB.prepare('SELECT * FROM exports WHERE id = ?').bind(id).first();
+  if (!r || r.created_at < now() - 6 * 3600000) return new Response('انتهت صلاحية الرابط. ارجع للموقع واضغط الزر مرة أخرى.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  const ua = req.headers.get('User-Agent') || '', fname = encodeURIComponent(r.name + (r.format === 'doc' ? '.doc' : '.html'));
+  const disp = (inline) => (inline ? 'inline' : 'attachment') + `; filename="${r.format === 'doc' ? 'tahdir.doc' : 'tahdir.html'}"; filename*=UTF-8''${fname}`;
+  if (r.format === 'doc') return new Response('\ufeff' + r.body, { headers: { 'Content-Type': 'application/msword; charset=utf-8', 'Content-Disposition': disp(false), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+  // صفحة الطباعة: داخل التطبيق نُرجعها كتحميل فيفتحها أندرويد في Chrome حيث تعمل الطباعة وحفظ PDF
+  const nonce = rand(16), inApp = /TahdirApp/.test(ua);
+  const page = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + r.name.replace(/</g, '') + '</title>' +
+    '<style>body{margin:0;background:#e9eeec;font-family:"Simplified Arabic","Traditional Arabic",Tahoma,serif;color:#000}.bar{position:sticky;top:0;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;padding:10px;background:#07493b;color:#fff;font-family:Tahoma,sans-serif;font-size:14px}.bar button{font:inherit;font-weight:bold;border:0;border-radius:10px;padding:10px 18px;background:#fff;color:#07493b;cursor:pointer}.pg{background:#fff;max-width:800px;margin:14px auto;padding:24px 28px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-size:15px;line-height:1.7}.pg+.pg{page-break-before:always}.oval{display:inline-block;width:22px;height:13px;border:1.5px solid #555;border-radius:8px;vertical-align:middle}@media print{@page{size:A4;margin:12mm}body{background:#fff}.bar{display:none}.pg{box-shadow:none;margin:0;padding:0;max-width:none;font-size:14pt}}@media (max-width:600px){.pg{padding:14px 10px;margin:8px 4px;font-size:14px}}</style></head><body>' +
+    '<div class="bar"><span>اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF» أو الطابعة</span><button type="button" id="pr">🖨 طباعة / PDF</button></div>' + r.body +
+    `<script nonce="${nonce}">document.getElementById('pr').onclick=function(){window.print();};setTimeout(function(){try{window.print();}catch(e){}},700);</script></body></html>`;
+  return new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Disposition': disp(!inApp), 'Cache-Control': 'no-store', 'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'nonce-${nonce}'`, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
+}
+
 // ---------- router ----------
 export default {
   async fetch(req, env) {
@@ -297,6 +315,7 @@ export default {
       const url = new URL(req.url), p = url.pathname, m = req.method;
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 
+      let mm0;
       const adminCount = async () => ((await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE role='admin'").first()) || {}).n || 0;
 
       if (p === '/tool/tahdir-noor.user.js' || p === '/tool/tahdir-noor.meta.js') return new Response(TOOL, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
@@ -305,6 +324,7 @@ export default {
       if (ICONS[p]) return new Response(Uint8Array.from(atob(ICONS[p]), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' } });
       if (p === '/manifest.webmanifest') return new Response(MANIFEST, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
       if (p === '/version') return json(BUILD);
+      if ((mm0 = p.match(/^\/x\/([a-f0-9]{40})$/))) return exportFile(req, env, mm0[1]);
       if (p === '/robots.txt') return new Response('User-agent: *\nDisallow: /', { headers: { 'Content-Type': 'text/plain' } });
       if (p === '/setup') return (await adminCount()) ? redirect('/') : html('setup');
       if (p === '/api/setup' && m === 'POST') {
@@ -316,7 +336,6 @@ export default {
       if (p === '/api/login' && m === 'POST') return login(req, env);
 
       const me = await currentUser(req, env);
-      let mm0;
       if (p === '/api/logout' && m === 'POST') {
         const c = cookies(req); if (c.sid) await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(c.sid).run();
         return json({ ok: true }, 200, { 'Set-Cookie': setCookie('sid', '', 0) });
@@ -338,6 +357,15 @@ export default {
         const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
         const ids = new Set(ls.map(l => l.id));
         return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, term: l.term || 1 })), items: QBANK.filter(q => ids.has(q.lesson_id)) });
+      }
+      if (p === '/api/export' && m === 'POST') {
+        const b = await body(req), id = rand(20), fmt = b.format === 'print' ? 'print' : 'doc';
+        const name = String(b.name || 'التحضير الآلي').replace(/[\\/:*?"<>|\r\n]+/g, '-').slice(0, 100);
+        await env.DB.batch([
+          env.DB.prepare('DELETE FROM exports WHERE created_at < ?').bind(now() - 86400000),
+          env.DB.prepare('INSERT INTO exports(id,user_id,name,format,body,created_at) VALUES(?,?,?,?,?,?)').bind(id, me.id, name, fmt, String(b.html || '').slice(0, 1900000), now())
+        ]);
+        return json({ ok: true, url: '/x/' + id });
       }
       if (p === '/api/quizzes' && m === 'GET') {
         const r = (await env.DB.prepare('SELECT id,title,grade,subject,kind,created_at,updated_at FROM quizzes WHERE user_id = ? ORDER BY updated_at DESC LIMIT 200').bind(me.id).all()).results || [];

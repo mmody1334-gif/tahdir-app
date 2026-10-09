@@ -52,6 +52,20 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await p1.click('#wordBtn'); await p1.waitForSelector('input[name=pp]');
   const [dl] = await Promise.all([p1.waitForEvent('download'), p1.click('#mOk')]);
   await dl.saveAs(OUT + 'q_test.doc'); console.log('word file:', dl.suggestedFilename());
+  // mobile + in-app: server export links
+  { const [cm, pm] = await mk({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36 TahdirApp/1', storageState: await c1.storageState() });
+    await pm.goto(B + '/quiz'); await pm.waitForSelector('[data-lid]');
+    await pm.evaluate(() => { const b = document.querySelector('[data-open]'); });
+    await pm.click('#savedList [data-open]'); await pm.waitForSelector('#paper .qi');
+    await pm.click('#wordBtn'); await pm.waitForSelector('input[name=pp]');
+    const [d2] = await Promise.all([pm.waitForEvent('download'), pm.click('#mOk')]);
+    console.log('in-app word:', d2.suggestedFilename(), d2.url().replace(/[a-f0-9]{40}/, 'ID'));
+    await pm.click('#printBtn'); await pm.waitForSelector('input[name=pp]');
+    const [d3] = await Promise.all([pm.waitForEvent('download'), pm.click('#mOk')]);
+    console.log('in-app print ->', d3.suggestedFilename());
+    const u = d3.url(); const plain = await b.newContext(); const pp = await plain.newPage(); await pp.goto(u); await pp.waitForSelector('.pg');
+    console.log('print page in Chrome: pages', await pp.$$eval('.pg', e => e.length), 'has button', !!(await pp.$('#pr')));
+    await pp.screenshot({ path: OUT + 'q_printpage.png' }); await plain.close(); await cm.close(); }
   // print area
   await p1.evaluate(() => { window.print = () => { window.__printed = document.getElementById('printArea').innerText.length; }; });
   await p1.click('#printBtn'); await p1.click('#mOk'); await p1.waitForTimeout(300);

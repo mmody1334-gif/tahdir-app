@@ -359,27 +359,41 @@ function chooseParts(title){
     $('mCancel').onclick=function(){close(null);};$('mOk').onclick=function(){var r=document.querySelector('input[name="pp"]:checked');close(r?r.value:'both');};
   });
 }
+var leavingOk=0,IN_APP=/TahdirApp/.test(navigator.userAgent),MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+function fileName(){return (doc.title||titleText(doc)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
+// التحميل من السيرفر برابط حقيقي: يعمل في التطبيق وفي متصفح الموبايل والكمبيوتر
+function serverFile(format,html,win){
+  toast('جارٍ التجهيز…');
+  return api('/api/export',{format:format,name:fileName(),html:html}).then(function(r){
+    if(win){try{win.location.href=r.url;return;}catch(e){}}
+    leavingOk=Date.now();var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
+  },function(e){if(win)try{win.close();}catch(x){}toast(e.message);});
+}
+function partsHtml(p,word){return (p!=='key'?(word?'':'<div class="pg">')+quizHtml(doc,word,false)+(word?'':'</div>'):'')+(word&&p==='both'?'<br clear="all" style="page-break-before:always">':'')+(p!=='quiz'?(word?'':'<div class="pg">')+keyHtml(doc,word)+(word?'':'</div>'):'');}
 function printDoc(){
   chooseParts('طباعة / حفظ PDF').then(function(p){
     if(!p)return;
-    var a=$('printArea');a.innerHTML=(p!=='key'?'<div class="ppage">'+quizHtml(doc,false,false)+'</div>':'')+(p!=='quiz'?'<div class="ppage">'+keyHtml(doc,false)+'</div>':'');
-    a.className=p==='key'||(p==='both')?'landscape-key':'';
-    document.body.classList.add('printing');track('quiz_print',p,titleText(doc));
-    setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},60);
+    track('quiz_print',p,titleText(doc));
+    if(!IN_APP&&!MOBILE){ // الكمبيوتر: طباعة مباشرة من الصفحة
+      var a=$('printArea');a.innerHTML=(p!=='key'?'<div class="ppage">'+quizHtml(doc,false,false)+'</div>':'')+(p!=='quiz'?'<div class="ppage">'+keyHtml(doc,false)+'</div>':'');
+      document.body.classList.add('printing');
+      setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},60);
+      return;
+    }
+    // الموبايل والتطبيق: صفحة طباعة مستقلة (في التطبيق تُفتح في Chrome)
+    var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}
+    serverFile('print',partsHtml(p,false),w).then(function(){if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');});
   });
 }
 function wordDoc(){
   chooseParts('تحميل ملف Word').then(function(p){
     if(!p)return;
-    var body=(p!=='key'?quizHtml(doc,true,false):'')+(p==='both'?'<br clear="all" style="page-break-before:always">':'')+(p!=='quiz'?keyHtml(doc,true):'');
     var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(titleText(doc))+'</title>'+
       '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
       '<style>@page WordSection1{size:595.3pt 841.9pt;margin:36pt 40pt 36pt 40pt}div.WordSection1{page:WordSection1}body{font-family:"Simplified Arabic","Traditional Arabic",Arial;font-size:13pt;direction:rtl}p{margin:0 0 4pt}table{direction:rtl}.oval{display:inline-block;width:16pt;height:9pt;border:1pt solid #000;border-radius:5pt}</style></head>'+
-      '<body dir="rtl" lang="AR-OM"><div class="WordSection1" dir="rtl">'+body+'</div></body></html>';
-    var blob=new Blob(['﻿',html],{type:'application/msword'});
-    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(doc.title||titleText(doc)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,90)+'.doc';
-    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
-    track('quiz_word',p,titleText(doc));toast('تم تحميل ملف Word');
+      '<body dir="rtl" lang="AR-OM"><div class="WordSection1" dir="rtl">'+partsHtml(p,true)+'</div></body></html>';
+    track('quiz_word',p,titleText(doc));
+    serverFile('doc',html,null).then(function(){toast(IN_APP?'يُحمَّل ملف Word عبر المتصفح، ستجده في «التنزيلات»':'تم تحميل ملف Word');});
   });
 }
 function saveDoc(){
@@ -405,7 +419,7 @@ function openSaved(id){
 }
 // ---------- البداية ----------
 $('logoutBtn').onclick=logout;
-window.addEventListener('beforeunload',function(e){if(doc&&dirty&&doc.items.length){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)return;if(doc&&dirty&&doc.items.length){e.preventDefault();e.returnValue='';}});
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   me=r[0];$('who').textContent=me.name;if(me.role==='admin'&&$('adminLink'))$('adminLink').hidden=false;
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
