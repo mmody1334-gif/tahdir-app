@@ -2,7 +2,7 @@ name: build-apk
 on:
   push:
     branches: [main]
-    paths-ignore: ['ios/**', '.github/workflows/ios.yml']
+    paths-ignore: ['ios/**', '.github/workflows/ios.yml', 'site/**', '.github/workflows/deploy-site.yml']
   workflow_dispatch:
 permissions:
   contents: write

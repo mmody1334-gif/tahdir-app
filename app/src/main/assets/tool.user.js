@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      2.7.0
+// @version      2.8.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/teacher/*
@@ -19,7 +19,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '2.7.0';
+  const VERSION = '2.8.0';
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -56,9 +56,11 @@
   }
   function clearPending(key) { if (typeof GM_deleteValue !== 'undefined') GM_deleteValue(key || PENDING_KEY); }
   // رابط الصفحة المطلوبة لهذا الصف في نور
-  function routeUrl(kind, grade) {
+  function subjKey(subject, grade) { return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '') + '|' + grade; }
+  function cidFor(map, grade, subject) { return (subject && map[subjKey(subject, grade)]) || map[grade]; }
+  function routeUrl(kind, grade, subject) {
     const map = GM_getValue(GRADES_KEY, {}) || {};
-    const cid = map[grade];
+    const cid = cidFor(map, grade, subject);
     if (!cid) return NOUR + '/teacher';
     return NOUR + (kind === 'prep' ? '/teacher/courses/add_preparation/cid:' : '/teacher/homeworks/create/cid:') + cid;
   }
@@ -74,7 +76,7 @@
       GM_setValue(kind === 'prep' ? PREP_KEY : PENDING_KEY, { data: data, ts: Date.now(), routed: false });
       document.dispatchEvent(new CustomEvent('tahdir-' + kind + '-ack'));
       // نفتح نور مباشرة على صفحة هذا الصف (أو الرئيسية أول مرة لنتعرف على أرقام الصفوف)
-      GM_openInTab(routeUrl(kind, data.grade || ''), { active: true });
+      GM_openInTab(routeUrl(kind, data.grade || '', data.subject || ''), { active: true });
     }
     document.addEventListener('tahdir-send-hw', e => onSend('hw', e));
     document.addEventListener('tahdir-send-prep', e => onSend('prep', e));
@@ -95,7 +97,11 @@
     document.querySelectorAll('a[href*="/courses/browse_content/cid:"]').forEach(a => {
       const t = (a.textContent || '').trim().replace(/\s+/g, ' ');
       const m = t.match(GRADE_RE), c = (a.getAttribute('href') || '').match(/cid:([^/?#]+)/);
-      if (m && c) { const g = m[1].replace(/\s+/g, ' '); if (map[g] !== c[1]) { map[g] = c[1]; changed = true; } }
+      if (m && c) {
+        const g = m[1].replace(/\s+/g, ' '), subj = t.split('/')[0].trim();
+        if (map[g] !== c[1]) { map[g] = c[1]; changed = true; }
+        if (subj && subj !== t) { const k = subjKey(subj, g); if (map[k] !== c[1]) { map[k] = c[1]; changed = true; } }
+      }
     });
     if (changed) GM_setValue(GRADES_KEY, map);
     return map;
@@ -115,9 +121,9 @@
       const p = getPending(key);
       if (!p || p.routed) continue;
       p.routed = true; GM_setValue(key, p); // مرة واحدة فقط مهما حدث
-      const grade = p.data.grade || '';
+      const grade = p.data.grade || '', subject = p.data.subject || '';
       const map = await learnGradesWait(grade, 10000);
-      if (map[grade]) { location.href = routeUrl(kind, grade); return true; }
+      if (cidFor(map, grade, subject)) { location.href = routeUrl(kind, grade, subject); return true; }
       showToast('لم أتعرف على «' + grade + '» في قائمة صفوفك في نور. افتح صفحة ' + (kind === 'prep' ? '«إضافة تحضير»' : '«إضافة مهمة»') + ' لهذا الصف بنفسك وسأكمل الباقي.', null, null, 9000);
       return false;
     }
@@ -393,7 +399,8 @@
     if (T) {
       const root = T.get_node(T.get_node('#').children[0]);
       const terms = await treeKids(T, root.id, 3000);
-      const term = terms.find(t => /الأول/.test(stripTags(t.text))) || terms[0];
+      const termRe = +data.term === 2 ? /الثاني/ : /الأول/;
+      const term = terms.find(t => termRe.test(stripTags(t.text))) || terms[0];
       if (term) {
         await selectNode(T, term);
         await ajaxIdle(6000);
@@ -426,7 +433,7 @@
             lessonOk = true;
           } else warn.push('لم أجد الدرس في الشجرة');
         } else warn.push('لم أجد الوحدة ' + (data.unit || '') + ' في الشجرة');
-      } else warn.push('لم أجد الفصل الدراسي الأول');
+      } else warn.push('لم أجد الفصل الدراسي');
     } else warn.push('شجرة الدروس لم تظهر');
     if (!lessonOk) { setVal(document.getElementById('PreparationTitle'), data.title || ''); }
     const obj = document.getElementById('PreparationObjective');

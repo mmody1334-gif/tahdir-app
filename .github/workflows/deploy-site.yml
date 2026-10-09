@@ -1,0 +1,51 @@
+name: deploy-site
+# يبني موقع «التحضير الآلي» وينشره على Cloudflare تلقائيًا عند أي تعديل في مجلد site/
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/deploy-site.yml']
+  workflow_dispatch:
+concurrency: { group: deploy-site, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CF_ACCOUNT: 0000e4925fd52a263ae76a9053eade14
+      CF_SCRIPT: tahdir
+      CF_D1: 43c1825c-d8d8-401a-a77b-2ec6897f457a
+      SITE: https://tahdir.hudhaifa-bio.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Build worker.js
+        run: python3 site/server/build_worker.py
+      - name: Check syntax
+        run: cp site/dist/worker.js /tmp/w.mjs && node --check /tmp/w.mjs
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with: { name: worker-js, path: site/dist/worker.js, retention-days: 30 }
+      - name: Deploy to Cloudflare
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CF_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN secret is not set yet — built but not deployed. Upload site/dist/worker.js manually or add the secret."
+            exit 0
+          fi
+          printf '{"main_module":"worker.js","compatibility_date":"2025-06-01","bindings":[{"type":"d1","name":"DB","id":"%s"}]}' "$CF_D1" > /tmp/meta.json
+          code=$(curl -sS -o /tmp/cf.json -w '%{http_code}' -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$CF_SCRIPT" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -F "metadata=@/tmp/meta.json;type=application/json" \
+            -F "worker.js=@site/dist/worker.js;type=application/javascript+module")
+          python3 -c "import json;d=json.load(open('/tmp/cf.json'));print('success:',d.get('success'));print(d.get('errors'))"
+          [ "$code" = "200" ] || { echo "::error::Cloudflare upload failed (HTTP $code)"; exit 1; }
+          want=$(git rev-parse --short HEAD)
+          for i in 1 2 3 4 5 6; do
+            got=$(curl -s "$SITE/version" | python3 -c "import sys,json;print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+            echo "live: $got  want: $want"; [ "$got" = "$want" ] && exit 0; sleep 10
+          done
+          echo "::error::live site does not show the new version"; exit 1
