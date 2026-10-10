@@ -5,7 +5,7 @@ var data=null,act=null,tab='teachers',q='',rep=null,repDays=30,crs=null,lessonsA
 var GRADES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function gn(g){var i=GRADES.indexOf(g);return i<0?99:i;}
 var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جهاز إضافي مرفوض',disabled:'حساب موقوف',locked:'محاولات كثيرة'};
-var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار'};
+var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات'};
 function load(){
   return Promise.all([api('/api/admin/stats'),api('/api/admin/activity'),api('/api/admin/courses'),api('/api/lessons'),api('/api/admin/report?days='+repDays)]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
 }
@@ -16,11 +16,11 @@ function reportView(){
   var t=rep.totals,rows=rep.rows.filter(function(r){return r.role!=='admin';});
   var h='<div class="toolbar"><div class="seg-r">'+[[7,'آخر 7 أيام'],[30,'آخر 30 يومًا'],[0,'كل المدة']].map(function(o){return '<button type="button" class="btn small'+(repDays===o[0]?' primary':'')+'" data-days="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div><button type="button" class="btn" id="csvBtn">⬇ تنزيل التقرير (Excel/CSV)</button></div>';
   h+='<div class="kpis">'+[['معلمون استخدموا الموقع',rows.filter(function(r){return r.last_active;}).length],['تحضيرات أُرسلت لنور',t.preps],['واجبات أُرسلت لنور',t.hws],['اختبارات ومراجعات',t.quizzes],['مرات الدخول',t.logins]].map(function(k){return '<div class="kpi"><span class="kpi-n">'+k[1]+'</span><span class="kpi-l">'+k[0]+'</span></div>';}).join('')+'</div>';
-  h+='<div class="t-wrap"><table class="tbl"><thead><tr><th>المعلم</th><th>الصفوف</th><th>دخول</th><th>تحضيرات</th><th>واجبات</th><th>اختبارات</th><th>مراجعات</th><th>طباعة/Word</th><th>آخر دخول</th></tr></thead><tbody>'+
+  h+='<div class="t-wrap"><table class="tbl"><thead><tr><th>المعلم</th><th>الصفوف</th><th>دخول</th><th>تحضيرات</th><th>واجبات</th><th>اختبارات</th><th>مراجعات</th><th>ألعاب</th><th>طباعة/Word</th><th>آخر دخول</th></tr></thead><tbody>'+
     rows.sort(function(a,b){return (b.preps+b.hws+b.quizzes)-(a.preps+a.hws+a.quizzes)||(b.last_active||0)-(a.last_active||0);}).map(function(r){
       var sc=[];try{sc=JSON.parse(r.scope||'[]')||[];}catch(e){}
       return '<tr><td><b>'+esc(r.name)+'</b><div class="sub ltr">'+esc(r.username)+'</div></td><td>'+(sc.length?sc.map(function(k){return '<span class="chip-s">'+esc(courseName(k))+'</span>';}).join(''):'<span class="muted">كل الصفوف</span>')+'</td>'+
-        '<td class="num">'+r.logins+'</td><td class="num">'+r.preps+'<span class="sub"> · '+r.prep_lessons+' درس</span></td><td class="num">'+r.hws+'<span class="sub"> · '+r.hw_lessons+' درس</span></td><td class="num">'+r.quizzes+'</td><td class="num">'+r.reviews+'</td><td class="num">'+r.prints+'</td><td>'+esc(ago(r.last_login))+'</td></tr>';
+        '<td class="num">'+r.logins+'</td><td class="num">'+r.preps+'<span class="sub"> · '+r.prep_lessons+' درس</span></td><td class="num">'+r.hws+'<span class="sub"> · '+r.hw_lessons+' درس</span></td><td class="num">'+r.quizzes+'</td><td class="num">'+r.reviews+'</td><td class="num">'+(r.games||0)+'</td><td class="num">'+r.prints+'</td><td>'+esc(ago(r.last_login))+'</td></tr>';
     }).join('')+'</tbody></table></div>';
   if(rep.by_grade.length)h+='<section class="card"><h3>الاستخدام حسب الصف</h3><div class="t-wrap" style="box-shadow:none"><table class="tbl" style="min-width:420px"><thead><tr><th>الصف</th><th>تحضيرات</th><th>واجبات</th><th>اختبارات ومراجعات</th></tr></thead><tbody>'+rep.by_grade.sort(function(a,b){return gn(a.grade)-gn(b.grade);}).map(function(g){return '<tr><td>'+esc(g.grade)+'</td><td class="num">'+g.preps+'</td><td class="num">'+g.hws+'</td><td class="num">'+g.quizzes+'</td></tr>';}).join('')+'</tbody></table></div></section>';
   if(rep.daily.length){var byD={};rep.daily.forEach(function(d){byD[d.d]=d;});var today=Math.floor((Date.now()+14400000)/86400000),days=[];
@@ -30,9 +30,9 @@ function reportView(){
   return h;
 }
 function downloadCsv(){
-  var rows=[['المعلم','اسم المستخدم','الصفوف','مرات الدخول','تحضيرات','دروس محضّرة','واجبات','دروس بواجبات','اختبارات','مراجعات','طباعة/Word','آخر دخول']];
+  var rows=[['المعلم','اسم المستخدم','الصفوف','مرات الدخول','تحضيرات','دروس محضّرة','واجبات','دروس بواجبات','اختبارات','مراجعات','ألعاب','طباعة/Word','آخر دخول']];
   rep.rows.filter(function(r){return r.role!=='admin';}).forEach(function(r){var sc=[];try{sc=JSON.parse(r.scope||'[]')||[];}catch(e){}
-    rows.push([r.name,r.username,sc.map(courseName).join(' / ')||'كل الصفوف',r.logins,r.preps,r.prep_lessons,r.hws,r.hw_lessons,r.quizzes,r.reviews,r.prints,r.last_login?new Date(r.last_login).toLocaleString('ar-OM'):'']);});
+    rows.push([r.name,r.username,sc.map(courseName).join(' / ')||'كل الصفوف',r.logins,r.preps,r.prep_lessons,r.hws,r.hw_lessons,r.quizzes,r.reviews,r.games||0,r.prints,r.last_login?new Date(r.last_login).toLocaleString('ar-OM'):'']);});
   var csv=rows.map(function(r){return r.map(function(c){c=String(c==null?'':c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',');}).join('\r\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='تقرير-الاستخدام-'+(repDays?repDays+'-يوم':'كامل')+'.csv';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
 }

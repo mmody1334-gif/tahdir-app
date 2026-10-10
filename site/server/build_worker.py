@@ -157,6 +157,174 @@ extra_css = '''
 .bar span{display:block;width:100%;background:var(--main);border-radius:3px 3px 0 0;min-height:3px}
 .bar:hover span{background:var(--accent)}
 
+/* ---------- games ---------- */
+.btn.games-link{background:#e9e1ff;border-color:#b9a4f5;color:#3b1d8f;font-weight:700}
+.btn.games-link:hover{background:#ddd0ff}
+.g-home{display:grid;gap:14px}
+.g-intro{background:linear-gradient(120deg,#2b1166,#5b2bb8 55%,#0c7a63);color:#fff;border-radius:20px;padding:18px 20px;box-shadow:var(--shadow)}
+.g-intro h2{margin:0 0 4px;font-family:var(--f-display);font-size:1.5rem}
+.g-intro p{margin:0;opacity:.92;font-size:.92rem}
+.g-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.g-card{display:flex;flex-direction:column;gap:6px;text-align:right;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:14px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s,border-color .15s}
+.g-card:hover{transform:translateY(-2px);border-color:var(--main)}
+.g-card.off{opacity:.55}
+.g-ic{font-size:2rem;line-height:1}
+.g-card b{font-size:1.02rem}
+.g-desc{font-size:.82rem;color:var(--mute);line-height:1.6;flex:1}
+.g-tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:.7rem;font-weight:700;border-radius:999px;padding:1px 9px;background:var(--main-l);color:var(--main-d)}
+.tag.good{background:#e1f7e7;color:#13723a}
+.tag.warn{background:var(--accent-l);color:var(--accent)}
+.teams-ed{display:grid;gap:6px}
+.team-row{display:flex;align-items:center;gap:6px}
+.team-row input{flex:1;min-width:0;font:inherit;font-size:.86rem;padding:5px 9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.team-row .x{border:0;background:transparent;color:var(--danger);font-size:1.1rem;cursor:pointer}
+.tdot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+.lp-uh label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.g-stage{background:var(--paper);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:auto;min-height:70vh;display:flex;flex-direction:column}
+.g-stage:fullscreen{border-radius:0;padding:10px 20px;font-size:1.25rem}
+.g-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.g-title{flex:1;text-align:center;font-family:var(--f-display);font-size:1.1rem}
+.g-score{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 10px 0}
+.g-score:empty{display:none}
+.sc{display:flex;align-items:center;gap:8px;border-radius:14px;padding:6px 12px;background:color-mix(in srgb,var(--tc) 14%,var(--paper));border:2px solid var(--tc)}
+.sc-n{font-weight:700}
+.sc-v{font-family:var(--f-display);font-size:1.4rem;font-weight:700;color:var(--tc);min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
+.sc-b{display:flex;gap:4px}
+.sc-b button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:4px 8px;cursor:pointer;background:var(--tc);color:#fff}
+.sc-b button+button{background:#888}
+.gm-body{padding:16px;flex:1}
+.g-setup{max-width:460px;margin:20px auto;display:grid;gap:10px}
+.g-setup input,.wh-left input{width:90px;font:inherit;padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);text-align:center}
+.btn.big{font-size:1.1rem;padding:12px 26px;justify-content:center}
+.g-stem{font-size:clamp(1.1rem,2.2vw,1.6rem);font-weight:700;line-height:1.7;margin:6px 0 12px;text-align:start}
+.g-table{border-collapse:collapse;margin:6px auto 12px;font-size:.95em}
+.g-table th,.g-table td{border:1px solid var(--line);padding:5px 12px;text-align:center}
+.g-table th{background:var(--main-l)}
+.g-table caption{font-weight:700;padding:3px}
+.lv-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.lv-n,.jp-v{font-weight:700;color:var(--mute)}
+.lv-ans{font-weight:700;color:var(--main-d)}
+.g-timer{position:relative;width:62px;height:62px}
+.g-timer svg{width:100%;height:100%;transform:rotate(-90deg)}
+.tr-bg{fill:none;stroke:var(--line);stroke-width:3.5}
+.tr-fg{fill:none;stroke:var(--main);stroke-width:3.5;stroke-linecap:round;transition:stroke-dasharray .2s linear}
+.g-timer span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-display);font-size:1.3rem;font-weight:700}
+.lv-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.lv-opt{display:flex;align-items:center;gap:10px;font:inherit;font-size:clamp(1rem,1.8vw,1.3rem);font-weight:700;color:#fff;text-align:start;border:0;border-radius:14px;padding:14px 16px;min-height:64px;position:relative;cursor:default}
+button.lv-opt{cursor:pointer}
+.lv-opt .sh{font-size:1.3em;opacity:.9}
+.o0{background:#e21b3c}.o1{background:#1368ce}.o2{background:#c78a00}.o3{background:#26890c}
+.lv-opt.right{outline:5px solid #fff;box-shadow:0 0 0 9px #26b04a}
+.lv-opts.rev .lv-opt.wrong,.lv-opt.gone{opacity:.35}
+.lv-opt.pick{outline:4px dashed #fff}
+.lv-opt.wrongpick{filter:grayscale(.6);outline:5px solid #222}
+.lv-bar{position:absolute;inset-inline:12px;bottom:6px;height:8px;background:rgba(255,255,255,.3);border-radius:6px;display:flex;align-items:center}
+.lv-bar i{display:block;height:100%;background:#fff;border-radius:6px}
+.lv-bar em{position:absolute;inset-inline-end:-2px;bottom:10px;font-style:normal;font-size:.8rem}
+.lv-lobby{display:grid;gap:16px;justify-items:center;text-align:center}
+.lv-join{display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center}
+.lv-qr{background:#fff;padding:8px;border-radius:14px;box-shadow:var(--shadow)}
+.lv-url{font-size:1.4rem;font-weight:700;color:var(--main-d);margin:0}
+.lv-code{font-family:var(--f-display);font-size:clamp(2.6rem,7vw,4.5rem);font-weight:700;letter-spacing:6px;margin:0;color:#3b1d8f}
+.lv-players .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:6px;max-width:900px}
+.lv-lead{max-width:520px;margin:10px auto;display:grid;gap:4px}
+.lv-lead.full{max-height:40vh;overflow:auto}
+.lr{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:6px 12px}
+.lr span:first-child{font-weight:700;color:var(--mute)}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:10px 0 16px}
+.pd{display:flex;flex-direction:column;align-items:center;gap:4px;width:150px}
+.pd-n{font-weight:700;font-size:1.1rem}
+.pd-s{color:var(--mute)}
+.pd-b{width:100%;border-radius:12px 12px 0 0;color:#fff;font-family:var(--f-display);font-size:2rem;display:grid;place-items:center}
+.p0 .pd-b{height:150px;background:#d4a017}.p1 .pd-b{height:110px;background:#9aa4ad}.p2 .pd-b{height:80px;background:#b0703c}
+.jp{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:8px}
+.jp-h{background:#3b1d8f;color:#fff;border-radius:12px;padding:10px 8px;text-align:center;font-weight:700;font-size:.92rem;display:grid;place-items:center;min-height:64px}
+.jp-t{font:inherit;font-family:var(--f-display);font-size:clamp(1.4rem,3vw,2.2rem);font-weight:700;color:#ffd84d;background:#1d3fa0;border:0;border-radius:12px;min-height:76px;cursor:pointer;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.jp-t:hover{background:#2850c4}
+.jp-t.done{background:var(--bg);box-shadow:none;cursor:default}
+.jp-q{max-width:980px;margin:0 auto}
+.jp-ans{background:#e1f7e7;color:#0f4d2a;border-radius:12px;padding:10px 14px;margin:10px 0;font-size:1.05rem}
+.jp-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.g-win{text-align:center;font-size:3rem;padding:30px 10px}
+.g-win h2{font-family:var(--f-display);font-size:1.8rem;margin:6px 0}
+.g-win p{font-size:1.1rem}
+.g-win.small{font-size:1.2rem;padding:10px;display:flex;gap:12px;justify-content:center;align-items:center;background:var(--accent-l);border-radius:14px;margin-bottom:10px}
+.mil{display:grid;grid-template-columns:1fr 180px;gap:16px}
+.ladder{list-style:none;margin:0;padding:0;display:grid;gap:3px;align-content:start}
+.ladder li{padding:5px 12px;border-radius:8px;font-weight:700;color:var(--mute);background:var(--bg);font-variant-numeric:tabular-nums}
+.ladder li.safe{color:#b07800}
+.ladder li.won{color:#26890c}
+.ladder li.on{background:#d89e00;color:#fff}
+.life{display:flex;gap:8px;flex-wrap:wrap}
+.esc-story{font-weight:700;color:var(--main-d);flex:1}
+.locks{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.lock{display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;background:#2a2f3a;color:#fff;border:0;border-radius:14px;padding:10px 16px;min-width:100px;cursor:pointer}
+.lock.open{background:#26890c}
+.lock .lk{font-size:2rem}
+.lock .dg{font-family:var(--f-display);font-size:1.8rem}
+.esc-final{text-align:center;margin-top:12px}
+.esc-final input{font:inherit;font-size:2rem;letter-spacing:10px;width:220px;text-align:center;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:6px}
+.g-hint{text-align:center;font-size:1.05rem}
+.mem{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mc{font:inherit;border:0;border-radius:14px;min-height:120px;cursor:pointer;background:#3b1d8f;color:#fff;padding:10px;position:relative;font-size:.92rem;line-height:1.5}
+.mc.a{background:#0c6b56}
+.mc .mc-b{display:none}
+.mc .mc-f{font-size:2rem}
+.mc.up{background:#fff;color:var(--ink);border:2px solid #3b1d8f}
+.mc.up .mc-f{display:none}
+.mc.up .mc-b{display:block}
+.mc.done{border-color:var(--tc);background:color-mix(in srgb,var(--tc) 12%,#fff);opacity:.8}
+.ws{display:grid;grid-template-columns:auto minmax(180px,1fr);gap:16px;align-items:start;justify-content:center}
+.ws-grid{display:grid;grid-template-columns:repeat(var(--n),minmax(26px,42px));gap:3px}
+.ws-c{font:inherit;font-weight:700;font-size:clamp(.95rem,1.8vw,1.35rem);aspect-ratio:1;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);cursor:pointer;padding:0}
+.ws-c.s{background:#ffd84d;color:#000}
+.ws-c.f{background:#26890c;color:#fff;border-color:#26890c}
+.ws-list{display:flex;flex-wrap:wrap;gap:6px;align-content:start}
+.ws-list b{width:100%}
+.ws-list span.w{background:var(--main-l);border-radius:999px;padding:2px 10px;font-weight:700}
+.ws-list span.w.got{text-decoration:line-through;opacity:.5}
+.wh{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:20px;align-items:start}
+.wh-left{display:grid;gap:10px;justify-items:center}
+.wh-wrap{position:relative;width:100%;max-width:360px}
+.wh-svg{width:100%;height:auto;display:block}
+.wh-ptr{position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:1.8rem;color:#10261f}
+.wh-who{font-size:1.4rem;margin-bottom:8px}
+.wh-who b{font-family:var(--f-display);font-size:2rem;color:#3b1d8f}
+.fc-wrap{max-width:820px;margin:0 auto;display:grid;gap:10px}
+.fc-n{text-align:center;color:var(--mute)}
+.fc{font:inherit;color:var(--ink);text-align:start;min-height:260px;border-radius:20px;border:2px solid #3b1d8f;background:var(--paper);padding:20px;cursor:pointer;box-shadow:var(--shadow)}
+.fc .fc-back{display:none}
+.fc.flip .fc-front{display:none}
+.fc.flip .fc-back{display:block;font-size:1.2rem;line-height:1.8}
+.fc.flip{background:#e1f7e7;border-color:#26890c;color:#0f4d2a}
+.fc-ch{margin:0 0 8px;font-size:1.05rem}
+.fc-act{display:flex;gap:10px;justify-content:center}
+@media (max-width:900px){.mil,.wh,.ws{grid-template-columns:1fr}.lv-opts{grid-template-columns:1fr}.jp-t{min-height:56px}}
+
+/* ---------- play (students' phones) ---------- */
+.pl{min-height:100vh;min-height:100dvh;background:linear-gradient(160deg,#2b1166,#5b2bb8 60%,#0c7a63);padding:14px;display:flex;flex-direction:column;gap:12px}
+.pl-card{background:#fff;color:#10261f;border-radius:20px;padding:20px;max-width:460px;width:100%;margin:auto;display:grid;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.pl-card.c{text-align:center}
+.pl-card h1{margin:0;font-family:var(--f-display);font-size:1.5rem;text-align:center}
+.pl-card h2{margin:0;font-family:var(--f-display)}
+.pl-card label{display:grid;gap:4px;font-weight:700}
+.pl-card input{font:inherit;font-size:1.3rem;padding:12px;border-radius:12px;border:2px solid #d4e5de;text-align:center}
+.pl-go{font:inherit;font-size:1.2rem;font-weight:700;border:0;border-radius:14px;padding:14px;background:#26890c;color:#fff;cursor:pointer}
+.pl-err{background:#fde8e6;color:#b23a2b;border-radius:10px;padding:8px;margin:0}
+.pl-big{font-size:3.5rem;line-height:1}
+.pl-card.ok{border:4px solid #26890c}.pl-card.bad{border:4px solid #e21b3c}
+.pl-rank{font-size:1.3rem;font-weight:700;color:#3b1d8f}
+.pl-head{display:flex;justify-content:space-between;color:#fff;font-weight:700;background:rgba(0,0,0,.2);border-radius:12px;padding:8px 14px}
+.pl-q{display:grid;gap:10px;color:#fff}
+.pl-meta{text-align:center;opacity:.9}
+.pl-stem{background:#fff;color:#10261f;border-radius:14px;padding:12px 14px;font-weight:700;line-height:1.7}
+.pl-q .g-table{background:#fff;color:#10261f}
+.pl-opts{display:grid;gap:10px}
+.pl-o{display:flex;align-items:center;gap:10px;font:inherit;font-size:1.1rem;font-weight:700;color:#fff;border:0;border-radius:14px;padding:16px;min-height:70px;text-align:start;cursor:pointer}
+.pl-o span{font-size:1.4rem}
+.pl-o:disabled{opacity:.5}.pl-o.sel{opacity:1;outline:4px solid #fff}
+
 /* ---------- subject switch ---------- */
 .subj-sw{display:flex;gap:4px;margin:0 2px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px}
 .subj-sw button{flex:1;font:inherit;font-size:.86rem;font-weight:700;border:0;border-radius:9px;padding:8px 6px;background:transparent;color:var(--mute);cursor:pointer}
@@ -326,17 +494,23 @@ TOP = lambda extra: f'''<header class="top">{HELIX}<div class="wrap top-in">
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span> درسًا</span><span class="stat"><span id="statFilled">0</span> بتحضير جاهز</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn small quiz-link" href="/quiz">📝 التقويم والاختبارات</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small pulse" id="toolBtn">⬇ ثبّت أداة نور</button><button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + f'''
+  '<span class="who" id="who"></span><a class="btn small quiz-link" href="/quiz">📝 التقويم والاختبارات</a><a class="btn small games-link" href="/games">🎲 الألعاب</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small pulse" id="toolBtn">⬇ ثبّت أداة نور</button><button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + f'''
 <div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «التحضير الآلي» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
 <div class="wrap layout"><aside class="tree" id="tree" aria-label="الصفوف والوحدات والدروس"></aside>
 <main class="panel" id="panel"><div class="welcome">{CELL}<h2>جارٍ تحميل الدروس…</h2></div></main></div>
 <p class="foot">التحضير الآلي لمادتي الأحياء والعلوم، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
 
 QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبارات القصيرة ومراجعات الوحدات</span><span class="stat">وفق وثيقة تقويم تعلم الطلبة</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">التحضير والواجب</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
+  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">التحضير والواجب</a><a class="btn small games-link" href="/games">🎲 الألعاب</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الاختبار"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
+
+GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب التعليمية</span><span class="stat">لكل درس ولكل صف</span></div>').replace('%BTNS%',
+  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">التحضير والواجب</a><a class="btn ghost small" href="/quiz">التقويم</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
+<div class="wrap qlayout"><aside class="qside" id="gside" aria-label="اختيار الدروس"></aside>
+<main class="panel" id="gmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>'''
+PLAY = '<main class="pl" id="pl"></main>'
 
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
   '<span class="who" id="who"></span><a class="btn ghost small" href="/app">صفحة الدروس</a><a class="btn ghost small" href="/quiz">التقويم</a><button type="button" class="btn ghost small" id="refreshBtn">تحديث</button><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
@@ -349,6 +523,8 @@ PAGES = {
   'app': page('التحضير الآلي', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · التحضير الآلي', ADMIN, rd('client_admin.js')),
   'quiz': page('التقويم · التحضير الآلي', QUIZ, rd('client_quiz.js')),
+  'games': page('الألعاب التعليمية · التحضير الآلي', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
+  'play': page('تحدي التحضير الآلي', PLAY, rd('client_play.js')),
 }
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))

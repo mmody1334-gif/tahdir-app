@@ -32,6 +32,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS courses(key TEXT PRIMARY KEY, subject TEXT NOT NULL, grade TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS quizzes(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, grade TEXT, subject TEXT, kind TEXT, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS qz_user ON quizzes(user_id, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS rooms(code TEXT PRIMARY KEY, owner INTEGER NOT NULL, title TEXT, grade TEXT, data TEXT NOT NULL, state TEXT NOT NULL, qi INTEGER NOT NULL DEFAULT -1, q_started INTEGER, dur INTEGER NOT NULL DEFAULT 20, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS players(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, name TEXT NOT NULL, token TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, ans_qi INTEGER NOT NULL DEFAULT -1, ans_choice INTEGER, ans_ok INTEGER, ans_pts INTEGER, ans_at INTEGER, joined_at INTEGER NOT NULL, UNIQUE(code, name))`,
+  `CREATE INDEX IF NOT EXISTS pl_code ON players(code)`,
   `CREATE TABLE IF NOT EXISTS exports(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT, format TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
@@ -254,7 +257,7 @@ async function adminReport(env, days) {
       COUNT(DISTINCT CASE WHEN type IN ${PREP_T} THEN lesson_id END) prep_lessons,
       SUM(type IN ${HW_T}) hws,
       COUNT(DISTINCT CASE WHEN type IN ${HW_T} THEN lesson_id END) hw_lessons,
-      SUM(type='quiz_make') quizzes, SUM(type='review_make') reviews, SUM(type IN ('quiz_print','quiz_word')) prints,
+      SUM(type='quiz_make') quizzes, SUM(type='review_make') reviews, SUM(type IN ('quiz_print','quiz_word')) prints, SUM(type IN ('game_play','game_live')) games,
       COUNT(DISTINCT CASE WHEN type='view' THEN lesson_id END) views,
       MAX(CASE WHEN type='login' THEN at END) last_login, MAX(at) last_active
     FROM events WHERE at > ? GROUP BY user_id`).bind(since).all()).results || [];
@@ -264,7 +267,7 @@ async function adminReport(env, days) {
   const daily = (await DB.prepare(`SELECT CAST((at + 14400000) / 86400000 AS INTEGER) d, COUNT(DISTINCT user_id) users,
       SUM(type IN ${PREP_T}) preps, SUM(type IN ${HW_T}) hws, SUM(type IN ('quiz_make','review_make')) quizzes
     FROM events WHERE at > ? GROUP BY d ORDER BY d`).bind(Math.max(since, now() - 30 * 86400000)).all()).results || [];
-  const A = Object.fromEntries(agg.map(r => [r.user_id, r])), z = { logins: 0, preps: 0, prep_lessons: 0, hws: 0, hw_lessons: 0, quizzes: 0, reviews: 0, prints: 0, views: 0, last_login: null, last_active: null };
+  const A = Object.fromEntries(agg.map(r => [r.user_id, r])), z = { games: 0, logins: 0, preps: 0, prep_lessons: 0, hws: 0, hw_lessons: 0, quizzes: 0, reviews: 0, prints: 0, views: 0, last_login: null, last_active: null };
   const rows = users.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, active: u.active, scope: u.scope, ...z, ...(A[u.id] || {}) }));
   const sum = k => rows.reduce((t, r) => t + (+r[k] || 0), 0);
   return { days, rows, by_grade: byGrade, daily,
@@ -306,6 +309,101 @@ async function exportFile(req, env, id) {
   return new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Disposition': disp(!inApp), 'Cache-Control': 'no-store', 'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'nonce-${nonce}'`, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
 }
 
+// ---------- live phone challenge (Kahoot-style) ----------
+const ROOM_TTL = 4 * 3600000;
+async function roomOf(env, code) {
+  const r = await env.DB.prepare('SELECT * FROM rooms WHERE code = ?').bind(String(code || '')).first();
+  if (!r || r.created_at < now() - ROOM_TTL) return null;
+  r.q = JSON.parse(r.data); return r;
+}
+function publicQ(q) { return { stem: q.stem, choices: q.choices, table: q.table || null }; }
+async function playApi(req, env, p, m, url) {
+  const DB = env.DB;
+  if (p === '/api/play/join' && m === 'POST') {
+    const b = await body(req), code = String(b.code || '').replace(/\D/g, '').slice(0, 6);
+    const name = String(b.name || '').replace(/[<>]/g, '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    if (!name) return json({ error: 'اكتب اسمك.' }, 400);
+    const r = await roomOf(env, code);
+    if (!r || r.state === 'end') return json({ error: 'رمز التحدي غير صحيح أو انتهى التحدي.' }, 404);
+    const n = await DB.prepare('SELECT COUNT(*) n FROM players WHERE code = ?').bind(code).first();
+    if (n && n.n >= 80) return json({ error: 'اكتمل عدد اللاعبين.' }, 400);
+    const token = rand(12);
+    try { const row = await DB.prepare('INSERT INTO players(code,name,token,joined_at) VALUES(?,?,?,?) RETURNING id').bind(code, name, token, now()).first(); return json({ ok: true, pid: row.id, token, title: r.title }); }
+    catch (e) { return json({ error: 'هذا الاسم مستخدم في التحدي. اكتب اسمًا آخر (مثلًا مع رقمك).' }, 400); }
+  }
+  if (p === '/api/play/state' || (p === '/api/play/answer' && m === 'POST')) {
+    const b = m === 'POST' ? await body(req) : Object.fromEntries(url.searchParams);
+    const r = await roomOf(env, b.code); if (!r) return json({ state: 'gone' });
+    const pl = await DB.prepare('SELECT * FROM players WHERE id = ? AND code = ? AND token = ?').bind(+b.pid, r.code, String(b.t || '')).first();
+    if (!pl) return json({ state: 'gone' });
+    const t = now(), q = r.q[r.qi], dur = r.dur * 1000;
+    if (p === '/api/play/answer') {
+      if (r.state !== 'question' || +b.qi !== r.qi || pl.ans_qi === r.qi) return json({ ok: false });
+      const el = t - r.q_started; if (el > dur + 1500) return json({ ok: false, late: true });
+      const choice = +b.choice, ok = choice === q.correct ? 1 : 0, pts = ok ? Math.round(1000 - 500 * Math.min(1, el / dur)) : 0;
+      await DB.prepare('UPDATE players SET ans_qi=?, ans_choice=?, ans_ok=?, ans_pts=?, ans_at=?, score=score+? WHERE id=?').bind(r.qi, choice, ok, pts, t, pts, pl.id).run();
+      return json({ ok: true });
+    }
+    const out = { state: r.state, qi: r.qi, total: r.q.length, title: r.title, you: { name: pl.name, score: pl.score } };
+    if (r.state === 'question') { out.q = publicQ(q); out.left = Math.max(0, dur - (t - r.q_started)); out.answered = pl.ans_qi === r.qi; out.choice = pl.ans_qi === r.qi ? pl.ans_choice : null; }
+    if (r.state === 'reveal' || r.state === 'end') {
+      if (r.state === 'reveal') { out.q = publicQ(q); out.correct = q.correct; out.mine = pl.ans_qi === r.qi ? { choice: pl.ans_choice, ok: !!pl.ans_ok, pts: pl.ans_pts } : null; }
+      const rk = await DB.prepare('SELECT COUNT(*) n FROM players WHERE code = ? AND score > ?').bind(r.code, pl.score).first();
+      out.rank = (rk ? rk.n : 0) + 1;
+    }
+    return json(out);
+  }
+  return null;
+}
+async function liveApi(req, env, me, p, m, url) {
+  const DB = env.DB;
+  if (p === '/api/live/create' && m === 'POST') {
+    const b = await body(req);
+    const items = (Array.isArray(b.items) ? b.items : []).filter(x => x && Array.isArray(x.choices) && x.choices.length >= 2 && x.correct >= 0 && x.correct < x.choices.length).slice(0, 40)
+      .map(x => ({ stem: String(x.stem || '').slice(0, 1500), choices: x.choices.slice(0, 4).map(c => String(c).slice(0, 300)), correct: +x.correct, table: x.table || null }));
+    if (!items.length) return json({ error: 'لا توجد أسئلة اختيار من متعدد.' }, 400);
+    await DB.prepare('DELETE FROM rooms WHERE created_at < ?').bind(now() - ROOM_TTL).run();
+    let code = '';
+    for (let i = 0; i < 8; i++) { code = String(100000 + Math.floor(Math.random() * 900000)); if (!(await DB.prepare('SELECT code FROM rooms WHERE code = ?').bind(code).first())) break; }
+    await DB.batch([DB.prepare('DELETE FROM players WHERE code = ?').bind(code),
+      DB.prepare('INSERT OR REPLACE INTO rooms(code,owner,title,grade,data,state,qi,q_started,dur,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(code, me.id, String(b.title || 'تحدٍّ').slice(0, 120), String(b.grade || ''), JSON.stringify(items), 'lobby', -1, null, Math.max(10, Math.min(120, +b.dur || 20)), now())]);
+    return json({ ok: true, code });
+  }
+  const r = await roomOf(env, (m === 'POST' ? (await req.clone().json().catch(() => ({}))).code : url.searchParams.get('code')));
+  if (!r || (r.owner !== me.id && me.role !== 'admin')) return json({ error: 'التحدي غير موجود أو انتهت صلاحيته.' }, 404);
+  if (p === '/api/live/state') {
+    const pls = (await DB.prepare('SELECT name, score, ans_qi, ans_choice, ans_ok FROM players WHERE code = ? ORDER BY score DESC, joined_at').bind(r.code).all()).results || [];
+    const dist = [0, 0, 0, 0]; let answered = 0;
+    pls.forEach(x => { if (x.ans_qi === r.qi) { answered++; if (x.ans_choice >= 0 && x.ans_choice < 4) dist[x.ans_choice]++; } });
+    const q = r.q[r.qi];
+    return json({ state: r.state, qi: r.qi, total: r.q.length, dur: r.dur, left: r.state === 'question' ? Math.max(0, r.dur * 1000 - (now() - r.q_started)) : 0,
+      q: q || null, players: pls.map(x => ({ name: x.name, score: x.score, ok: x.ans_qi === r.qi ? !!x.ans_ok : null })), answered, dist });
+  }
+  if (p === '/api/live/control' && m === 'POST') {
+    const b = await body(req), a = b.action;
+    if (a === 'next' || a === 'start') {
+      const nq = r.qi + 1;
+      if (nq >= r.q.length) await DB.prepare("UPDATE rooms SET state='end' WHERE code=?").bind(r.code).run();
+      else await DB.prepare("UPDATE rooms SET state='question', qi=?, q_started=? WHERE code=?").bind(nq, now(), r.code).run();
+    } else if (a === 'reveal') await DB.prepare("UPDATE rooms SET state='reveal' WHERE code=? AND state='question'").bind(r.code).run();
+    else if (a === 'end') await DB.prepare("UPDATE rooms SET state='end' WHERE code=?").bind(r.code).run();
+    else return json({ error: 'bad' }, 400);
+    return json({ ok: true });
+  }
+  return json({ error: 'not found' }, 404);
+}
+async function gamesData(env, me, key) {
+  const sc = scopeOf(me); if (sc && !sc.has(key)) return { error: 'غير مسموح.' };
+  const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
+  const ids = new Set(ls.map(l => l.id));
+  const items = QBANK.filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'bank' }));
+  let k = 0;
+  ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
+    const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;
+    items.push({ qid: 900000 + (k++), lesson_id: l.id, type: 'mcq', stem: String(l['hw_q' + n]).replace(/^Choose the correct answer:\s*/i, ''), choices: c.slice(0, 4), correct: 0, marks: 1, ao: '', difficulty: 'منخفضة', src: 'hw' }); }); });
+  return { lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, concepts: l.concepts || '', subject: l.subject, grade: l.grade })), items };
+}
+
 // ---------- router ----------
 export default {
   async fetch(req, env) {
@@ -334,6 +432,8 @@ export default {
         return json({ ok: true });
       }
       if (p === '/api/login' && m === 'POST') return login(req, env);
+      if (p === '/play') return html('play');
+      if (p.startsWith('/api/play/')) { const r = await playApi(req, env, p, m, url); if (r) return r; }
 
       const me = await currentUser(req, env);
       if (p === '/api/logout' && m === 'POST') {
@@ -349,6 +449,9 @@ export default {
       if (p === '/app') return html('app');
       if (p === '/api/me') return json({ name: me.name, username: me.username, role: me.role });
       if (p === '/quiz') return html('quiz');
+      if (p === '/games') return html('games');
+      if (p === '/api/games/data') { const d = await gamesData(env, me, url.searchParams.get('key') || ''); return d.error ? json(d, 403) : json(d); }
+      if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
       if (p === '/api/lessons') return json({ lessons: await lessonsFor(env, me) });
       if (p === '/api/courses') { const sc = scopeOf(me); return json({ courses: (await coursesList(env)).filter(c => !sc || sc.has(c.key)) }); }
       if (p === '/api/quiz/bank') {
@@ -393,7 +496,7 @@ export default {
       }
       if (p === '/api/event' && m === 'POST') {
         const b = await body(req);
-        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save'].includes(b.type) ? b.type : null;
+        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'game_play', 'game_live', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save'].includes(b.type) ? b.type : null;
         if (!type) return json({ error: 'bad' }, 400);
         let l = LESSONS.find(x => x.id === +b.lesson_id);
         if (!l && +b.lesson_id >= CUSTOM_BASE) { const r = await env.DB.prepare('SELECT data FROM custom_lessons WHERE id = ?').bind(+b.lesson_id).first(); if (r) { try { l = { ...JSON.parse(r.data), id: +b.lesson_id }; } catch {} } }
