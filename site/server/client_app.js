@@ -163,11 +163,9 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
 function sendToNour(kind,json,okMsg,minVer,fallback){
-  var auto=IN_APP?toolOk(minVer):(hasExt()?toolOk(minVer):toolOk(TOOL_LATEST));
-  if(!auto){
-    if(!IN_APP&&bmOk())return bmSend(kind,json);
+  if(!toolOk(IN_APP||hasExt()?minVer:TOOL_LATEST)){
     if(!IN_APP&&toolVersion()&&!hasExt()){forceToolUpdate();return false;}
-    toolDialog(IN_APP?'حدّث التطبيق ثم حاول مرة أخرى.':'الإرسال إلى نور يحتاج زر «أداة نور» مرة واحدة على متصفحك (بدون تثبيت أي برنامج).');
+    toolDialog(toolVersion()?'أداة نور عندك قديمة. حدّثها مرة واحدة وبعدها تتحدث تلقائيًا.':'الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك.');
     return false;
   }
   var done=false,ev='tahdir-'+kind+'-ack';
@@ -176,7 +174,7 @@ function sendToNour(kind,json,okMsg,minVer,fallback){
   try{var o=JSON.parse(json);o.nonce=Date.now().toString(36)+Math.random().toString(36).slice(2,8);json=JSON.stringify(o);}catch(e){}
   // في المتصفح نستخدم أسماء أحداث لا تسمعها النسخ القديمة المكررة من الأداة
   document.dispatchEvent(new CustomEvent((IN_APP?'tahdir-send-':'tahdir-v3-send-')+kind,{detail:json}));
-  setTimeout(function(){if(!done){document.removeEventListener(ev,onAck);if(!IN_APP)toolDialog('لم تستجب الأداة التلقائية في متصفحك. استخدم زر «أداة نور» بدلًا منها — لا يحتاج أي تثبيت.');else toast('لم تستجب الأداة. أعد تحميل الصفحة وحاول مرة أخرى');}},1500);
+  setTimeout(function(){if(!done){document.removeEventListener(ev,onAck);toast('لم تستجب الأداة. أعد تحميل الصفحة وحاول مرة أخرى');}},1500);
   return true;
 }
 function sendHw(l){
