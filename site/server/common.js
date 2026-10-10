@@ -66,6 +66,11 @@ function toolDialog(reason){
    '<li><b>مرة واحدة فقط:</b> ثبّت إضافة Tampermonkey من متجر المتصفح:<br><a href="https://addons.mozilla.org/ar/firefox/addon/tampermonkey/" target="_blank" rel="noopener">Firefox</a> · <a href="https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener">Chrome</a> · <a href="https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener">Edge</a></li>'+
    '<li>اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة اللي تفتح اضغط <b>«تثبيت»</b> (أو «تحديث»).</li>'+
    '<li>ارجع لهنا وحدّث الصفحة.</li></ol>'+
+   (/Chrome|Edg\//.test(navigator.userAgent)&&!/Firefox/.test(navigator.userAgent)?
+   '<div class="m-msg" style="background:#fff8e6;border:1px solid #f2c66d;border-radius:10px;padding:8px 12px"><b>على '+(/Edg\//.test(navigator.userAgent)?'Edge':'Chrome')+': لو ثبّتّ الأداة ومازالت لا تعمل</b> فالمتصفح يمنع السكربتات حتى تسمح بها مرة واحدة:<br>'+
+   (/Edg\//.test(navigator.userAgent)?'افتح <b class="ltr">edge://extensions</b> وفعّل <b>«وضع المطور» Developer mode</b> (أسفل يسار الصفحة)، ثم ادخل <b>تفاصيل</b> Tampermonkey وفعّل <b>«السماح بالبرامج النصية للمستخدم» Allow User Scripts</b> إن ظهر.':
+   'افتح <b class="ltr">chrome://extensions</b> ← Tampermonkey ← <b>التفاصيل Details</b> ← فعّل <b>«السماح بالنصوص البرمجية للمستخدم» Allow User Scripts</b>. (في إصدارات Chrome الأقدم: فعّل <b>«وضع مطوّر البرامج» Developer mode</b> أعلى يمين الصفحة.)')+
+   '<br>بعدها حدّث هذه الصفحة.</div>':'')+
    '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «التحضير الآلي»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
   return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
@@ -86,7 +91,7 @@ function forceToolUpdate(){
     '<p class="m-msg">المتصفح ما زال يشغّل الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_LATEST)+'</b>.</p>'+
     (tried?
       '<p class="m-msg">غالبًا عندك نسخة قديمة من الأداة مثبتة مرتين، أو لم يُضغط زر «تحديث» في صفحة Tampermonkey. الحل النهائي (دقيقة واحدة):</p>'+
-      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «التحضير الآلي» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>':
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «التحضير الآلي» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>'+(/Chrome|Edg\//.test(navigator.userAgent)&&!/Firefox/.test(navigator.userAgent)?'<p class="m-msg">على Chrome/Edge تأكد كمان إن <b>Allow User Scripts</b> (أو Developer mode) مفعّل لإضافة Tampermonkey من صفحة الإضافات.</p>':''):
       '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b> (أو Install).</li><li>ارجع لهنا — النافذة تختفي وحدها بعد التحديث. لو ما اختفت اضغط «تم التحديث».</li></ol>')+
     '<div class="m-actions"><button type="button" class="btn" id="mReload">'+(tried?'تم':'تم التحديث')+'</button><button type="button" class="btn primary" id="mOk">'+(tried?'تثبيت الأداة من جديد':'تحديث الأداة الآن')+'</button></div>';
   ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
