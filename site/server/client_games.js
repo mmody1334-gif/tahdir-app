@@ -43,6 +43,11 @@ var GAMES=[
  {id:'memory',icon:'🧠',name:'لعبة الذاكرة والتوصيل',desc:'اقلب بطاقتين: سؤال وإجابته. الفريق اللي يطابق أكثر يفوز.',grades:[5,10],need:'mcq',min:4},
  {id:'words',icon:'🔤',name:'البحث عن الكلمات',desc:'شبكة حروف فيها مصطلحات الدروس المختارة. حدّد أول حرف وآخر حرف.',grades:[5,9],need:'words',min:5},
  {id:'wheel',icon:'🎡',name:'عجلة الأسئلة',desc:'لفّ العجلة لاختيار طالب أو فريق، ثم يظهر سؤال عشوائي من الدروس.',grades:[5,12],need:'any',min:1},
+ {id:'myth',icon:'🧪',name:'حقيقة أم مغالطة؟',desc:'عبارات علمية بعضها مغالطات شائعة. كل فريق يصوّت: حقيقة أم مغالطة؟ ثم يظهر التعليل العلمي.',grades:[10,12],need:'claims',min:4,teen:1},
+ {id:'seq',icon:'🧬',name:'رتّب العملية',desc:'مراحل عملية حيوية مبعثرة (انقسام، بناء بروتين، نبضة عصبية، PCR…). رتّبوها بأقل أخطاء وأسرع وقت.',grades:[10,12],need:'seq',min:1,teen:1},
+ {id:'case',icon:'🕵️',name:'ملف القضية',desc:'سؤال تحليلي ببيانات. كل دليل تكشفه يقلل النقاط: 400 ثم 300 ثم 200… حلّوا القضية بأقل الأدلة.',grades:[10,12],need:'case',min:2,teen:1},
+ {id:'bet',icon:'🎯',name:'رهان الثقة',desc:'أسئلة متقدمة. كل فريق يختار إجابته ويراهن من 1 إلى 3 حسب ثقته: الصح يكسب الرهان والخطأ يخسره.',grades:[10,12],need:'hard',min:4,teen:1},
+ {id:'links',icon:'🔗',name:'ما العلاقة؟',desc:'مفهومان من الدرس. الفرق تشرح العلاقة بينهما خلال دقيقة، ثم تظهر العلاقة النموذجية للمقارنة.',grades:[10,12],need:'links',min:2,teen:1},
  {id:'cards',icon:'🗂️',name:'بطاقات المراجعة',desc:'سؤال على الوجه والإجابة على الظهر، تشمل أسئلة البيانات والتحليل. مناسبة لمراجعة سريعة قبل الاختبار.',grades:[9,12],best:[10,12],need:'any',min:3}
 ];
 function fits(g){var n=gnum();return n>=g.grades[0]&&n<=g.grades[1];}
@@ -87,12 +92,20 @@ function enough(g){
   var p=pool();
   if(g.need==='mcq')return p.filter(function(x){return x.type==='mcq';}).length>=g.min;
   if(g.need==='words')return wordList().length>=g.min;
+  if(g.need==='claims')return packList('claims').length>=g.min;
+  if(g.need==='links')return packList('links').length>=g.min;
+  if(g.need==='seq')return packSeqs().length>=g.min;
+  if(g.need==='case')return caseItems().length>=g.min;
+  if(g.need==='hard')return hardMcq().length>=g.min;
   return p.length>=g.min;
 }
 function renderHome(){
   stopAll();game=null;
   var h='<div class="g-home"><div class="g-intro"><h2>🎲 ركن الألعاب التعليمية</h2><p>اختر الدروس من القائمة، ثم اللعبة. الأسئلة تُسحب من بنك الأسئلة وواجبات الدروس'+(isEn()?' والمفردات':' والمصطلحات')+'، ومستواها يناسب الصف. اعرضها على السبورة بملء الشاشة.</p></div><div class="g-cards">';
-  GAMES.forEach(function(g){
+  var list=gnum()>=10?GAMES.filter(function(g){return g.teen;}).concat(GAMES.filter(function(g){return !g.teen;})):GAMES.filter(function(g){return !g.teen;});
+  list.forEach(function(g,gi){
+    if(gnum()>=10&&gi===0)h+='<h3 class="g-sec">🎓 ألعاب للمرحلة الثانوية (10–12): تفكير وتحليل ومنافسة</h3>';
+    if(gnum()>=10&&!g.teen&&list[gi-1]&&list[gi-1].teen)h+='<h3 class="g-sec">ألعاب لكل الصفوف</h3>';
     var ok=enough(g),f=fits(g),b=bestFor(g);
     h+='<button type="button" class="g-card'+(ok?'':' off')+'" data-game="'+g.id+'"'+(ok?'':' aria-disabled="true"')+'><span class="g-ic">'+g.icon+'</span><b>'+esc(g.name)+'</b><span class="g-desc">'+esc(g.desc)+'</span>'+
       '<span class="g-tags">'+(b?'<span class="tag good">مقترحة لصفك</span>':f?'<span class="tag">تناسب صفك</span>':'<span class="tag warn">الأنسب للصفوف '+g.grades[0]+'–'+g.grades[1]+'</span>')+(ok?'':'<span class="tag warn">'+(selIds().length?'تحتاج دروسًا أكثر':'اختر الدروس')+'</span>')+'</span></button>';
@@ -112,7 +125,7 @@ function renderScore(showButtons,val){
 function resetScores(){teams.forEach(function(t){t.score=0;});}
 function startGame(g){
   stopAll();game=g.id;track('game_play',g.id);
-  ({live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards})[g.id](g);
+  ({live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
 }
 function timerHtml(id){return '<div class="g-timer" id="'+id+'"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" class="tr-bg"/><circle cx="18" cy="18" r="16" class="tr-fg" id="'+id+'C" stroke-dasharray="100 100"/></svg><span id="'+id+'T"></span></div>';}
 function runTimer(id,secs,onEnd){
@@ -385,6 +398,108 @@ function gCards(g){
     $('fcNo').onclick=function(){again.push(x);i++;draw();};
   };
   $('gmain').innerHTML=stage(g.name,'');bindStage();draw();
+}
+
+// ========== ألعاب المرحلة الثانوية ==========
+function packList(kind){var out=[];selIds().forEach(function(id){var p=(data.pack||{})[id];if(p&&p[kind])p[kind].forEach(function(x){out.push(Object.assign({lesson_id:id},x));});});return out;}
+function packSeqs(){var out=[];selIds().forEach(function(id){var p=(data.pack||{})[id];if(p&&p.sequence)out.push(Object.assign({lesson_id:id},p.sequence));});return out;}
+function caseItems(){return pool().filter(function(x){return x.type!=='mcq'&&(x.table||x.type==='long')&&/AO2|استدلال|تطبيق/.test(x.ao||'')&&String(x.answer||'').split('\n').filter(Boolean).length>=2;});}
+function hardMcq(){var m=mcqPool();var h=m.filter(function(x){return diff(x)>=2;});return h.length>=4?h:m;}
+// لوحة اختيار لكل فريق: يعيد كائنًا بالاختيارات
+function teamPicks(opts,withBet){
+  return '<div class="tp">'+teams.map(function(t,i){return '<div class="tp-row" style="--tc:'+TEAM_COLORS[i]+'"><span class="tp-n">'+esc(t.name)+'</span><span class="tp-o">'+opts.map(function(o,k){return '<button type="button" data-tp="'+i+'" data-v="'+k+'">'+o+'</button>';}).join('')+'</span>'+
+    (withBet?'<span class="tp-bet">رهان: '+[1,2,3].map(function(b){return '<button type="button" data-tb="'+i+'" data-v="'+b+'"'+(b===1?' class="on"':'')+'>×'+b+'</button>';}).join('')+'</span>':'')+'</div>';}).join('')+'</div>';
+}
+function bindPicks(state){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tp]'),function(b){b.onclick=function(){if(state.locked)return;var i=+b.getAttribute('data-tp');state.pick[i]=+b.getAttribute('data-v');Array.prototype.forEach.call(document.querySelectorAll('[data-tp="'+i+'"]'),function(x){x.classList.toggle('on',x===b);});};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tb]'),function(b){b.onclick=function(){if(state.locked)return;var i=+b.getAttribute('data-tb');state.bet[i]=+b.getAttribute('data-v');Array.prototype.forEach.call(document.querySelectorAll('[data-tb="'+i+'"]'),function(x){x.classList.toggle('on',x===b);});};});
+}
+function endScreen(g,fn,msg){var w=teams.slice().sort(function(a,b){return b.score-a.score;})[0];beep('win');$('gBody').innerHTML='<div class="g-win">🏆<h2>'+(msg||('الفائز: '+esc(w.name)))+'</h2><p>'+teams.map(function(t){return esc(t.name)+': '+t.score;}).join(' · ')+'</p><button type="button" class="btn primary" id="again">لعبة جديدة</button></div>';renderScore(false);$('again').onclick=function(){fn(g);};}
+
+// ---- حقيقة أم مغالطة
+function gMyth(g){
+  resetScores();var cl=shuffle(packList('claims')).slice(0,12),i=0;
+  var show=function(){
+    stopAll();if(i>=cl.length)return endScreen(g,gMyth);var c=cl[i],st={pick:{},bet:{},locked:false};
+    $('gBody').innerHTML='<div class="myth"><div class="lv-top"><span class="lv-n">العبارة '+(i+1)+' من '+cl.length+' · '+esc((lessonById[c.lesson_id]||{}).title||'')+'</span>'+timerHtml('myT')+'</div><blockquote class="claim" dir="auto">«'+rich(c.text)+'»</blockquote>'+
+      teamPicks(['✔ حقيقة','✖ مغالطة'])+'<div class="jp-act"><button type="button" class="btn primary" id="myRev">اكشف الإجابة</button></div><div id="myAns"></div></div>';
+    renderScore(false);bindPicks(st);runTimer('myT',gnum()>=11?30:25,function(){});
+    $('myRev').onclick=function(){if(st.locked){i++;show();return;}st.locked=true;stopAll();var right=c.true?0:1;
+      teams.forEach(function(t,k){if(st.pick[k]===right)t.score+=100;});beep('ok');renderScore(false);
+      $('myAns').innerHTML='<div class="jp-ans '+(c.true?'':'myth-x')+'"><b>'+(c.true?'✔ حقيقة':'✖ مغالطة')+'</b><div dir="auto">'+rich(c.why)+'</div></div>';
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tp]'),function(b){if(+b.getAttribute('data-v')===right)b.classList.add('right');});
+      this.textContent=i+1<cl.length?'العبارة التالية ◀':'النتيجة 🏁';};
+  };
+  $('gmain').innerHTML=stage(g.name,'');bindStage();show();
+}
+// ---- رتّب العملية
+function gSeq(g){
+  resetScores();var seqs=shuffle(packSeqs()),si=0,turn=0;
+  var show=function(){
+    stopAll();if(si>=seqs.length)return endScreen(g,gSeq);var sq=seqs[si],order=[],cards=shuffle(sq.steps.map(function(t,k){return {t:t,k:k};})),t0=Date.now();
+    var draw=function(done){
+      $('gBody').innerHTML='<div class="seq"><div class="lv-top"><span class="lv-n">'+esc(sq.title)+' · '+esc((lessonById[sq.lesson_id]||{}).title||'')+'</span><span>دور: <b style="color:'+TEAM_COLORS[turn]+'">'+esc(teams[turn].name)+'</b></span>'+(done?'':timerHtml('sqT'))+'</div>'+
+        '<p class="muted">اضغطوا البطاقات بالترتيب الصحيح (الأولى أولًا). اضغط بطاقة مختارة لإلغائها.</p><div class="seq-pool">'+cards.map(function(c,ci){var pos=order.indexOf(ci);return '<button type="button" class="seq-c'+(pos>=0?' on':'')+(done?(c.k===pos?' ok':' no'):'')+'" data-s="'+ci+'"'+(done?' disabled':'')+' dir="auto">'+(pos>=0?'<span class="seq-n">'+(pos+1)+'</span>':'')+esc(c.t)+'</button>';}).join('')+'</div>'+
+        (done?'<div class="jp-ans"><b>الترتيب الصحيح:</b><ol>'+sq.steps.map(function(t){return '<li dir="auto">'+esc(t)+'</li>';}).join('')+'</ol></div><button type="button" class="btn primary" id="sqNext">'+(si+1<seqs.length?'العملية التالية ◀':'النتيجة 🏁')+'</button>':'<button type="button" class="btn primary" id="sqCheck"'+(order.length===cards.length?'':' disabled')+'>تحقّق</button>')+'</div>';
+      renderScore(false);
+      if(!done){Array.prototype.forEach.call(document.querySelectorAll('[data-s]'),function(b){b.onclick=function(){var ci=+b.getAttribute('data-s'),p=order.indexOf(ci);if(p>=0)order.splice(p,1);else order.push(ci);draw(false);};});
+        $('sqCheck').onclick=function(){stopAll();var right=0;order.forEach(function(ci,p){if(cards[ci].k===p)right++;});var secs=Math.round((Date.now()-t0)/1000),pts=right*50+(right===cards.length?Math.max(0,100-secs):0);
+          teams[turn].score+=pts;beep(right===cards.length?'win':'bad');toast(right+' من '+cards.length+' في مكانها الصحيح · +'+pts);cards=order.map(function(ci){return cards[ci];});order=cards.map(function(_,k){return k;});draw(true);};
+        runTimer('sqT',90+cards.length*10,function(){toast('انتهى الوقت! تحقّقوا الآن');});}
+      else $('sqNext').onclick=function(){si++;turn=(turn+1)%teams.length;show();};
+    };
+    draw(false);
+  };
+  $('gmain').innerHTML=stage(g.name,'');bindStage();show();
+}
+// ---- ملف القضية
+function gCase(g){
+  resetScores();var cs=shuffle(caseItems()).slice(0,6),i=0;
+  var show=function(){
+    stopAll();if(i>=cs.length)return endScreen(g,gCase);var x=cs[i],clues=String(x.answer||'').split('\n').filter(Boolean),shown=0;
+    var pts=function(){return Math.max(100,400-shown*100);};
+    var draw=function(solved){
+      $('gBody').innerHTML='<div class="case"><div class="lv-top"><span class="lv-n">🗂️ القضية '+(i+1)+' من '+cs.length+' · '+esc((lessonById[x.lesson_id]||{}).title||'')+'</span><span class="case-pts">قيمة الحل الآن: <b>'+pts()+'</b></span>'+(solved?'':timerHtml('csT'))+'</div>'+qHtml(x)+
+        '<div class="clues">'+clues.map(function(c,k){return k<shown||solved?'<div class="clue" dir="auto"><b>'+(solved?'نقطة '+(k+1):'دليل '+(k+1))+':</b> '+rich(c)+'</div>':'';}).join('')+'</div>'+
+        (solved?'<button type="button" class="btn primary" id="csNext">'+(i+1<cs.length?'القضية التالية ◀':'النتيجة 🏁')+'</button>':'<div class="jp-act"><button type="button" class="btn" id="csClue"'+(shown>=clues.length-1?' disabled':'')+'>🔍 اكشف دليلًا (−100)</button><button type="button" class="btn primary" id="csSolve">✅ حلّ القضية</button></div><p class="muted small">الفرق تكتب حلها على ورقة. عند «حلّ القضية» تظهر الإجابة كاملة: أعطِ الفريق الصحيح نقاط القضية من الأزرار.</p>')+'</div>';
+      renderScore(solved,pts());
+      if(!solved){$('csClue').onclick=function(){shown++;draw(false);};$('csSolve').onclick=function(){stopAll();draw(true);};runTimer('csT',x.type==='long'?150:90,function(){toast('انتهى وقت القضية');});}
+      else{$('csNext').onclick=function(){i++;show();};bindScoreBtns(pts());}
+    };
+    draw(false);
+  };
+  $('gmain').innerHTML=stage(g.name,'');bindStage();show();
+}
+function bindScoreBtns(v){Array.prototype.forEach.call(document.querySelectorAll('[data-plus]'),function(b){b.onclick=function(){teams[+b.getAttribute('data-plus')].score+=v;beep('ok');renderScore(true,v);bindScoreBtns(v);};});Array.prototype.forEach.call(document.querySelectorAll('[data-minus]'),function(b){b.onclick=function(){teams[+b.getAttribute('data-minus')].score-=v;beep('bad');renderScore(true,v);bindScoreBtns(v);};});}
+// ---- رهان الثقة
+function gBet(g){
+  resetScores();var qs=shuffle(hardMcq()).slice(0,8).map(mixMcq),i=0;
+  var show=function(){
+    stopAll();if(i>=qs.length)return endScreen(g,gBet);var x=qs[i],st={pick:{},bet:{},locked:false};
+    $('gBody').innerHTML='<div class="bet"><div class="lv-top"><span class="lv-n">السؤال '+(i+1)+' من '+qs.length+'</span>'+timerHtml('btT')+'</div>'+qHtml(x)+
+      '<div class="lv-opts">'+x.choices.map(function(c,k){return '<div class="lv-opt o'+k+'" dir="auto"><span class="sh">'+SHAPES[k]+'</span>'+rich(c)+'</div>';}).join('')+'</div>'+
+      teamPicks(SHAPES.slice(0,x.choices.length),true)+'<div class="jp-act"><button type="button" class="btn primary" id="btRev">اكشف وحاسب</button></div></div>';
+    renderScore(false);bindPicks(st);runTimer('btT',gnum()>=11?60:45,function(){});
+    $('btRev').onclick=function(){if(st.locked){i++;show();return;}st.locked=true;stopAll();
+      teams.forEach(function(t,k){if(st.pick[k]==null)return;var b=(st.bet[k]||1)*100;t.score+=st.pick[k]===x.correct?b:-b;});
+      document.querySelectorAll('.lv-opt')[x.correct].classList.add('right');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tp]'),function(b){if(+b.getAttribute('data-v')===x.correct)b.classList.add('right');});
+      beep('ok');renderScore(false);this.textContent=i+1<qs.length?'السؤال التالي ◀':'النتيجة 🏁';};
+  };
+  $('gmain').innerHTML=stage(g.name,'');bindStage();show();
+}
+// ---- ما العلاقة؟
+function gLinks(g){
+  resetScores();var ls=shuffle(packList('links')).slice(0,8),i=0;
+  var show=function(){
+    stopAll();if(i>=ls.length)return endScreen(g,gLinks);var x=ls[i];
+    $('gBody').innerHTML='<div class="links-g"><div class="lv-top"><span class="lv-n">الثنائية '+(i+1)+' من '+ls.length+' · '+esc((lessonById[x.lesson_id]||{}).title||'')+'</span>'+timerHtml('lkT')+'</div>'+
+      '<div class="lk-pair"><div class="lk-a" dir="auto">'+esc(x.a)+'</div><div class="lk-mid">⇄</div><div class="lk-a b" dir="auto">'+esc(x.b)+'</div></div><p class="g-hint">ما العلاقة بينهما؟ كل فريق يكتب العلاقة في جملة أو جملتين.</p>'+
+      '<div class="jp-act"><button type="button" class="btn primary" id="lkShow">إظهار العلاقة النموذجية</button></div><div id="lkAns"></div></div>';
+    renderScore(false);runTimer('lkT',60,function(){beep('bad');});
+    $('lkShow').onclick=function(){stopAll();$('lkAns').innerHTML='<div class="jp-ans" dir="auto">'+rich(x.answer)+'</div><p class="muted small">قارنوا إجاباتكم: +100 للإجابة الكاملة (من الأزرار أعلاه).</p><button type="button" class="btn primary" id="lkNext">'+(i+1<ls.length?'التالي ◀':'النتيجة 🏁')+'</button>';renderScore(true,100);bindScoreBtns(100);this.disabled=true;$('lkNext').onclick=function(){i++;show();};};
+  };
+  $('gmain').innerHTML=stage(g.name,'');bindStage();show();
 }
 
 // ---------- البداية ----------

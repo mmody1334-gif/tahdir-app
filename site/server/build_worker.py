@@ -302,6 +302,32 @@ button.lv-opt{cursor:pointer}
 .fc-act{display:flex;gap:10px;justify-content:center}
 @media (max-width:900px){.mil,.wh,.ws{grid-template-columns:1fr}.lv-opts{grid-template-columns:1fr}.jp-t{min-height:56px}}
 
+/* ---------- teen games ---------- */
+.g-sec{margin:6px 0 -4px;font-size:1rem;color:#3b1d8f;grid-column:1/-1}
+.claim{font-size:clamp(1.2rem,2.4vw,1.8rem);font-weight:700;line-height:1.8;background:var(--bg);border-inline-start:6px solid #3b1d8f;border-radius:12px;margin:10px 0 14px;padding:16px 20px}
+.tp{display:grid;gap:8px;margin:10px 0}
+.tp-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:2px solid var(--tc);border-radius:14px;padding:8px 12px;background:color-mix(in srgb,var(--tc) 8%,var(--paper))}
+.tp-n{font-weight:700;min-width:110px;color:var(--tc)}
+.tp-o,.tp-bet{display:flex;gap:6px;flex-wrap:wrap}
+.tp-bet{margin-inline-start:auto;align-items:center;font-size:.85rem;color:var(--mute)}
+.tp button{font:inherit;font-weight:700;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:6px 14px;cursor:pointer;min-width:52px}
+.tp button.on{background:var(--tc);border-color:var(--tc);color:#fff}
+.tp button.right{box-shadow:0 0 0 3px #26b04a}
+.jp-ans.myth-x{background:#fde8e6;color:#7a1d12}
+.seq-pool{display:grid;gap:8px;margin:10px 0}
+.seq-c{display:flex;align-items:center;gap:10px;font:inherit;font-size:clamp(1rem,1.7vw,1.2rem);text-align:start;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:12px;padding:10px 14px;cursor:pointer;line-height:1.6}
+.seq-c.on{border-color:#3b1d8f;background:#efe9ff}
+.seq-c.ok{border-color:#26890c;background:#e1f7e7}
+.seq-c.no{border-color:#e21b3c;background:#fde8e6}
+.seq-n{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#3b1d8f;color:#fff;font-weight:700}
+.case-pts{font-size:1.1rem}.case-pts b{color:#b07800;font-size:1.4rem}
+.clues{display:grid;gap:6px;margin:8px 0}
+.clue{background:#fff8e1;border-inline-start:5px solid #d89e00;border-radius:10px;padding:8px 12px;color:#4a3b00}
+.lk-pair{display:flex;align-items:stretch;justify-content:center;gap:14px;flex-wrap:wrap;margin:24px 0 10px}
+.lk-a{background:#3b1d8f;color:#fff;border-radius:18px;padding:22px 26px;font-size:clamp(1.3rem,2.6vw,2rem);font-weight:700;min-width:220px;text-align:center;display:grid;place-items:center}
+.lk-a.b{background:#0c6b56}
+.lk-mid{font-size:2.4rem;display:grid;place-items:center;color:var(--mute)}
+
 /* ---------- play (students' phones) ---------- */
 .pl{min-height:100vh;min-height:100dvh;background:linear-gradient(160deg,#2b1166,#5b2bb8 60%,#0c7a63);padding:14px;display:flex;flex-direction:column;gap:12px}
 .pl-card{background:#fff;color:#10261f;border-radius:20px;padding:20px;max-width:460px;width:100%;margin:auto;display:grid;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
@@ -531,6 +557,7 @@ src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separat
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
 src = src.replace('__ICONS__', rd('icons.json'))
+src = src.replace('__GPACK__', json.dumps(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))
 src = src.replace('__PRIVACY__', json.dumps(rd('privacy.html'), ensure_ascii=False))

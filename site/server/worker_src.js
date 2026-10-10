@@ -7,6 +7,7 @@ const ICONS = __ICONS__;
 const APK = __APK__;
 const PRIVACY = __PRIVACY__;
 const QBANK = __QBANK__;
+const GPACK = __GPACK__;
 const BUILD = __BUILD__;
 LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 'العلوم' : 'الأحياء'; if (!l.term) l.term = 1; });
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
@@ -401,7 +402,8 @@ async function gamesData(env, me, key) {
   ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
     const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;
     items.push({ qid: 900000 + (k++), lesson_id: l.id, type: 'mcq', stem: String(l['hw_q' + n]).replace(/^Choose the correct answer:\s*/i, ''), choices: c.slice(0, 4), correct: 0, marks: 1, ao: '', difficulty: 'منخفضة', src: 'hw' }); }); });
-  return { lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, concepts: l.concepts || '', subject: l.subject, grade: l.grade })), items };
+  const pack = {}; ls.forEach(l => { if (GPACK[l.id]) pack[l.id] = GPACK[l.id]; });
+  return { lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, concepts: l.concepts || '', subject: l.subject, grade: l.grade })), items, pack };
 }
 
 // ---------- router ----------
