@@ -4,3 +4,4 @@ tests/*.png
 tests/dev.pid
 tests/dev.log
 tests/*.doc
+/*.png
