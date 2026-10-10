@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.0.0
+// @version      3.1.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -20,7 +20,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '3.0.0';
+  const VERSION = '3.1.0';
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -68,10 +68,24 @@
 
   // ================= على موقع التحضير الآلي =================
   if (location.hostname === 'tahdir.hudhaifa-bio.workers.dev') {
-    document.documentElement.setAttribute('data-tahdir-tool', VERSION);
+    // لو عند المعلم نسخة قديمة مكررة من الأداة، الإصدار الأحدث هو اللي يظهر للموقع دائمًا
+    const de = document.documentElement;
+    const vcmp = (a, b) => { a = String(a || '').split('.'); b = String(b || '').split('.'); for (let i = 0; i < 3; i++) { const d = (parseInt(a[i], 10) || 0) - (parseInt(b[i], 10) || 0); if (d) return d; } return 0; };
+    const claim = () => {
+      const cur = de.getAttribute('data-tahdir-tool');
+      if (cur && vcmp(cur, VERSION) > 0) return; // نسخة أحدث موجودة: هي المسؤولة
+      if (cur && cur !== VERSION) de.setAttribute('data-tahdir-tool-old', cur);
+      if (cur !== VERSION) de.setAttribute('data-tahdir-tool', VERSION);
+    };
+    claim();
+    new MutationObserver(claim).observe(de, { attributes: true, attributeFilter: ['data-tahdir-tool'] });
     function onSend(kind, e) {
+      if (de.getAttribute('data-tahdir-tool') !== VERSION) return; // نسخة أحدث ستتولى الإرسال
       let data;
       try { data = JSON.parse(String(e.detail)); } catch (err) { return; }
+      // نسختان بنفس الإصدار: واحدة فقط تنفّذ الإرسال
+      const nonce = String(data && data.nonce || '');
+      if (nonce) { if (de.getAttribute('data-tahdir-last') === nonce) return; de.setAttribute('data-tahdir-last', nonce); }
       if (kind === 'hw' && (!validPayload(data, 'homework') || !Array.isArray(data.items) || !data.items.length)) return;
       if (kind === 'prep' && (!data || data.source !== 'tahdir-al-aali' || data.kind === 'homework')) return;
       GM_setValue(kind === 'prep' ? PREP_KEY : PENDING_KEY, { data: data, ts: Date.now(), routed: false });
@@ -79,6 +93,9 @@
       // نفتح نور مباشرة على صفحة هذا الصف (أو الرئيسية أول مرة لنتعرف على أرقام الصفوف)
       GM_openInTab(routeUrl(kind, data.grade || '', data.subject || ''), { active: true });
     }
+    // أسماء أحداث جديدة: النسخ القديمة (حتى 3.0) لا تسمعها فلا تفتح نور مرتين
+    document.addEventListener('tahdir-v3-send-hw', e => onSend('hw', e));
+    document.addEventListener('tahdir-v3-send-prep', e => onSend('prep', e));
     document.addEventListener('tahdir-send-hw', e => onSend('hw', e));
     document.addEventListener('tahdir-send-prep', e => onSend('prep', e));
     return;

@@ -171,7 +171,9 @@ function sendToNour(kind,json,okMsg,minVer,fallback){
   var done=false,ev='tahdir-'+kind+'-ack';
   function onAck(){done=true;document.removeEventListener(ev,onAck);toast(okMsg);}
   document.addEventListener(ev,onAck);
-  document.dispatchEvent(new CustomEvent('tahdir-send-'+kind,{detail:json}));
+  try{var o=JSON.parse(json);o.nonce=Date.now().toString(36)+Math.random().toString(36).slice(2,8);json=JSON.stringify(o);}catch(e){}
+  // في المتصفح نستخدم أسماء أحداث لا تسمعها النسخ القديمة المكررة من الأداة
+  document.dispatchEvent(new CustomEvent((IN_APP?'tahdir-send-':'tahdir-v3-send-')+kind,{detail:json}));
   setTimeout(function(){if(!done){document.removeEventListener(ev,onAck);toast('لم تستجب الأداة. أعد تحميل الصفحة وحاول مرة أخرى');}},1500);
   return true;
 }

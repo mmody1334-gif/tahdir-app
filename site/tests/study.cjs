@@ -47,11 +47,11 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // quiz list must not show remedial/summary
   await p.goto(B + '/quiz'); await p.waitForSelector('#savedList li'); await p.waitForTimeout(500); console.log('quiz saved list:', await p.$$eval('#savedList li', e => e.map(x => x.textContent.slice(0, 40))));
   // forced update: pretend an old tool is installed
-  await p.goto(B + '/app'); await p.evaluate(() => document.documentElement.setAttribute('data-tahdir-tool', '2.9.0')); await p.waitForTimeout(2300);
+  await p.goto(B + '/app'); await p.evaluate(() => document.documentElement.setAttribute('data-tahdir-tool', '2.9.0')); await p.waitForTimeout(3000);
   console.log('force modal:', await p.isVisible('#modal'), (await p.textContent('#modalBox')).slice(0, 60));
   await p.mouse.click(20, 880); await p.keyboard.press('Escape'); console.log('still locked:', await p.isVisible('#modal'));
   await p.screenshot({ path: OUT + 'n_force.png' });
-  await p.goto(B + '/app'); await p.evaluate(() => document.documentElement.setAttribute('data-tahdir-tool', '3.0.0')); await p.waitForTimeout(2300); console.log('no modal for latest:', !(await p.isVisible('#modal')));
+  await p.goto(B + '/app'); await p.evaluate(() => document.documentElement.setAttribute('data-tahdir-tool', '9.9.9')); await p.waitForTimeout(3000); console.log('no modal for latest:', !(await p.isVisible('#modal')));
   // settings link from another page
   await p.goto(B + '/games#'); await p.click('a[href="/app#settings"]'); await p.waitForURL(B + '/app'); await p.waitForTimeout(600); console.log('settings opened:', (await p.textContent('#panel')).includes('تم'));
   // mobile menu

@@ -70,17 +70,38 @@ function toolDialog(reason){
   return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
 // تحديث إجباري: لو الأداة مثبتة بإصدار أقدم من المنشور على الموقع، لا يكمل المعلم حتى يحدّثها
+var UPD_KEY='tahdir_tool_upd';
+function updState(){try{var o=JSON.parse(localStorage.getItem(UPD_KEY)||'null');return o&&o.to===TOOL_LATEST?o:{to:TOOL_LATEST,n:0};}catch(e){return {to:TOOL_LATEST,n:0};}}
+function updSave(o){try{localStorage.setItem(UPD_KEY,JSON.stringify(o));}catch(e){}}
 function forceToolUpdate(){
   if(IN_APP)return;
-  var v=toolVersion();if(!v||toolOk())return;
-  var ov=$('modal'),box=$('modalBox');if(!ov||!box)return;
-  box.innerHTML='<h3 id="mTitle">⚠ حدّث «أداة نور» قبل المتابعة</h3>'+
-    '<p class="m-msg">الأداة المثبتة عندك إصدار <b>'+esc(v)+'</b>، والإصدار الجديد <b>'+esc(TOOL_LATEST)+'</b> فيه إصلاحات ضرورية للإرسال إلى نور. التحديث يأخذ ثوانٍ:</p>'+
-    '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b>.</li><li>ارجع لهنا واضغط <b>«تم التحديث»</b>.</li></ol>'+
-    '<div class="m-actions"><button type="button" class="btn" id="mReload">تم التحديث</button><button type="button" class="btn primary" id="mOk">تحديث الأداة الآن</button></div>';
+  var v=toolVersion(),ov=$('modal'),box=$('modalBox');if(!ov||!box)return;
+  if(!v||toolOk()){ // محدّثة: نقفل النافذة لو كانت مفتوحة، وننبّه مرة لو فيه نسخة قديمة مكررة
+    if(ov.classList.contains('locked')){ov.classList.remove('locked');ov.hidden=true;box.innerHTML='';toast('تم تحديث أداة نور ✓');}
+    if(v)updSave({to:TOOL_LATEST,n:0,done:1});
+    return;
+  }
+  var stt=updState(),tried=stt.n>0;
+  box.innerHTML='<h3 id="mTitle">'+(tried?'⚠ التحديث لم يكتمل بعد':'⚠ حدّث «أداة نور» قبل المتابعة')+'</h3>'+
+    '<p class="m-msg">المتصفح ما زال يشغّل الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_LATEST)+'</b>.</p>'+
+    (tried?
+      '<p class="m-msg">غالبًا عندك نسخة قديمة من الأداة مثبتة مرتين، أو لم يُضغط زر «تحديث» في صفحة Tampermonkey. الحل النهائي (دقيقة واحدة):</p>'+
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «التحضير الآلي» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>':
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b> (أو Install).</li><li>ارجع لهنا — النافذة تختفي وحدها بعد التحديث. لو ما اختفت اضغط «تم التحديث».</li></ol>')+
+    '<div class="m-actions"><button type="button" class="btn" id="mReload">'+(tried?'تم':'تم التحديث')+'</button><button type="button" class="btn primary" id="mOk">'+(tried?'تثبيت الأداة من جديد':'تحديث الأداة الآن')+'</button></div>';
   ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
-  $('mOk').onclick=function(){window.open(TOOL_URL+'?v='+encodeURIComponent(TOOL_LATEST),'_blank');$('mReload').classList.add('primary');};
+  $('mOk').onclick=function(){var o=updState();o.n=(o.n||0)+1;updSave(o);window.open(TOOL_URL,'_blank');$('mReload').classList.add('primary');};
   $('mReload').onclick=function(){location.reload();};
+}
+function watchTool(){
+  if(IN_APP)return;
+  // الأداة قد تُحقن متأخرة (Firefox) أو تتحدث والصفحة مفتوحة: نعيد الفحص كلما تغيّر إصدارها أو رجع المعلم للصفحة
+  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(forceToolUpdate,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool']});}catch(e){}
+  document.addEventListener('visibilitychange',function(){if(document.hidden)return;var ov=$('modal');
+    // رجع من صفحة Tampermonkey بعد ضغط التحديث: نعيد تحميل الصفحة لتعمل النسخة الجديدة
+    if(ov&&ov.classList.contains('locked')&&updState().n>0){setTimeout(function(){location.reload();},700);return;}
+    setTimeout(forceToolUpdate,600);});
+  setTimeout(forceToolUpdate,2500);
 }
 // ---------- شريط التنقل: الأساسي ظاهر والباقي في قائمة ----------
 function initNav(me){
@@ -100,5 +121,5 @@ function initNav(me){
   }
   if(me&&me.role==='admin')Array.prototype.forEach.call(document.querySelectorAll('.admin-only'),function(x){x.hidden=false;});
   if(me&&$('who'))$('who').textContent=me.name;
-  setTimeout(forceToolUpdate,1800);
+  watchTool();
 }
