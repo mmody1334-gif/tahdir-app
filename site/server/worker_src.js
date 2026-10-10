@@ -8,6 +8,7 @@ const APK = __APK__;
 const PRIVACY = __PRIVACY__;
 const QBANK = __QBANK__;
 const GPACK = __GPACK__;
+const STUDY = __STUDY__;
 const BUILD = __BUILD__;
 LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 'العلوم' : 'الأحياء'; if (!l.term) l.term = 1; });
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
@@ -258,7 +259,7 @@ async function adminReport(env, days) {
       COUNT(DISTINCT CASE WHEN type IN ${PREP_T} THEN lesson_id END) prep_lessons,
       SUM(type IN ${HW_T}) hws,
       COUNT(DISTINCT CASE WHEN type IN ${HW_T} THEN lesson_id END) hw_lessons,
-      SUM(type='quiz_make') quizzes, SUM(type='review_make') reviews, SUM(type IN ('quiz_print','quiz_word')) prints, SUM(type IN ('game_play','game_live')) games,
+      SUM(type='quiz_make') quizzes, SUM(type='review_make') reviews, SUM(type IN ('quiz_print','quiz_word')) prints, SUM(type IN ('game_play','game_live')) games, SUM(type IN ('remedial_make','summary_make')) study,
       COUNT(DISTINCT CASE WHEN type='view' THEN lesson_id END) views,
       MAX(CASE WHEN type='login' THEN at END) last_login, MAX(at) last_active
     FROM events WHERE at > ? GROUP BY user_id`).bind(since).all()).results || [];
@@ -268,7 +269,7 @@ async function adminReport(env, days) {
   const daily = (await DB.prepare(`SELECT CAST((at + 14400000) / 86400000 AS INTEGER) d, COUNT(DISTINCT user_id) users,
       SUM(type IN ${PREP_T}) preps, SUM(type IN ${HW_T}) hws, SUM(type IN ('quiz_make','review_make')) quizzes
     FROM events WHERE at > ? GROUP BY d ORDER BY d`).bind(Math.max(since, now() - 30 * 86400000)).all()).results || [];
-  const A = Object.fromEntries(agg.map(r => [r.user_id, r])), z = { games: 0, logins: 0, preps: 0, prep_lessons: 0, hws: 0, hw_lessons: 0, quizzes: 0, reviews: 0, prints: 0, views: 0, last_login: null, last_active: null };
+  const A = Object.fromEntries(agg.map(r => [r.user_id, r])), z = { games: 0, study: 0, logins: 0, preps: 0, prep_lessons: 0, hws: 0, hw_lessons: 0, quizzes: 0, reviews: 0, prints: 0, views: 0, last_login: null, last_active: null };
   const rows = users.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, active: u.active, scope: u.scope, ...z, ...(A[u.id] || {}) }));
   const sum = k => rows.reduce((t, r) => t + (+r[k] || 0), 0);
   return { days, rows, by_grade: byGrade, daily,
@@ -452,6 +453,16 @@ export default {
       if (p === '/api/me') return json({ name: me.name, username: me.username, role: me.role });
       if (p === '/quiz') return html('quiz');
       if (p === '/games') return html('games');
+      if (p === '/remedial') return html('remedial');
+      if (p === '/summaries') return html('summaries');
+      if (p === '/api/study') {
+        const key = url.searchParams.get('key') || '', sc = scopeOf(me);
+        if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
+        const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
+        const study = {}, units = {};
+        ls.forEach(l => { if (STUDY.lessons[l.id]) study[l.id] = STUDY.lessons[l.id]; const u = STUDY.units[key + '|' + l.unit]; if (u) units[l.unit] = u; });
+        return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, outcomes: l.outcomes || '', concepts: l.concepts || '' })), study, units });
+      }
       if (p === '/api/games/data') { const d = await gamesData(env, me, url.searchParams.get('key') || ''); return d.error ? json(d, 403) : json(d); }
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
       if (p === '/api/lessons') return json({ lessons: await lessonsFor(env, me) });
@@ -473,8 +484,10 @@ export default {
         return json({ ok: true, url: '/x/' + id });
       }
       if (p === '/api/quizzes' && m === 'GET') {
-        const r = (await env.DB.prepare('SELECT id,title,grade,subject,kind,created_at,updated_at FROM quizzes WHERE user_id = ? ORDER BY updated_at DESC LIMIT 200').bind(me.id).all()).results || [];
-        return json({ quizzes: r });
+        const kinds = (url.searchParams.get('kind') || '').split(',').filter(Boolean);
+        let r = (await env.DB.prepare('SELECT id,title,grade,subject,kind,created_at,updated_at FROM quizzes WHERE user_id = ? ORDER BY updated_at DESC LIMIT 400').bind(me.id).all()).results || [];
+        if (kinds.length) r = r.filter(q => kinds.includes(q.kind || 'quiz'));
+        return json({ quizzes: r.slice(0, 200) });
       }
       if (p === '/api/quizzes' && m === 'POST') {
         const b = await body(req), t = now();
@@ -485,7 +498,7 @@ export default {
           if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id });
         }
         const n = await env.DB.prepare('SELECT COUNT(*) n FROM quizzes WHERE user_id = ?').bind(me.id).first();
-        if (n && n.n >= 200) return json({ error: 'وصلت إلى 200 اختبار محفوظ. احذف بعضها أولًا.' }, 400);
+        if (n && n.n >= 400) return json({ error: 'وصلت إلى الحد الأقصى للملفات المحفوظة. احذف بعضها أولًا.' }, 400);
         const r = await env.DB.prepare('INSERT INTO quizzes(user_id,title,grade,subject,kind,data,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id').bind(me.id, title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, t).first();
         return json({ ok: true, id: r && r.id });
       }
@@ -498,7 +511,7 @@ export default {
       }
       if (p === '/api/event' && m === 'POST') {
         const b = await body(req);
-        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'game_play', 'game_live', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save'].includes(b.type) ? b.type : null;
+        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'game_play', 'game_live', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word'].includes(b.type) ? b.type : null;
         if (!type) return json({ error: 'bad' }, 400);
         let l = LESSONS.find(x => x.id === +b.lesson_id);
         if (!l && +b.lesson_id >= CUSTOM_BASE) { const r = await env.DB.prepare('SELECT data FROM custom_lessons WHERE id = ?').bind(+b.lesson_id).first(); if (r) { try { l = { ...JSON.parse(r.data), id: +b.lesson_id }; } catch {} } }

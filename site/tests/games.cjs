@@ -6,7 +6,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   const [ac, p] = await mk();
   await p.goto(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.fill('#password2', 'Bio@2026x'); await p.click('#setupForm button[type=submit]');
   await p.waitForURL(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForURL(B + '/admin');
-  await p.goto(B + '/app'); await p.waitForSelector('a.games-link'); await p.click('a.games-link'); await p.waitForURL(B + '/games');
+  await p.goto(B + '/app'); await p.waitForSelector('#menuBtn'); await p.click('#menuBtn'); await p.click('#menuList a[href="/games"]'); await p.waitForURL(B + '/games');
   await p.waitForSelector('#courseSel'); await p.selectOption('#courseSel', 'الأحياء|الحادي عشر'); await p.waitForSelector('[data-unit]');
   await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('sel info:', await p.textContent('#selInfo'));

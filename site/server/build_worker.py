@@ -18,6 +18,8 @@ for l in lessons:
     l.setdefault('ai_filled', [])
 rd = lambda f: open(os.path.join(HERE, f), encoding='utf-8').read()
 common = rd('common.js')
+TOOL_VER = re.search(r'@version\s+(\S+)', rd('tahdir-noor.user.js')).group(1)
+common = common.replace('__TOOLVER__', TOOL_VER)
 
 extra_css = '''
 .whobar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -432,6 +434,28 @@ button.lv-opt{cursor:pointer}
 }
 @media (max-width:900px){.qlayout{grid-template-columns:1fr}.qside{position:static;max-height:none}.paper{padding:18px 14px;font-size:15px}}
 '''
+extra_css += '''
+/* ---------- header nav: essentials + menu ---------- */
+.whobar .btn[aria-current]{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.7)}
+.whobar a.btn{text-decoration:none}
+.navmenu{position:relative}
+.menu-btn{background:#fff;color:#07493b;border-color:#fff;font-weight:700}
+.menu-btn:hover{background:#eafff6}
+.menu-list{position:fixed;z-index:80;min-width:250px;background:var(--paper,#fff);color:var(--ink,#10261f);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.22);padding:6px;display:grid;gap:2px}
+.menu-list[hidden]{display:none}
+.menu-list a,.menu-list button{display:flex;align-items:center;gap:10px;width:100%;text-align:start;font:inherit;font-size:.92rem;font-weight:600;color:inherit;text-decoration:none;background:none;border:0;border-radius:10px;padding:9px 12px;cursor:pointer}
+.menu-list a:hover,.menu-list button:hover,.menu-list a[aria-current]{background:var(--main-l,#e6f4ef);color:var(--main-d,#07493b)}
+.menu-list .mi{width:22px;text-align:center}
+.menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.menu-list #logoutBtn{color:var(--danger,#b23a2b)}
+.modal.locked{backdrop-filter:blur(3px)}
+/* ---------- study pages ---------- */
+.edit-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fff8e6);border-radius:10px;padding:6px 12px;margin-bottom:8px}
+.study-paper{outline:none;font-size:15px}
+.study-paper:focus{box-shadow:0 0 0 3px #b9d8cf,0 2px 14px rgba(0,0,0,.18)}
+.study-paper .cb{user-select:none;font-size:1.1em}
+@media (max-width:700px){.menu-list{top:auto!important;left:0!important;bottom:0;inset-inline:0;border-radius:18px 18px 0 0;min-width:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}}
+'''
 CSS = base_css + extra_css
 
 FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">'
@@ -519,27 +543,51 @@ TOP = lambda extra: f'''<header class="top">{HELIX}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
+MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات')]
+def NAV(active, extra=''):
+    cur = lambda k: ' aria-current="page"' if k == active else ''
+    h = '<span class="who" id="who"></span>'
+    h += f'<a class="btn ghost small" href="/app"{cur("app")}>التحضير</a>'
+    h += '<button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button>' if active == 'app' else '<a class="btn ghost small" href="/app#settings">القيم الثابتة</a>'
+    h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
+    h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
+    for k, href, ic, t in MENU_ITEMS:
+        h += f'<a role="menuitem" href="{href}"{cur(k)}><span class="mi">{ic}</span>{t}</a>'
+    h += f'<a role="menuitem" class="admin-only" id="adminLink" href="/admin"{cur("admin")} hidden><span class="mi">⚙</span>لوحة التحكم</a>'
+    h += extra
+    h += '<hr><button type="button" role="menuitem" id="logoutBtn"><span class="mi">⎋</span>تسجيل الخروج</button></div></div>'
+    return h
+
 APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span> درسًا</span><span class="stat"><span id="statFilled">0</span> بتحضير جاهز</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn small quiz-link" href="/quiz">📝 التقويم والاختبارات</a><a class="btn small games-link" href="/games">🎲 الألعاب</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small pulse" id="toolBtn">⬇ ثبّت أداة نور</button><button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + f'''
+  NAV('app')) + f'''
 <div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «التحضير الآلي» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
 <div class="wrap layout"><aside class="tree" id="tree" aria-label="الصفوف والوحدات والدروس"></aside>
 <main class="panel" id="panel"><div class="welcome">{CELL}<h2>جارٍ تحميل الدروس…</h2></div></main></div>
 <p class="foot">التحضير الآلي لمادتي الأحياء والعلوم، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
 
 QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبارات القصيرة ومراجعات الوحدات</span><span class="stat">وفق وثيقة تقويم تعلم الطلبة</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">التحضير والواجب</a><a class="btn small games-link" href="/games">🎲 الألعاب</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
+  NAV('quiz')) + '''
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الاختبار"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
 
 GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب التعليمية</span><span class="stat">لكل درس ولكل صف</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">التحضير والواجب</a><a class="btn ghost small" href="/quiz">التقويم</a><a class="btn ghost small" id="adminLink" href="/admin" hidden>لوحة التحكم</a><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
+  NAV('games')) + '''
 <div class="wrap qlayout"><aside class="qside" id="gside" aria-label="اختيار الدروس"></aside>
 <main class="panel" id="gmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>'''
+REMEDIAL = TOP('<div class="stats"><span class="stat">الخطط والأنشطة العلاجية</span><span class="stat">للطلاب دون المستوى</span></div>').replace('%BTNS%', NAV('remedial')) + '''
+<div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الخطة"></aside>
+<main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<div id="printArea"></div>'''
+SUMMARIES = TOP('<div class="stats"><span class="stat">ملخصات الدروس والوحدات</span><span class="stat">وفق مخرجات التعلم</span></div>').replace('%BTNS%', NAV('summaries')) + '''
+<div class="wrap qlayout"><aside class="qside" id="qside" aria-label="اختيار الملخص"></aside>
+<main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<div id="printArea"></div>'''
 PLAY = '<main class="pl" id="pl"></main>'
 
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
-  '<span class="who" id="who"></span><a class="btn ghost small" href="/app">صفحة الدروس</a><a class="btn ghost small" href="/quiz">التقويم</a><button type="button" class="btn ghost small" id="refreshBtn">تحديث</button><button type="button" class="btn ghost small" id="logoutBtn">خروج</button>') + '''
+  NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
 
 PAGES = {
@@ -551,12 +599,15 @@ PAGES = {
   'quiz': page('التقويم · التحضير الآلي', QUIZ, rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · التحضير الآلي', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
   'play': page('تحدي التحضير الآلي', PLAY, rd('client_play.js')),
+  'remedial': page('الخطط العلاجية · التحضير الآلي', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
+  'summaries': page('ملخصات الدروس · التحضير الآلي', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
 }
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
 src = src.replace('__ICONS__', rd('icons.json'))
+src = src.replace('__STUDY__', json.dumps(json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__GPACK__', json.dumps(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))

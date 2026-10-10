@@ -1,0 +1,307 @@
+(function(){
+'use strict';
+// صفحتا «الخطط العلاجية» و«ملخصات الدروس» — نفس الكود، ويحدد PAGE_KIND أيهما
+var KIND=window.PAGE_KIND||'remedial',REM=KIND==='remedial';
+var GRADE_NUM={'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
+var DEF_HDR={dir:'المديرية العامة للتربية والتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول',teacher:''};
+var WEAK_AR=['الرسم العلمي','المفاهيم العلمية','مهارات حسابية','مهارات القراءة والكتابة الأساسية','كتابة الرموز والصيغ','تحليل الأشكال البيانية والمخططات العلمية','تحليل وتفسير الجداول العلمية','تطبيق القوانين','التفسير العلمي','مهارات التطبيق العملي'];
+var WEAK_EN=['Reading comprehension','Vocabulary','Grammar','Writing','Listening','Speaking','Spelling & punctuation'];
+var T_ACTS=[['إعادة شرح المفاهيم الأساسية بأسلوب مبسط وأمثلة من الحياة',1],['أوراق عمل علاجية متدرجة من السهل إلى الأصعب',1],['التعلم بالأقران (طالب متمكن مع طالب متعثر)',1],['تعليم فردي قصير داخل الحصة',0],['استخدام الوسائل والنماذج والصور والمخططات',1],['تقسيم المهمة إلى خطوات قصيرة ومتابعة كل خطوة',0],['تكليفات منزلية قصيرة ومتابعتها وتصحيحها',0],['اختبارات تشخيصية قصيرة لقياس التقدم',0],['التعزيز والتحفيز المستمر',1],['حصص تقوية / مراجعة',0]];
+var S_ACTS=[['التواصل مع ولي الأمر وإطلاعه على الخطة',1],['متابعة الأخصائي الاجتماعي / النفسي',0],['متابعة المعلم الأول للمادة',1],['توفير حصص تقوية ضمن جدول المدرسة',0],['تكريم الطلاب المتحسنين',0]];
+var me=null,courses=[],course=null,data=null,byId={},sel={},sumMode='lesson',unitSel='',doc=null,dirty=false,part='',hdr=null,rows=5;
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function track(type,detail,title){try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,grade:course&&course.grade,detail:detail||'',title:title||''})});}catch(e){}}
+function gnum(g){return GRADE_NUM[g]||99;}
+function isEnC(c){return /انجليز|إنجليز|English/i.test((c||course||{}).subject||'');}
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function hdrKey(){return 'tahdir_quiz_hdr_'+(me?me.username:'');}
+function unitsList(){
+  var m={},order=[];data.lessons.forEach(function(l){var k=String(l.unit);if(!m[k]){m[k]={unit:k,name:l.unit_name||'',lessons:[]};order.push(k);}m[k].lessons.push(l);});
+  return order.sort(function(a,b){return parseInt(a,10)-parseInt(b,10);}).map(function(k){return m[k];});
+}
+// ---------- مكوّنات الورقة (أنماط مضمّنة لتعمل في الطباعة وWord) ----------
+var TB='border-collapse:collapse;width:100%;margin:4px 0 10px',TD='border:1px solid #000;padding:4px 7px;vertical-align:top',TH=TD+';background:#e6e6e6;font-weight:bold;text-align:center';
+function cb(on){return '<span class="cb" contenteditable="false" style="font-family:\'Segoe UI Symbol\',\'DejaVu Sans\',sans-serif;cursor:pointer">'+(on?'☑':'☐')+'</span>';}
+function H(t,en){return '<h3 style="font-size:1.05em;margin:12px 0 4px;padding:2px 8px;background:#eef3f1;border-inline-start:4px solid #0e7c66">'+t+'</h3>';}
+function sheetHead(title,en,student){
+  var h=hdr;
+  var top='<table style="width:100%;border-collapse:collapse" dir="rtl"><tr><td style="width:32%;vertical-align:top;font-size:.8em;line-height:1.5" dir="rtl">سلطنة عُمان<br>وزارة التعليم<br>'+esc(h.dir)+'<br>'+esc(h.school)+'</td>'+
+    '<td style="width:68%;text-align:center;vertical-align:middle"><div style="font-weight:bold;font-size:1.1em;background:#e6e6e6;padding:4px 8px">'+esc(title)+'</div>'+
+    '<div style="font-size:.9em" dir="rtl">الفصل الدراسي: '+esc(h.term)+' - العام الدراسي: '+esc(h.year)+'م</div></td></tr></table>';
+  var st=student?'<table style="width:100%;border-collapse:collapse;margin-top:6px"'+(en?' dir="ltr"':'')+'><tr><td style="border:1px solid #000;padding:4px 10px">'+(en?'Name: ........................................ &nbsp; Class: .......... &nbsp; Date: ..........':'اسم الطالب: ................................................ &nbsp; الصف: .............. &nbsp; التاريخ: ..............')+'</td></tr></table>':'';
+  return top+st+'<hr style="border:0;border-top:2px solid #000;margin:8px 0 10px">';
+}
+function wrap(html,en){return '<div dir="'+(en?'ltr':'rtl')+'" style="text-align:'+(en?'left':'right')+'">'+html+'</div>';}
+function lessonsSel(){var ids=Object.keys(sel).map(Number);return data.lessons.filter(function(l){return ids.indexOf(l.id)>=0;});}
+function st(l){return data.study[l.id]||null;}
+function fallbackSummary(l){ // درس مضاف بلا ملخص جاهز: نبني هيكلًا من مخرجاته
+  var o=String(l.outcomes||'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
+  return {intro:'',outcomes:(o.length?o:['…']).map(function(t){return {code:'',text:t,points:['…']};}),terms:String(l.concepts||'').split(/[،,]/).map(function(x){return x.trim();}).filter(Boolean).slice(0,6).map(function(t){return {t:t,d:'…'};}),remember:[]};
+}
+// ---------- الخطة العلاجية ----------
+function planHtml(ls){
+  var en=isEnC(),weak=en?WEAK_EN:WEAK_AR,on={};
+  ls.forEach(function(l){var s=st(l);if(s)s.remedial.weak_areas.forEach(function(w){on[w]=1;});});
+  var title='نموذج خطة علاجية للطالب دون المستوى في مادة/ '+course.subject+' للصف '+course.grade;
+  var h=sheetHead(title,false,false);
+  h+='<table style="'+TB+'"><tr><td style="'+TD+';width:50%"><b>معلم المادة:</b> '+esc(hdr.teacher||'..............................')+'</td><td style="'+TD+'"><b>الفترة الزمنية للخطة:</b> من ........... إلى ...........</td></tr>'+
+    '<tr><td style="'+TD+'" colspan="2"><b>الدروس / المحتوى المستهدف:</b> '+ls.map(function(l){return esc(l.title);}).join('، ')+'</td></tr></table>';
+  h+=H('أولًا: بيانات الطلاب دون المستوى');
+  h+='<table id="stTbl" style="'+TB+'"><thead><tr><th style="'+TH+';width:5%">م</th><th style="'+TH+';width:24%">اسم الطالب</th><th style="'+TH+';width:9%">الشعبة</th><th style="'+TH+';width:11%">الدرجة / المستوى</th><th style="'+TH+'">جوانب الضعف</th><th style="'+TH+';width:25%">مدى التحسن</th></tr></thead><tbody>';
+  for(var i=0;i<rows;i++)h+=stRow(i+1);
+  h+='</tbody></table>';
+  h+=H('ثانيًا: جوانب الضعف (مجالات التعثر)');
+  h+='<table style="'+TB+'"><tr>'+weak.map(function(w,i){return (i&&i%2===0?'</tr><tr>':'')+'<td style="'+TD+';width:50%">'+cb(on[w])+' '+esc(w)+'</td>';}).join('')+(weak.length%2?'<td style="'+TD+'"></td>':'')+'</tr></table>';
+  h+=H('ثالثًا: المهارات المستهدفة والأنشطة العلاجية');
+  h+='<table style="'+TB+'"><thead><tr><th style="'+TH+';width:18%">الدرس</th><th style="'+TH+'">المهارة / المفهوم المستهدف</th><th style="'+TH+';width:26%">النشاط العلاجي</th><th style="'+TH+';width:14%">أداة التقويم</th><th style="'+TH+';width:10%">التاريخ</th><th style="'+TH+';width:8%">تحقق</th></tr></thead><tbody>';
+  ls.forEach(function(l){var s=st(l),r=s?s.remedial:null;
+    h+='<tr><td style="'+TD+'">'+esc(l.title)+'</td><td style="'+TD+'">'+esc(r?r.focus:'')+'</td><td style="'+TD+'">'+(r?r.activities.map(function(a,k){return (k+1)+'. '+esc(a.title);}).join('<br>'):'')+'</td><td style="'+TD+'">ورقة عمل علاجية<br>سؤال شفهي</td><td style="'+TD+'"></td><td style="'+TD+';text-align:center">'+cb(0)+'</td></tr>';});
+  h+='</tbody></table>';
+  h+=H('رابعًا: الإجراءات العلاجية من قِبل المعلم');
+  h+='<table style="'+TB+'"><tr>'+T_ACTS.map(function(a,i){return (i&&i%2===0?'</tr><tr>':'')+'<td style="'+TD+';width:50%">'+cb(a[1])+' '+esc(a[0])+'</td>';}).join('')+'</tr></table>';
+  h+=H('خامسًا: الإجراءات من قِبل المدرسة وولي الأمر');
+  h+='<table style="'+TB+'"><tr>'+S_ACTS.map(function(a,i){return (i&&i%2===0?'</tr><tr>':'')+'<td style="'+TD+';width:50%">'+cb(a[1])+' '+esc(a[0])+'</td>';}).join('')+(S_ACTS.length%2?'<td style="'+TD+'"></td>':'')+'</tr></table>';
+  h+=H('سادسًا: ملاحظات ونتائج تنفيذ الخطة');
+  h+='<p>.................................................................................................................................................</p><p>.................................................................................................................................................</p>';
+  h+='<table style="width:100%;border-collapse:collapse;margin-top:18px;text-align:center"><tr><td style="width:33%"><b>معلم المادة</b><br>'+esc(hdr.teacher||'.........................')+'<br>التوقيع: ..............</td><td style="width:33%"><b>المعلم الأول</b><br>.........................<br>التوقيع: ..............</td><td style="width:34%"><b>مدير المدرسة</b><br>.........................<br>التوقيع: ..............</td></tr></table>';
+  return wrap(h,false);
+}
+function stRow(n){return '<tr><td style="'+TD+';text-align:center">'+n+'</td><td style="'+TD+'"></td><td style="'+TD+'"></td><td style="'+TD+'"></td><td style="'+TD+'"></td><td style="'+TD+';font-size:.85em">'+cb(0)+' تحسّن '+cb(0)+' جزئي '+cb(0)+' لم يتحسن</td></tr>';}
+// ---------- ورقة الأنشطة العلاجية ونموذج إجابتها ----------
+var LET_AR='أبجدهوزح',LET_EN='ABCDEFGH';
+function itemsHtml(a,en,key){
+  var L=en?LET_EN:LET_AR,dots='..........................................................';
+  if(a.type==='match'){
+    var mix=a._mix||(a._mix=shuffle(a.items.map(function(_,i){return i;})));
+    if(key)return '<p>'+a.items.map(function(it,i){return (i+1)+' ← '+L[mix.indexOf(i)];}).join(' &nbsp; | &nbsp; ')+'</p>';
+    return '<table style="'+TB+'"><tr><th style="'+TH+'">'+(en?'Column A':'العمود (أ)')+'</th><th style="'+TH+';width:12%">'+(en?'Letter':'الحرف')+'</th><th style="'+TH+'">'+(en?'Column B':'العمود (ب)')+'</th></tr>'+
+      a.items.map(function(it,i){return '<tr><td style="'+TD+'">'+(i+1)+'. '+esc(it.q)+'</td><td style="'+TD+';text-align:center">( &nbsp; &nbsp; )</td><td style="'+TD+'">'+L[i]+') '+esc(a.items[mix[i]].a)+'</td></tr>';}).join('')+'</table>';
+  }
+  return '<ol style="margin:2px 0 8px;padding-inline-start:1.6em">'+a.items.map(function(it){
+    if(key)return '<li>'+esc(it.a)+'</li>';
+    var ln=(a.type==='short'||a.type==='order'||a.type==='label')?'<br>'+dots:(a.type==='draw'?'<br>'+dots:'');
+    return '<li style="margin-bottom:4px">'+esc(it.q)+ln+'</li>';}).join('')+'</ol>'+(a.type==='draw'&&!key?'<div style="border:1px dashed #777;height:150px;margin:4px 0 10px"></div>':'');
+}
+function sheetHtml(ls,key){
+  var en=isEnC();
+  var title=en?(key?'Answer key – ':'')+'Remedial activities – English – Grade 9':(key?'نموذج إجابة ':'')+'أنشطة علاجية في مادة '+course.subject+' للصف '+course.grade;
+  var h=sheetHead(title,en,!key);
+  ls.forEach(function(l,li){var s=st(l);if(!s)return;var r=s.remedial;
+    h+='<h3 style="font-size:1.08em;margin:14px 0 4px;border-bottom:1.5px solid #000">'+(en?'Lesson: ':'الدرس: ')+esc(l.title)+'</h3>';
+    if(!key)h+='<div style="border:1px solid #0e7c66;background:#f1f8f5;border-radius:6px;padding:6px 10px;margin:4px 0 8px"><b>'+(en?'In simple words: ':'الفكرة ببساطة: ')+'</b>'+esc(r.simple).replace(/\n/g,'<br>')+'</div>';
+    r.activities.forEach(function(a,k){
+      h+='<p style="margin:8px 0 2px"><b>'+(en?'Activity ':'النشاط ')+(k+1)+': '+esc(a.title)+'</b>'+(key?'':'<br><span style="font-size:.92em">'+esc(a.instructions)+'</span>')+'</p>'+itemsHtml(a,en,key);
+    });
+  });
+  return wrap(h,en);
+}
+// ---------- الملخصات ----------
+function lessonSum(l,en,brief){
+  var s=st(l),S=s?s.summary:fallbackSummary(l),h='';
+  h+='<h3 style="font-size:1.12em;margin:14px 0 4px;border-bottom:1.5px solid #0e7c66;color:#07493b">'+(en?'Lesson: ':'الدرس: ')+esc(l.title)+'</h3>';
+  if(S.intro)h+='<div style="background:#f1f8f5;border:1px solid #bcd9cf;border-radius:6px;padding:6px 10px;margin:4px 0 8px">'+esc(S.intro)+'</div>';
+  h+='<p style="margin:6px 0 2px"><b>'+(en?'Learning outcomes and key points':'مخرجات التعلم وأهم النقاط')+'</b></p>';
+  S.outcomes.forEach(function(o){
+    h+='<div style="margin:4px 0 6px"><div style="font-weight:bold">'+(o.code?'<span style="background:#e6e6e6;padding:0 6px;border-radius:4px;font-size:.85em" dir="ltr">'+esc(o.code)+'</span> ':'')+esc(o.text)+'</div>'+
+      '<ul style="margin:2px 0;padding-inline-start:1.5em">'+(brief?o.points.slice(0,2):o.points).map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ul></div>';
+  });
+  if(!brief&&S.terms&&S.terms.length)h+='<p style="margin:8px 0 2px"><b>'+(en?'Key words':'المصطلحات العلمية')+'</b></p><table style="'+TB+'">'+S.terms.map(function(t){return '<tr><td style="'+TD+';width:28%;font-weight:bold">'+esc(t.t)+'</td><td style="'+TD+'">'+esc(t.d)+'</td></tr>';}).join('')+'</table>';
+  if(!brief&&S.remember&&S.remember.length)h+='<div style="border:1.5px dashed #b45309;background:#fff8ec;border-radius:6px;padding:6px 10px;margin:6px 0"><b>'+(en?'Remember!':'تذكّر 💡')+'</b><ul style="margin:2px 0;padding-inline-start:1.5em">'+S.remember.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ul></div>';
+  return h;
+}
+function summaryHtml(){
+  var en=isEnC(),h;
+  if(sumMode==='unit'){
+    var u=unitsList().filter(function(x){return x.unit===unitSel;})[0];if(!u)return '';
+    var U=data.units[u.unit]||{title:u.name,big_ideas:[],connections:'',check:[]};
+    h=sheetHead(en?'Unit '+u.unit+' summary: '+(U.title||u.name||''):'ملخص الوحدة '+u.unit+(u.name?': '+u.name:'')+' — '+course.subject+' للصف '+course.grade,en,false);
+    if(U.big_ideas.length)h+=H(en?'Big ideas':'الأفكار الكبرى للوحدة')+'<ul style="padding-inline-start:1.5em">'+U.big_ideas.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>';
+    if(U.connections)h+=H(en?'How the lessons connect':'كيف ترتبط دروس الوحدة؟')+'<p>'+esc(U.connections)+'</p>';
+    h+=H(en?'Lesson summaries':'ملخص دروس الوحدة');
+    u.lessons.forEach(function(l){h+=lessonSum(l,en,true);});
+    if(U.check.length)h+=H(en?'Check yourself':'أسئلة مراجعة الوحدة')+'<ol style="padding-inline-start:1.6em">'+U.check.map(function(x){return '<li style="margin-bottom:4px">'+esc(x)+'<br>..........................................................</li>';}).join('')+'</ol>';
+    return wrap(h,en);
+  }
+  var ls=lessonsSel();
+  h=sheetHead(en?'Lesson summary – English – Grade 9':(ls.length>1?'ملخصات دروس ':'ملخص درس ')+course.subject+' للصف '+course.grade,en,false);
+  ls.forEach(function(l){h+=lessonSum(l,en,false);});
+  return wrap(h,en);
+}
+// ---------- الواجهة ----------
+function renderSide(){
+  var h='<section class="qcard"><h3>1. الصف والمادة</h3><select id="courseSel" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'"'+(course&&c.key===course.key?' selected':'')+'>'+esc(c.subject)+' — الصف '+esc(c.grade)+'</option>';}).join('')+'</select>';
+  if(!REM)h+='<div class="seg"><button type="button" class="'+(sumMode==='lesson'?'on':'')+'" data-sm="lesson">ملخص درس</button><button type="button" class="'+(sumMode==='unit'?'on':'')+'" data-sm="unit">ملخص وحدة</button></div>';
+  h+='</section>';
+  if(!course||!data){$('qside').innerHTML=h;bindSide();return;}
+  var units=unitsList();
+  if(!REM&&sumMode==='unit'){
+    h+='<section class="qcard"><h3>2. الوحدة</h3><select id="unitSel" class="qsel">'+units.map(function(u){return '<option value="'+esc(u.unit)+'"'+(unitSel===u.unit?' selected':'')+'>الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</option>';}).join('')+'</select><button type="button" class="btn primary go-btn" id="makeBtn">اعرض ملخص الوحدة</button></section>';
+  }else{
+    h+='<section class="qcard"><h3>2. '+(REM?'الدروس التي تعثّر فيها الطلاب':'الدروس')+' <span class="muted">(حتى 6)</span></h3><div class="lpick">';
+    units.forEach(function(u){
+      h+='<div class="lp-unit"><div class="lp-uh">الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</div>';
+      u.lessons.forEach(function(l){var ok=!!st(l);h+='<label class="lp-l'+(ok||!REM?'':' dim')+'"><input type="checkbox" data-lid="'+l.id+'"'+(sel[l.id]?' checked':'')+(ok||!REM?'':' disabled')+'> <span>'+esc(l.title)+'</span></label>';});
+      h+='</div>';
+    });
+    h+='</div>';
+    if(REM)h+='<label class="qrow">عدد صفوف الطلاب <input id="rowsIn" type="number" min="1" max="30" value="'+rows+'" class="qsel sm" style="width:80px"></label>';
+    h+='<button type="button" class="btn primary go-btn" id="makeBtn">'+(REM?'كوّن الخطة والأنشطة':'اعرض الملخص')+'</button></section>';
+  }
+  h+='<section class="qcard"><h3>بيانات الورقة</h3><div class="hdr-f">'+(REM?'<label>اسم معلم المادة<input id="h_teacher" value="'+esc(hdr.teacher)+'"></label>':'')+
+    '<label>المديرية<input id="h_dir" value="'+esc(hdr.dir)+'"></label><label>المدرسة<input id="h_school" value="'+esc(hdr.school)+'"></label>'+
+    '<label>الفصل الدراسي<select id="h_term"><option'+(hdr.term==='الأول'?' selected':'')+'>الأول</option><option'+(hdr.term==='الثاني'?' selected':'')+'>الثاني</option></select></label><label>العام الدراسي<input id="h_year" value="'+esc(hdr.year)+'" class="ltr"></label></div></section>'+
+    '<section class="qcard"><h3>'+(REM?'خططي المحفوظة':'ملخصاتي المحفوظة')+'</h3><ul class="saved" id="savedList"><li class="muted">جارٍ التحميل…</li></ul></section>';
+  $('qside').innerHTML=h;bindSide();loadSaved();
+}
+function bindSide(){
+  $('courseSel').onchange=function(){selectCourse(this.value);};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-sm]'),function(b){b.onclick=function(){sumMode=b.getAttribute('data-sm');renderSide();};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked){if(Object.keys(sel).length>=6){b.checked=false;toast('اختر 6 دروس كحد أقصى');return;}sel[id]=1;}else delete sel[id];};});
+  if($('unitSel'))$('unitSel').onchange=function(){unitSel=this.value;};
+  if($('rowsIn'))$('rowsIn').onchange=function(){rows=Math.max(1,Math.min(30,parseInt(this.value,10)||5));};
+  if($('makeBtn'))$('makeBtn').onclick=make;
+  ['dir','school','year','term','teacher'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);};});
+}
+function selectCourse(key){
+  course=courses.filter(function(c){return c.key===key;})[0]||null;sel={};unitSel='';data=null;
+  if(!course){renderSide();return Promise.resolve();}
+  lsSet('tahdir_study_course',key);
+  if(!doc)$('qmain').innerHTML='<div class="welcome"><h2>جارٍ التحميل…</h2></div>';
+  return api('/api/study?key='+encodeURIComponent(key)).then(function(r){
+    data=r;byId={};data.lessons.forEach(function(l){byId[l.id]=l;});
+    var u=unitsList();unitSel=u.length?u[0].unit:'';
+    renderSide();if(!doc)welcome();
+  },function(e){toast(e.message);});
+}
+function welcome(){
+  $('qmain').innerHTML=REM?
+    '<div class="welcome qwel"><h2>🩹 الخطط والأنشطة العلاجية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
+    '<div class="welcome qwel"><h2>📚 ملخصات الدروس والوحدات</h2><p>ملخص لكل درس مبني على مخرجات التعلم في المنهج العُماني والكتاب المدرسي: الفكرة الأساسية، نقاط كل مخرج، المصطلحات، وأخطاء شائعة. وملخص للوحدة بأفكارها الكبرى وأسئلة مراجعة.</p><div class="welcome-steps"><span>1. اختر درسًا أو وحدة</span><span>2. اعرض الملخص</span><span>3. عدّل ما تريد</span><span>4. اطبع أو حمّل Word للطلاب</span></div></div>';
+}
+function make(){
+  if(!course||!data)return;
+  var ls=lessonsSel();
+  if((REM||sumMode==='lesson')&&!ls.length){toast('اختر درسًا واحدًا على الأقل');return;}
+  var title,parts;
+  if(REM){
+    parts={plan:planHtml(ls),sheet:sheetHtml(ls,false),key:sheetHtml(ls,true)};
+    title='خطة علاجية — '+course.subject+' '+course.grade+' — '+ls.map(function(l){return l.title;}).join('، ');part='plan';
+    track('remedial_make',ls.length+' دروس',title);
+  }else{
+    parts={main:summaryHtml()};part='main';
+    var u=unitsList().filter(function(x){return x.unit===unitSel;})[0];
+    title=sumMode==='unit'?'ملخص الوحدة '+unitSel+(u&&u.name?': '+u.name:'')+' — '+course.grade:'ملخص: '+ls.map(function(l){return l.title;}).join('، ');
+    track('summary_make',sumMode==='unit'?'الوحدة '+unitSel:ls.length+' دروس',title);
+  }
+  doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:title.slice(0,150),parts:parts,lessons:ls.map(function(l){return l.id;}),id:null,en:isEnC()};
+  dirty=true;renderDoc();
+}
+var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',main:'الملخص'};
+function partKeys(){return REM?['plan','sheet','key']:['main'];}
+function renderDoc(){
+  if(!doc){welcome();return;}
+  var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title)+'" aria-label="الاسم في قائمتك"><div class="muted small">'+(doc.id?'محفوظ':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
+    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+
+    (REM&&part==='plan'?'<button type="button" class="btn" id="rowAdd">+ صف طالب</button><button type="button" class="btn" id="rowDel">− صف</button>':'')+'</div></div>'+
+    '<div class="edit-hint no-print">✎ اضغط على أي نص في الورقة لتعديله أو حذفه أو الكتابة فيه'+(REM?'، واضغط على المربع ☐ لتحديده':'')+'.</div>'+
+    (REM?'<div class="ptabs no-print" role="tablist">'+partKeys().map(function(k){return '<button type="button" class="ltab'+(part===k?' on':'')+'" data-part="'+k+'">'+PART_TXT[k]+'</button>';}).join('')+'</div>':'')+
+    '<div class="paper study-paper" id="paper" contenteditable="true" spellcheck="false">'+clean(doc.parts[part]||'')+'</div>';
+  $('qmain').innerHTML=h;
+  var pp=$('paper');
+  pp.addEventListener('input',function(){doc.parts[part]=pp.innerHTML;dirty=true;});
+  pp.addEventListener('click',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('cb')){t.textContent=t.textContent==='☑'?'☐':'☑';doc.parts[part]=pp.innerHTML;dirty=true;}});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-part]'),function(b){b.onclick=function(){part=b.getAttribute('data-part');renderDoc();};});
+  $('docTitle').onchange=function(){doc.title=this.value.trim()||doc.title;dirty=true;};
+  $('printBtn').onclick=printDoc;$('wordBtn').onclick=wordDoc;$('saveBtn').onclick=saveDoc;
+  if($('rowAdd'))$('rowAdd').onclick=function(){var tb=pp.querySelector('#stTbl tbody');if(!tb)return;var n=tb.rows.length+1;tb.insertAdjacentHTML('beforeend',stRow(n));doc.parts[part]=pp.innerHTML;dirty=true;};
+  if($('rowDel'))$('rowDel').onclick=function(){var tb=pp.querySelector('#stTbl tbody');if(!tb||tb.rows.length<2)return;tb.deleteRow(-1);doc.parts[part]=pp.innerHTML;dirty=true;};
+}
+// تنظيف HTML المحفوظ/الملصوق قبل عرضه (لا سكربتات ولا أحداث)
+function clean(html){
+  var t=document.createElement('template');t.innerHTML=String(html||'');
+  Array.prototype.forEach.call(t.content.querySelectorAll('script,iframe,object,embed,link,meta,style,form,input,button,textarea,select'),function(x){x.remove();});
+  Array.prototype.forEach.call(t.content.querySelectorAll('*'),function(x){Array.prototype.slice.call(x.attributes).forEach(function(a){var n=a.name.toLowerCase();if(n.indexOf('on')===0||((n==='href'||n==='src'||n==='xlink:href')&&/^\s*(javascript|data):/i.test(a.value)))x.removeAttribute(a.name);});});
+  var d=document.createElement('div');d.appendChild(t.content.cloneNode(true));return d.innerHTML;
+}
+function curPaper(){var pp=$('paper');if(pp)doc.parts[part]=pp.innerHTML;}
+function chooseParts(title){
+  if(!REM)return Promise.resolve(['main']);
+  return new Promise(function(res){
+    var ov=$('modal'),box=$('modalBox');
+    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+partKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+(k!=='key'||part==='key'?' checked':'')+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
+    ov.hidden=false;var close=function(v){ov.hidden=true;box.innerHTML='';res(v);};
+    $('mCancel').onclick=function(){close(null);};
+    $('mOk').onclick=function(){var v=Array.prototype.map.call(document.querySelectorAll('input[name="pp"]:checked'),function(x){return x.value;});if(!v.length){toast('اختر جزءًا واحدًا على الأقل');return;}close(v);};
+  });
+}
+function forOut(html){return clean(html).replace(/ contenteditable="false"/g,'').replace(/<span class="cb"[^>]*>/g,'<span>');}
+var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+function fileName(){return String(doc.title||'التحضير الآلي').replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
+function serverFile(format,html,win){
+  toast('جارٍ التجهيز…');
+  return api('/api/export',{format:format,name:fileName(),html:html}).then(function(r){
+    if(win){try{win.location.href=r.url;return;}catch(e){}}
+    leavingOk=Date.now();var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
+  },function(e){if(win)try{win.close();}catch(x){}toast(e.message);});
+}
+function printDoc(){
+  curPaper();
+  chooseParts('طباعة / حفظ PDF').then(function(ps){
+    if(!ps)return;track(KIND==='remedial'?'remedial_print':'summary_print',ps.join('+'),doc.title);
+    if(!IN_APP&&!MOBILE){
+      var a=$('printArea');a.innerHTML=ps.map(function(k){return '<div class="ppage">'+forOut(doc.parts[k])+'</div>';}).join('');
+      document.body.classList.add('printing');
+      setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},60);
+      return;
+    }
+    var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}
+    serverFile('print',ps.map(function(k){return '<div class="pg">'+forOut(doc.parts[k])+'</div>';}).join(''),w).then(function(){if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');});
+  });
+}
+function wordDoc(){
+  curPaper();
+  chooseParts('تحميل ملف Word').then(function(ps){
+    if(!ps)return;
+    var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(doc.title)+'</title>'+
+      '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
+      '<style>@page WordSection1{size:595.3pt 841.9pt;margin:30pt 34pt 30pt 34pt}div.WordSection1{page:WordSection1}body{font-family:"Simplified Arabic","Traditional Arabic",Arial;font-size:12.5pt}p{margin:0 0 4pt}h3{font-size:13pt}</style></head>'+
+      '<body dir="'+(doc.en&&!REM?'ltr':'rtl')+'"><div class="WordSection1">'+ps.map(function(k){return forOut(doc.parts[k]);}).join('<br clear="all" style="page-break-before:always">')+'</div></body></html>';
+    track(KIND==='remedial'?'remedial_word':'summary_word',ps.join('+'),doc.title);
+    serverFile('doc',html,null).then(function(){toast(IN_APP?'يُحمَّل ملف Word عبر المتصفح، ستجده في «التنزيلات»':'تم تحميل ملف Word');});
+  });
+}
+function saveDoc(){
+  curPaper();
+  var t=($('docTitle')&&$('docTitle').value.trim())||doc.title;doc.title=t;
+  return api('/api/quizzes',{id:doc.id,title:t,grade:doc.grade,subject:doc.subject,kind:KIND,data:doc}).then(function(r){doc.id=r.id;dirty=false;renderDoc();loadSaved();toast('حُفظ ✓');},function(e){toast(e.message);});
+}
+function loadSaved(){
+  if(!$('savedList'))return;
+  api('/api/quizzes?kind='+KIND).then(function(r){
+    var l=r.quizzes||[];var el=$('savedList');if(!el)return;
+    el.innerHTML=l.length?l.map(function(q){return '<li><button type="button" class="link-btn" data-open="'+q.id+'"><b>'+esc(q.title)+'</b></button><span class="muted small">'+esc(fmtDate(q.updated_at))+'</span><button type="button" class="x" data-delq="'+q.id+'" aria-label="حذف">×</button></li>';}).join(''):'<li class="muted">لا يوجد. بعد التكوين اضغط «حفظ».</li>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-open]'),function(b){b.onclick=function(){openSaved(+b.getAttribute('data-open'));};});
+    Array.prototype.forEach.call(el.querySelectorAll('[data-delq]'),function(b){b.onclick=function(){dialog({title:'حذف الملف المحفوظ؟',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/quizzes/'+b.getAttribute('data-delq'),null,'DELETE').then(function(){if(doc&&doc.id===+b.getAttribute('data-delq'))doc.id=null;loadSaved();toast('حُذف');});});};});
+  },function(){});
+}
+function openSaved(id){
+  api('/api/quizzes/'+id).then(function(r){
+    var d=r.quiz.data;d.id=r.quiz.id;d.title=r.quiz.title;
+    var go=function(){doc=d;dirty=false;part=partKeys()[0];renderDoc();};
+    if(!course||course.key!==d.course){var c=courses.filter(function(x){return x.key===d.course;})[0];if(c){doc=null;selectCourse(c.key).then(go);return;}}
+    go();
+  },function(e){toast(e.message);});
+}
+// ---------- البداية ----------
+window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)return;if(doc&&dirty){e.preventDefault();e.returnValue='';}});
+Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
+  me=r[0];initNav(me);
+  hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
+  courses=(r[1].courses||[]).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
+  if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
+  var last=lsGet('tahdir_study_course')||lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses[0];
+  selectCourse(c.key);
+},function(e){$('qmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});
+})();

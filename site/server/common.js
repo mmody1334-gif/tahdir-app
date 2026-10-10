@@ -21,6 +21,7 @@ function copyText(text){
 function dialog(opts){
   return new Promise(function(resolve){
     var ov=$('modal'),box=$('modalBox');
+    if(ov.classList.contains('locked')){resolve(null);return;}
     var h='<h3 id="mTitle">'+esc(opts.title)+'</h3>';
     if(opts.message)h+='<p class="m-msg">'+esc(opts.message)+'</p>';
     if(opts.html)h+=opts.html;
@@ -51,3 +52,53 @@ function guard(){
 function logout(){api('/api/logout',{}).then(function(){location.href='/';},function(){location.href='/';});}
 function fmtDate(t){if(!t)return '—';var d=new Date(t);return d.toLocaleDateString('ar-OM',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('ar-OM',{hour:'2-digit',minute:'2-digit'});}
 function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if(s<60)return 'الآن';if(s<3600)return 'منذ '+Math.floor(s/60)+' دقيقة';if(s<86400)return 'منذ '+Math.floor(s/3600)+' ساعة';var d=Math.floor(s/86400);return d===1?'أمس':'منذ '+d+' يوم';}
+// ---------- أداة نور (مشتركة لكل الصفحات) ----------
+var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST='__TOOLVER__',IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
+function verCmp(a,b){a=String(a||'').split('.');b=String(b||'').split('.');for(var i=0;i<3;i++){var d=(parseInt(a[i],10)||0)-(parseInt(b[i],10)||0);if(d)return d;}return 0;}
+function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
+function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_LATEST)>=0;}
+function toolDialog(reason){
+  if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
+  var v=toolVersion(),ok=toolOk();
+  var st=v?(ok?'<p class="m-msg" style="color:var(--brand,#0e7c66)"><b>✓ الأداة مثبتة ومحدّثة (الإصدار '+esc(v)+').</b></p>':'<p class="m-msg" style="color:#b45309"><b>عندك إصدار قديم ('+esc(v)+') والأحدث '+esc(TOOL_LATEST)+'.</b> اضغط «تثبيت الأداة» ثم «تحديث» في صفحة Tampermonkey.</p>'):'';
+  var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+st+
+   '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+   '<li><b>مرة واحدة فقط:</b> ثبّت إضافة Tampermonkey من متجر المتصفح:<br><a href="https://addons.mozilla.org/ar/firefox/addon/tampermonkey/" target="_blank" rel="noopener">Firefox</a> · <a href="https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener">Chrome</a> · <a href="https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener">Edge</a></li>'+
+   '<li>اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة اللي تفتح اضغط <b>«تثبيت»</b> (أو «تحديث»).</li>'+
+   '<li>ارجع لهنا وحدّث الصفحة.</li></ol>'+
+   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «التحضير الآلي»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
+  return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
+}
+// تحديث إجباري: لو الأداة مثبتة بإصدار أقدم من المنشور على الموقع، لا يكمل المعلم حتى يحدّثها
+function forceToolUpdate(){
+  if(IN_APP)return;
+  var v=toolVersion();if(!v||toolOk())return;
+  var ov=$('modal'),box=$('modalBox');if(!ov||!box)return;
+  box.innerHTML='<h3 id="mTitle">⚠ حدّث «أداة نور» قبل المتابعة</h3>'+
+    '<p class="m-msg">الأداة المثبتة عندك إصدار <b>'+esc(v)+'</b>، والإصدار الجديد <b>'+esc(TOOL_LATEST)+'</b> فيه إصلاحات ضرورية للإرسال إلى نور. التحديث يأخذ ثوانٍ:</p>'+
+    '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b>.</li><li>ارجع لهنا واضغط <b>«تم التحديث»</b>.</li></ol>'+
+    '<div class="m-actions"><button type="button" class="btn" id="mReload">تم التحديث</button><button type="button" class="btn primary" id="mOk">تحديث الأداة الآن</button></div>';
+  ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
+  $('mOk').onclick=function(){window.open(TOOL_URL+'?v='+encodeURIComponent(TOOL_LATEST),'_blank');$('mReload').classList.add('primary');};
+  $('mReload').onclick=function(){location.reload();};
+}
+// ---------- شريط التنقل: الأساسي ظاهر والباقي في قائمة ----------
+function initNav(me){
+  var mb=$('menuBtn'),ml=$('menuList');
+  if(mb&&ml){
+    var close=function(){ml.hidden=true;mb.setAttribute('aria-expanded','false');};
+    var place=function(){if(window.innerWidth<=700){ml.style.top=ml.style.left='';return;}var r=mb.getBoundingClientRect();ml.style.top=(r.bottom+8)+'px';ml.style.left=Math.max(8,Math.min(r.left,window.innerWidth-ml.offsetWidth-8))+'px';};
+    mb.onclick=function(e){e.stopPropagation();var o=ml.hidden;ml.hidden=!o;mb.setAttribute('aria-expanded',o?'true':'false');if(o)place();};
+    window.addEventListener('resize',function(){if(!ml.hidden)place();});window.addEventListener('scroll',function(){if(!ml.hidden)close();},{passive:true});
+    document.addEventListener('click',function(e){if(!ml.hidden&&!ml.contains(e.target))close();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  }
+  if($('logoutBtn'))$('logoutBtn').onclick=logout;
+  if($('toolBtn')){
+    if(IN_APP)$('toolBtn').hidden=true;
+    else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolOk()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
+  }
+  if(me&&me.role==='admin')Array.prototype.forEach.call(document.querySelectorAll('.admin-only'),function(x){x.hidden=false;});
+  if(me&&$('who'))$('who').textContent=me.name;
+  setTimeout(forceToolUpdate,1800);
+}

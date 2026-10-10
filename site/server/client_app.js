@@ -162,22 +162,9 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
   return [1,2].map(function(n){return {text:hwVal(l,'hw_q'+n),answer:hwVal(l,'hw_a'+n),mark:m};}).filter(function(x){return x.text.trim();});}
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
-function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
-var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST=2.9,IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
-function toolDialog(reason){
-  if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
-  var v=toolVersion(),ok=parseFloat(v)>=TOOL_LATEST;
-  var st=v?(ok?'<p class="m-msg" style="color:var(--brand,#0e7c66)"><b>✓ الأداة مثبتة ومحدّثة (الإصدار '+esc(v)+').</b> التحديثات القادمة تصل تلقائيًا.</p>':'<p class="m-msg" style="color:#b45309"><b>عندك إصدار قديم ('+esc(v)+').</b> نفّذ الخطوة 2 مرة واحدة للتحديث، وبعدها تتحدث تلقائيًا.</p>'):'';
-  var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+st+
-   '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-   '<li><b>مرة واحدة فقط:</b> ثبّت إضافة Tampermonkey من متجر المتصفح:<br><a href="https://addons.mozilla.org/ar/firefox/addon/tampermonkey/" target="_blank" rel="noopener">Firefox</a> · <a href="https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener">Chrome</a> · <a href="https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener">Edge</a></li>'+
-   '<li>اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة اللي تفتح اضغط <b>«تثبيت»</b> (أو «تحديث»).</li>'+
-   '<li>ارجع لهنا وحدّث الصفحة.</li></ol>'+
-   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «التحضير الآلي»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
-  return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
-}
 function sendToNour(kind,json,okMsg,minVer,fallback){
-  if(!(parseFloat(toolVersion())>=minVer)){
+  if(!toolOk(IN_APP?minVer:TOOL_LATEST)){
+    if(!IN_APP&&toolVersion()){forceToolUpdate();return false;}
     toolDialog(toolVersion()?'أداة نور عندك قديمة. حدّثها مرة واحدة وبعدها تتحدث تلقائيًا.':'الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك.');
     return false;
   }
@@ -190,10 +177,10 @@ function sendToNour(kind,json,okMsg,minVer,fallback){
 }
 function sendHw(l){
   if(!hwItems(l).length){toast('لا توجد أسئلة في هذا الواجب');return;}
-  if(sendToNour('hw',buildHwJson(l),'أُرسل الواجب ✓ تابع في نور',isMcq(l)?2.6:2.3,function(){copyText(buildHwJson(l));track('copy_hw',l);}))track('send_hw',l,'send');
+  if(sendToNour('hw',buildHwJson(l),'أُرسل الواجب ✓ تابع في نور',isMcq(l)?'2.6':'2.3',function(){copyText(buildHwJson(l));track('copy_hw',l);}))track('send_hw',l,'send');
 }
 function sendPrep(l){
-  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',isEn(l)?2.9:2.3,function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
+  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',isEn(l)?'2.9':'2.3',function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
 }
 function buildHwText(l){var L='أبجدهو';return 'واجب: '+(l.title||'')+'\n\n'+hwItems(l).map(function(x,i){return (i+1)+'- '+x.text+(x.choices?'\n'+x.choices.map(function(c,k){return '   '+L[k]+') '+c;}).join('\n'):'');}).join('\n\n');}
 function renderLesson(l){
@@ -245,17 +232,17 @@ function renderChips(k){
   settings[k].forEach(function(v,i){var c=document.createElement('span');c.className='chip';c.innerHTML='<span>'+esc(v)+'</span>';var b=document.createElement('button');b.type='button';b.textContent='×';b.setAttribute('aria-label','حذف '+v);b.onclick=function(){settings[k].splice(i,1);lsSet('tahdir_settings_v1',settings);renderChips(k);};c.appendChild(b);row.appendChild(c);});
 }
 function init(){
-  $('logoutBtn').onclick=logout;$('settingsBtn').onclick=openSettings;if($('toolBtn'))$('toolBtn').onclick=function(){toolDialog('');};
-  if(IN_APP){if($('appBar'))$('appBar').hidden=true;if($('toolBtn'))$('toolBtn').hidden=true;}
-  else{setTimeout(function(){if(parseFloat(toolVersion())>=TOOL_LATEST&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);
+  $('settingsBtn').onclick=openSettings;
+  if(IN_APP){if($('appBar'))$('appBar').hidden=true;}
+  else{
     if($('pcBtn'))$('pcBtn').onclick=function(){toolDialog('');};
     if($('iosBtn'))$('iosBtn').onclick=function(){dialog({title:'التطبيق على الآيفون',html:'<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>افتح الموقع من متصفح <b>Safari</b>.</li><li>اضغط زر <b>«مشاركة»</b> ⬆ أسفل الشاشة.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة».</li></ol><p class="m-msg">يظهر «التحضير الآلي» بأيقونة على شاشتك مثل أي تطبيق.</p>',okText:'تم',cancelText:false});};}
   var st=lsGet('tahdir_settings_v1');if(st)settings=Object.assign(settings,st);
   Promise.all([api('/api/me'),api('/api/lessons')]).then(function(r){
     me=r[0];lessons=r[1].lessons;
-    $('who').textContent=me.name;
-    if(me.role==='admin')$('adminLink').hidden=false;
-    else{var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
+    initNav(me);
+    if(location.hash==='#settings'){history.replaceState(null,'','/app');setTimeout(openSettings,50);}
+    if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
     $('statLessons').textContent=lessons.length;$('statFilled').textContent=lessons.filter(function(l){return !isEmpty(l);}).length;
     renderTree();showWelcome('أهلًا '+me.name,'اختر الصف ثم الوحدة ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في منصة نور.');
   },function(e){showWelcome('تعذّر تحميل الدروس',e.message);});

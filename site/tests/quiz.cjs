@@ -31,7 +31,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // custom chemistry lesson prep json
   const chemBtn = (await p1.$$('.g-btn')).length; console.log('tree blocks', chemBtn);
   // open quiz page
-  await p1.click('a.quiz-link'); await p1.waitForURL(B + '/quiz'); await p1.waitForSelector('#courseSel');
+  await p1.click('#menuBtn'); await p1.click('#menuList a[href="/quiz"]'); await p1.waitForURL(B + '/quiz'); await p1.waitForSelector('#courseSel');
   console.log('quiz courses:', await p1.$$eval('#courseSel option', o => o.map(x => x.textContent)));
   await p1.selectOption('#courseSel', 'الأحياء|الحادي عشر'); await p1.waitForSelector('[data-lid]');
   const lids = await p1.$$eval('[data-lid]:not([disabled])', e => e.slice(0, 3).map(x => x.getAttribute('data-lid')));

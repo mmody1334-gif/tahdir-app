@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      2.9.0
+// @version      3.0.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
-// @match        https://lms.moe.gov.om/teacher/*
+// @match        https://lms.moe.gov.om/*
+// @match        https://lms.moe.gov.om/teacher
 // @match        https://tahdir.hudhaifa-bio.workers.dev/*
 // @grant        unsafeWindow
 // @grant        GM_registerMenuCommand
@@ -19,7 +20,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '2.9.0';
+  const VERSION = '3.0.0';
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -85,6 +86,8 @@
 
   // ================= على منصة نور =================
   const path = location.pathname;
+  // الصفحة الرئيسية لنور هي /teacher (بدون شرطة أخيرة) — نعمل عليها أيضًا. صفحات الدخول وغيرها: لا شيء.
+  if (!/^\/teacher(\/|$)/.test(path)) return;
   const IS_HW = /\/questions\/add_bulk_questions\//.test(path);
   const IS_PREP = /\/courses\/add_preparation\//.test(path);
   const IS_TASK = /\/homeworks\/(create|edit|add)\//.test(path);
@@ -94,7 +97,7 @@
   function learnGrades() {
     const map = GM_getValue(GRADES_KEY, {}) || {};
     let changed = false;
-    document.querySelectorAll('a[href*="/courses/browse_content/cid:"]').forEach(a => {
+    document.querySelectorAll('a[href*="cid:"]').forEach(a => {
       const t = (a.textContent || '').trim().replace(/\s+/g, ' ');
       const m = t.match(GRADE_RE), c = (a.getAttribute('href') || '').match(/cid:([^/?#]+)/);
       if (m && c) {

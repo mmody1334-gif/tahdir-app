@@ -371,7 +371,7 @@ function chooseParts(title){
     $('mCancel').onclick=function(){close(null);};$('mOk').onclick=function(){var r=document.querySelector('input[name="pp"]:checked');close(r?r.value:'both');};
   });
 }
-var leavingOk=0,IN_APP=/TahdirApp/.test(navigator.userAgent),MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function fileName(){return (doc.title||titleText(doc)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
 // التحميل من السيرفر برابط حقيقي: يعمل في التطبيق وفي متصفح الموبايل والكمبيوتر
 function serverFile(format,html,win){
@@ -414,7 +414,7 @@ function saveDoc(){
 }
 function loadSaved(){
   if(!$('savedList'))return;
-  api('/api/quizzes').then(function(r){
+  api('/api/quizzes?kind=quiz,review').then(function(r){
     var l=r.quizzes||[];var el=$('savedList');if(!el)return;
     el.innerHTML=l.length?l.map(function(q){return '<li><button type="button" class="link-btn" data-open="'+q.id+'"><b>'+esc(q.title)+'</b></button><span class="muted small">'+esc(fmtDate(q.updated_at))+'</span><button type="button" class="x" data-delq="'+q.id+'" aria-label="حذف">×</button></li>';}).join(''):'<li class="muted">لا يوجد. بعد تكوين اختبار اضغط «حفظ».</li>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-open]'),function(b){b.onclick=function(){openSaved(+b.getAttribute('data-open'));};});
@@ -430,10 +430,9 @@ function openSaved(id){
   },function(e){toast(e.message);});
 }
 // ---------- البداية ----------
-$('logoutBtn').onclick=logout;
 window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)return;if(doc&&dirty&&doc.items.length){e.preventDefault();e.returnValue='';}});
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
-  me=r[0];$('who').textContent=me.name;if(me.role==='admin'&&$('adminLink'))$('adminLink').hidden=false;
+  me=r[0];initNav(me);
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
   courses=(r[1].courses||[]).filter(function(c){return !/انجليز|إنجليز|English/i.test(c.subject);}).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}

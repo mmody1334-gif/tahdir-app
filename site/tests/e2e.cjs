@@ -36,7 +36,7 @@ const B='http://localhost:8787';
   await p3.goto(B+'/'); await p3.fill('#username','ahmed.b'); await p3.fill('#password','123456'); await p3.click('#loginBtn'); await p3.waitForSelector('#loginErr:not([hidden])');
   console.log('device 3:', await p3.textContent('#loginErr'));
   // 6 admin view
-  await ap.click('#refreshBtn'); await ap.waitForTimeout(400);
+  await ap.click('#menuBtn'); await ap.click('#refreshBtn'); await ap.waitForTimeout(400);
   const row=await ap.$$eval('.tbl tbody tr',rs=>rs.map(r=>r.innerText.replace(/\s+/g,' ')));
   console.log('rows:', row);
   await ap.screenshot({path:'s_admin.png',fullPage:true});

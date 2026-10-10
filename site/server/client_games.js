@@ -503,10 +503,9 @@ function gLinks(g){
 }
 
 // ---------- البداية ----------
-$('logoutBtn').onclick=logout;
 teams=(lsGet('tahdir_teams')||['الفريق الأول','الفريق الثاني']).map(function(n){return {name:n,score:0};});
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
-  me=r[0];$('who').textContent=me.name;if(me.role==='admin'&&$('adminLink'))$('adminLink').hidden=false;
+  me=r[0];initNav(me);
   courses=(r[1].courses||[]).sort(function(a,b){return ((GRADE_NUM[a.grade]||99)-(GRADE_NUM[b.grade]||99))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('gmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2></div>';return;}
   var last=lsGet('tahdir_games_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses[0];
