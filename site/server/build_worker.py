@@ -449,6 +449,10 @@ extra_css += '''
 .menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 .menu-list #logoutBtn{color:var(--danger,#b23a2b)}
 .modal.locked{backdrop-filter:blur(3px)}
+.bm-box{border:2px solid #36b37e;background:#effaf4;border-radius:14px;padding:10px 14px;margin:6px 0 10px}
+.bm-box h4{margin:0 0 4px!important;color:#07493b!important;font-size:.98rem!important}
+.bm-link{display:inline-block;background:#0e7c66;color:#fff!important;text-decoration:none;font-weight:700;padding:9px 20px;border-radius:999px;cursor:grab;box-shadow:0 4px 14px rgba(14,124,102,.35);border:2px dashed #b6f0d6}
+.tm-adv summary{cursor:pointer;color:var(--mute)}
 /* ---------- study pages ---------- */
 .edit-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fff8e6);border-radius:10px;padding:6px 12px;margin-bottom:8px}
 .study-paper{outline:none;font-size:15px}
@@ -605,6 +609,19 @@ PAGES = {
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
+def _bookmarklet():
+    tool = rd('tahdir-noor.user.js')
+    body = tool[tool.index('==/UserScript=='):].split(chr(10), 1)[1]
+    # نحذف التعليقات الكاملة والمسافات البادئة لتصغير الرابط (بدون لمس الأسطر نفسها)
+    lines = [l.strip() for l in body.split(chr(10))]
+    body = chr(10).join(l for l in lines if l and not l.startswith('//'))
+    run = 'function (GM_getValue, GM_setValue, GM_deleteValue, GM_openInTab, GM_registerMenuCommand, unsafeWindow) {' + chr(10) + body + chr(10) + '}'
+    shim = open(os.path.join(HERE, '..', 'extension', 'bookmarklet_shim.js'), encoding='utf-8').read()
+    code = shim.replace('__RUN__', run)
+    from urllib.parse import quote
+    return 'javascript:' + quote(code, safe="-_.!~*'();,/:=+&?[]{}$@")
+BOOKMARKLET = _bookmarklet()
+src = src.replace('__BOOKMARKLET__', json.dumps(BOOKMARKLET))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
 src = src.replace('__ICONS__', rd('icons.json'))
 src = src.replace('__STUDY__', json.dumps(json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
