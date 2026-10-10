@@ -163,8 +163,8 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
 function sendToNour(kind,json,okMsg,minVer,fallback){
-  if(!toolOk(IN_APP?minVer:TOOL_LATEST)){
-    if(!IN_APP&&toolVersion()){forceToolUpdate();return false;}
+  if(!toolOk(IN_APP||hasExt()?minVer:TOOL_LATEST)){
+    if(!IN_APP&&toolVersion()&&!hasExt()){forceToolUpdate();return false;}
     toolDialog(toolVersion()?'أداة نور عندك قديمة. حدّثها مرة واحدة وبعدها تتحدث تلقائيًا.':'الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك.');
     return false;
   }

@@ -56,10 +56,19 @@ function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if
 var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST='__TOOLVER__',IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
 function verCmp(a,b){a=String(a||'').split('.');b=String(b||'').split('.');for(var i=0;i<3;i++){var d=(parseInt(a[i],10)||0)-(parseInt(b[i],10)||0);if(d)return d;}return 0;}
 function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
+// إضافة المتصفح الرسمية (Chrome / Edge): تتحدث من المتجر تلقائيًا ولا تحتاج أي إعداد
+var EXT_STORE={chrome:'',edge:''};
+function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
+function browserKind(){var u=navigator.userAgent;return /Edg\//.test(u)?'edge':(/Firefox/.test(u)?'firefox':(/Chrome/.test(u)?'chrome':''));}
+function extUrl(){return EXT_STORE[browserKind()]||'';}
 function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_LATEST)>=0;}
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
-  var v=toolVersion(),ok=toolOk();
+  var v=toolVersion(),ok=toolOk()||hasExt(),eu=extUrl();
+  if(eu&&!hasExt()){
+    var bn=browserKind()==='edge'?'Edge':'Chrome';
+    return dialog({title:'أداة نور',html:(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<p class="m-msg"><b>خطوة واحدة فقط:</b> اضغط الزر الأخضر، وفي صفحة المتجر اضغط <b>«إضافة إلى '+bn+'» / Add to '+bn+'</b>. بعدها ارجع لهنا وحدّث الصفحة.</p><p class="m-msg muted small">الإضافة رسمية من متجر '+bn+' وتتحدث تلقائيًا، ولا تحتاج Tampermonkey ولا أي إعدادات.'+(v?' لو عندك Tampermonkey والأداة القديمة فيه، احذفها بعد تثبيت الإضافة.':'')+'</p>',okText:'تثبيت الإضافة من متجر '+bn,cancelText:'إغلاق'}).then(function(r){if(r)window.open(eu,'_blank');});
+  }
   var st=v?(ok?'<p class="m-msg" style="color:var(--brand,#0e7c66)"><b>✓ الأداة مثبتة ومحدّثة (الإصدار '+esc(v)+').</b></p>':'<p class="m-msg" style="color:#b45309"><b>عندك إصدار قديم ('+esc(v)+') والأحدث '+esc(TOOL_LATEST)+'.</b> اضغط «تثبيت الأداة» ثم «تحديث» في صفحة Tampermonkey.</p>'):'';
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+st+
    '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
@@ -79,7 +88,7 @@ var UPD_KEY='tahdir_tool_upd';
 function updState(){try{var o=JSON.parse(localStorage.getItem(UPD_KEY)||'null');return o&&o.to===TOOL_LATEST?o:{to:TOOL_LATEST,n:0};}catch(e){return {to:TOOL_LATEST,n:0};}}
 function updSave(o){try{localStorage.setItem(UPD_KEY,JSON.stringify(o));}catch(e){}}
 function forceToolUpdate(){
-  if(IN_APP)return;
+  if(IN_APP||hasExt())return;
   var v=toolVersion(),ov=$('modal'),box=$('modalBox');if(!ov||!box)return;
   if(!v||toolOk()){ // محدّثة: نقفل النافذة لو كانت مفتوحة، وننبّه مرة لو فيه نسخة قديمة مكررة
     if(ov.classList.contains('locked')){ov.classList.remove('locked');ov.hidden=true;box.innerHTML='';toast('تم تحديث أداة نور ✓');}
@@ -87,6 +96,15 @@ function forceToolUpdate(){
     return;
   }
   var stt=updState(),tried=stt.n>0;
+  if(extUrl()){ // على Chrome/Edge: الحل النهائي هو الإضافة الرسمية بدل Tampermonkey
+    var bn=browserKind()==='edge'?'Edge':'Chrome';
+    box.innerHTML='<h3 id="mTitle">⚠ ثبّت «أداة نور» الجديدة</h3><p class="m-msg">الأداة صارت إضافة رسمية في متجر '+bn+' تتحدث وحدها ولا تحتاج أي إعدادات. اضغط الزر، ثم <b>«إضافة إلى '+bn+'»</b>، وارجع لهنا.</p>'+
+      '<div class="m-actions"><button type="button" class="btn" id="mReload">تم</button><button type="button" class="btn primary" id="mOk">تثبيت من متجر '+bn+'</button></div>';
+    ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
+    $('mOk').onclick=function(){var o=updState();o.n=(o.n||0)+1;updSave(o);window.open(extUrl(),'_blank');$('mReload').classList.add('primary');};
+    $('mReload').onclick=function(){location.reload();};
+    return;
+  }
   box.innerHTML='<h3 id="mTitle">'+(tried?'⚠ التحديث لم يكتمل بعد':'⚠ حدّث «أداة نور» قبل المتابعة')+'</h3>'+
     '<p class="m-msg">المتصفح ما زال يشغّل الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_LATEST)+'</b>.</p>'+
     (tried?
@@ -101,7 +119,7 @@ function forceToolUpdate(){
 function watchTool(){
   if(IN_APP)return;
   // الأداة قد تُحقن متأخرة (Firefox) أو تتحدث والصفحة مفتوحة: نعيد الفحص كلما تغيّر إصدارها أو رجع المعلم للصفحة
-  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(forceToolUpdate,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool']});}catch(e){}
+  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(forceToolUpdate,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
   document.addEventListener('visibilitychange',function(){if(document.hidden)return;var ov=$('modal');
     // رجع من صفحة Tampermonkey بعد ضغط التحديث: نعيد تحميل الصفحة لتعمل النسخة الجديدة
     if(ov&&ov.classList.contains('locked')&&updState().n>0){setTimeout(function(){location.reload();},700);return;}
@@ -122,7 +140,7 @@ function initNav(me){
   if($('logoutBtn'))$('logoutBtn').onclick=logout;
   if($('toolBtn')){
     if(IN_APP)$('toolBtn').hidden=true;
-    else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolOk()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
+    else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolOk()||hasExt()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
   }
   if(me&&me.role==='admin')Array.prototype.forEach.call(document.querySelectorAll('.admin-only'),function(x){x.hidden=false;});
   if(me&&$('who'))$('who').textContent=me.name;
