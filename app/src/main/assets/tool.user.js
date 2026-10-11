@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.2.0
+// @version      3.3.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -20,7 +20,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '3.2.0';
+  const VERSION = '3.3.0';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
@@ -112,7 +112,8 @@
       if (!mine()) return; let d; try { d = JSON.parse(String(e.detail)); } catch (x) { return; }
       if (!d || !/^https:\/\/lms\.moe\.gov\.om\/teacher\/lectures\/submissions\//.test(String(d.subUrl || ''))) return;
       const aid = (String(d.subUrl).match(/\/aid:([^/?#]+)/) || [])[1] || '';
-      GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aid, title: String(d.title || ''), comment: String(d.comment || 'أحسنت').slice(0, 300), visited: [], filled: 0, ts: Date.now(), active: true, autosave: false });
+      GM_setValue('tahdir_grade_autosave', d.autosave !== false); GM_setValue('tahdir_grade_comment', String(d.comment || 'أحسنت').slice(0, 300));
+      GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aid, title: String(d.title || ''), comment: String(d.comment || 'أحسنت').slice(0, 300), visited: [], queue: null, filled: 0, saved: 0, ts: Date.now(), active: true, autosave: d.autosave !== false });
       reply('grade-ack', { ok: true });
       GM_openInTab(d.subUrl, { active: true });
     });
@@ -633,78 +634,125 @@
     if (f && Date.now() - f.ts < 15 * 60000) { GM_deleteValue(FETCH_KEY); showToast('✓ حُفظت ' + tasks.length + ' مهمة في موقع «التحضير الآلي». ارجع للموقع واختر المهمة لتصحيحها.', null, null, 9000); }
   }
   function startJob(d) {
-    GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aidOf(d.subUrl), title: d.title || '', comment: 'أحسنت', visited: [], filled: 0, ts: Date.now(), active: true, autosave: false });
+    GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aidOf(d.subUrl), title: d.title || '', comment: GM_getValue('tahdir_grade_comment', 'أحسنت') || 'أحسنت', visited: [], queue: null, filled: 0, saved: 0, ts: Date.now(), active: true, autosave: GM_getValue('tahdir_grade_autosave', true) !== false });
     location.href = d.subUrl;
   }
-  // 2) صفحة «التسليمات»: نفتح أول طالب لم يُصحَّح بعد
+  // 2) صفحة «التسليمات»: أول مرة نبني قائمة الطلاب غير المصحَّحين، وبعدها ننتقل مباشرة للتالي بدون انتظار الجدول
+  function nextInQueue(job) { return (job.queue || []).find(x => job.visited.indexOf(x.href) < 0) || null; }
+  function goNext(job, next) {
+    job.visited.push(next.href); job.ts = Date.now(); GM_setValue(JOB_KEY, job);
+    location.href = next.href;
+  }
+  function finishJob(job, total) {
+    gBar('✅ انتهى التصحيح: «' + escHtml(job.title) + '»' + (job.autosave ? ' — حُفظ ' + (job.saved || 0) + ' تسليم' : '') + (total ? ' من ' + total : '') + '.', [['إغلاق', () => stopJob(), false]]);
+    const j = GM_getValue(JOB_KEY, null); if (j) { j.active = false; j.finished = Date.now(); GM_setValue(JOB_KEY, j); }
+  }
   async function runSubmissions(job) {
-    gBar('⏳ التصحيح التلقائي: «' + escHtml(job.title) + '» — أبحث عن تسليمات لم تُصحَّح…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+    // رجعنا بعد الحفظ وعندنا القائمة: ننتقل فورًا
+    if (job.queue) {
+      const nx = nextInQueue(job);
+      if (nx) { gBar('⚡ التصحيح التلقائي: «' + escHtml(job.title) + '» — ' + job.visited.length + ' من ' + job.queue.length + '… أفتح: <b>' + escHtml(nx.name) + '</b>', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]); goNext(job, nx); return; }
+      finishJob(job, job.queue.length); return;
+    }
+    gBar('⏳ التصحيح التلقائي: «' + escHtml(job.title) + '» — أقرأ قائمة التسليمات…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
     showAllRows();
-    await waitRows('table tbody tr', 15000);
-    showAllRows(); await sleep(600);
-    const rows = Array.from(document.querySelectorAll('table tbody tr'));
-    const items = rows.map(tr => {
+    await waitRows('table tbody tr', 20000);
+    showAllRows(); await sleep(300);
+    const items = Array.from(document.querySelectorAll('table tbody tr')).map(tr => {
       const a = Array.from(tr.querySelectorAll('a[href*="/lectures/mark_submission/"]'))[0];
       const name = ((tr.querySelector('td') || {}).textContent || '').replace(/\s+/g, ' ').trim();
       return a ? { href: new URL(a.getAttribute('href'), location.href).href, name, graded: /تم التصحيح/.test(tr.textContent || '') } : null;
     }).filter(Boolean);
-    const left = items.filter(x => !x.graded && job.visited.indexOf(x.href) < 0);
-    const done = items.filter(x => x.graded).length;
     if (!items.length) { gBar('لم أجد تسليمات في هذه الصفحة.', [['إغلاق', () => stopJob(), true]]); return; }
-    if (!left.length) {
-      gBar('✅ انتهى التصحيح: «' + escHtml(job.title) + '» — ' + done + ' من ' + items.length + ' تسليم مصحَّح.', [['إغلاق', () => stopJob(), false]]);
-      const j = GM_getValue(JOB_KEY, null); if (j) { j.active = false; j.finished = Date.now(); GM_setValue(JOB_KEY, j); }
-      return;
-    }
-    const next = left[0];
-    gBar('✍ التصحيح التلقائي: «' + escHtml(job.title) + '» — مصحَّح ' + done + ' من ' + items.length + '. أفتح تسليم: <b>' + escHtml(next.name) + '</b>…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
-    job.visited.push(next.href); job.ts = Date.now(); GM_setValue(JOB_KEY, job);
-    await sleep(900);
-    if (getJob()) location.href = next.href;
+    job.queue = items.filter(x => !x.graded).map(x => ({ href: x.href, name: x.name }));
+    GM_setValue(JOB_KEY, job);
+    const nx = nextInQueue(job);
+    if (!nx) { finishJob(job, 0); gBar('✅ كل التسليمات (' + items.length + ') مصحَّحة بالفعل.', [['إغلاق', () => stopJob(), false]]); return; }
+    goNext(job, nx);
   }
-  // 3) صفحة «الدرجة» لطالب: الدرجة النهائية لكل سؤال + «أحسنت» في التعليقات — بدون حفظ
+  // 3) صفحة «الدرجة»: الدرجة النهائية لكل سؤال + التعليق، ثم «درجة التسليم» تلقائيًا (لو مفعّل)
+  const numOf = t => { const m = String(t == null ? '' : t).trim().match(/^\d+(\.\d+)?$/); return m ? parseFloat(m[0]) : NaN; };
+  function gradeSelects() {
+    return Array.from(document.querySelectorAll('select')).filter(sel => {
+      const nums = Array.from(sel.options).map(o => numOf(o.value !== '' ? o.value : o.text)).filter(n => !isNaN(n));
+      const other = Array.from(sel.options).filter(o => !(o.hasAttribute('value') && o.value === '') && o.text.trim() !== '' && isNaN(numOf(o.value !== '' ? o.value : o.text)));
+      return nums.length >= 2 && !other.length && Math.max.apply(null, nums) > 0 && Math.max.apply(null, nums) <= 100;
+    });
+  }
   function setSelectMax(sel) {
-    const opts = Array.from(sel.options).map(o => ({ o, n: parseFloat(o.value !== '' ? o.value : o.text) })).filter(x => !isNaN(x.n));
+    const opts = Array.from(sel.options).map(o => ({ o, n: numOf(o.value !== '' ? o.value : o.text) })).filter(x => !isNaN(x.n));
     if (!opts.length) return false;
     const best = opts.reduce((a, b) => (b.n > a.n ? b : a));
-    if (sel.value === best.o.value) return true;
     sel.value = best.o.value; best.o.selected = true;
     sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
-    try { const $ = uw.jQuery; if ($) $(sel).trigger('change').trigger('chosen:updated').trigger('change.select2'); } catch (e) { }
-    return true;
+    try {
+      const $ = uw.jQuery;
+      if ($) { const $s = $(sel); $s.val(best.o.value).trigger('change'); $s.trigger('chosen:updated'); if ($s.selectpicker) try { $s.selectpicker('refresh'); } catch (e) { } if ($s.niceSelect) try { $s.niceSelect('update'); } catch (e) { } }
+    } catch (e) { }
+    // قوائم مخصّصة فوق القائمة الأصلية (nice-select وما يشبهها): نضغط الخيار الأعلى أيضًا
+    const wrap = sel.nextElementSibling;
+    if (wrap && /nice-select|dropdown|select/.test(wrap.className || '')) {
+      const li = Array.from(wrap.querySelectorAll('[data-value]')).find(x => String(x.getAttribute('data-value')) === String(best.o.value));
+      if (li) try { li.click(); } catch (e) { }
+    }
+    return String(sel.value) === String(best.o.value);
+  }
+  function customGradeLists() { // قوائم بلا <select>: عناصر [data-value] رقمية داخل نفس الحاوية
+    const out = [];
+    document.querySelectorAll('.nice-select, [class*="select"]').forEach(w => {
+      if (w.tagName === 'SELECT' || w.querySelector('select')) return;
+      const lis = Array.from(w.querySelectorAll('[data-value]')).filter(x => !isNaN(numOf(x.getAttribute('data-value'))));
+      if (lis.length >= 2) out.push(lis);
+    });
+    return out;
+  }
+  function gradeDebug() {
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n, el = null;
+    while ((n = tw.nextNode())) { if (/^\s*\d+\s*\/\s*$/.test(n.nodeValue)) { el = n.parentElement; break; } }
+    let box = el; for (let i = 0; i < 4 && box && box.parentElement; i++) box = box.parentElement;
+    return 'tahdir ' + VERSION + ' | ' + location.pathname.slice(0, 60) + '\n' + (box ? box.outerHTML : document.body.innerHTML).replace(/\s+/g, ' ').slice(0, 6000);
   }
   async function runMark(job) {
     gBar('⏳ أكتب الدرجة والتعليق…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
-    let sels = [];
-    for (let i = 0; i < 60; i++) {
-      sels = Array.from(document.querySelectorAll('select')).filter(s => Array.from(s.options).length >= 2 && Array.from(s.options).every(o => /^\s*\d+(\.\d+)?\s*$/.test(o.value !== '' ? o.value : o.text)));
-      if (sels.length) break; await sleep(250);
-    }
-    let marked = 0; sels.forEach(s => { if (setSelectMax(s)) marked++; });
-    // التعليق: محرر CKEditor تحت «التعليقات» (أو مربع نص عادي)
+    let sels = [], lists = [];
+    for (let i = 0; i < 80; i++) { sels = gradeSelects(); lists = sels.length ? [] : customGradeLists(); if (sels.length || lists.length) break; await sleep(150); }
+    let marked = 0;
+    sels.forEach(sl => { if (setSelectMax(sl)) marked++; });
+    lists.forEach(lis => { const best = lis.reduce((a, b) => (numOf(b.getAttribute('data-value')) > numOf(a.getAttribute('data-value')) ? b : a)); try { best.click(); marked++; } catch (e) { } });
+    // عدد الأسئلة في الصفحة من علامات «1/» بجانب كل سؤال: لا نحفظ إلا لو اخترنا درجة لكل سؤال
+    let pills = 0; { const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) if (/^\s*\d+(\.\d+)?\s*\/\s*$/.test(n.nodeValue)) pills++; }
+    const total = Math.max(sels.length + lists.length, pills);
+    // التعليق
     let commented = false;
     for (let i = 0; i < 40 && !commented; i++) {
       const CK = uw.CKEDITOR;
       if (CK && CK.instances) {
-        const ids = Object.keys(CK.instances);
-        const inst = ids.map(k => CK.instances[k]).find(x => x && x.status === 'ready');
-        if (inst) {
-          const cur = String(inst.getData() || '').replace(/<[^>]+>|&nbsp;/g, '').trim();
-          if (!cur) inst.setData('<p>' + escHtml(job.comment || 'أحسنت') + '</p>');
-          try { inst.updateElement(); } catch (e) { }
-          commented = true; break;
-        }
+        const inst = Object.keys(CK.instances).map(k => CK.instances[k]).find(x => x && x.status === 'ready');
+        if (inst) { const cur = String(inst.getData() || '').replace(/<[^>]+>|&nbsp;/g, '').trim(); if (!cur) inst.setData('<p>' + escHtml(job.comment || 'أحسنت') + '</p>'); try { inst.updateElement(); } catch (e) { } commented = true; break; }
       }
       const ta = Array.from(document.querySelectorAll('textarea')).find(t => t.offsetParent !== null);
       if (ta && !(CK && Object.keys(CK.instances || {}).length)) { if (!ta.value.trim()) setVal(ta, job.comment || 'أحسنت'); commented = true; break; }
-      await sleep(300);
+      await sleep(150);
     }
     job.filled = (job.filled || 0) + 1; GM_setValue(JOB_KEY, job);
     const saveBtn = Array.from(document.querySelectorAll('button, input[type=submit], a.btn')).find(b => /درجة التسليم/.test(b.textContent || b.value || ''));
+    const pos = job.queue ? (job.visited.length + ' من ' + job.queue.length) : '';
+    const ok = total > 0 && marked === total && commented;
+    if (ok && job.autosave && saveBtn) {
+      gBar('💾 ' + pos + ' — الدرجة النهائية + «' + escHtml(job.comment || 'أحسنت') + '»… أحفظ وأنتقل للتالي', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+      job.saved = (job.saved || 0) + 1; GM_setValue(JOB_KEY, job);
+      await sleep(350); // ننتظر تحديث المحرر والقائمة قبل الحفظ
+      if (!getJob()) return; // أوقفه المعلم
+      saveBtn.click();
+      // لو لم ينتقل نور خلال 8 ثوانٍ (خطأ في الحفظ) نتوقف ليتدخل المعلم
+      setTimeout(() => { if (/\/lectures\/mark_submission\//.test(location.pathname) && getJob()) { job.saved--; GM_setValue(JOB_KEY, job); gBar('⚠ لم يكتمل الحفظ لهذا الطالب. راجع الصفحة واحفظ بنفسك، أو تخطَّه.', [['تخطَّ هذا الطالب', () => { location.href = job.subUrl; }, true], ['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]); } }, 8000);
+      return;
+    }
     if (saveBtn) { saveBtn.style.outline = '4px solid #f2c66d'; saveBtn.style.outlineOffset = '3px'; try { saveBtn.scrollIntoView({ block: 'center' }); } catch (e) { } }
-    gBar('✅ كتبت الدرجة النهائية (' + marked + ' ' + (marked === 1 ? 'سؤال' : 'أسئلة') + ')' + (commented ? ' وتعليق «' + escHtml(job.comment || 'أحسنت') + '»' : ' — <b>لم أجد مربع التعليق</b>') +
-      '. راجع ثم اضغط <b>«درجة التسليم»</b> للحفظ، وبعدها أفتح الطالب التالي تلقائيًا.', [['تخطَّ هذا الطالب', () => { location.href = job.subUrl; }, true], ['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
-    if (!marked) showToast('لم أجد قوائم الدرجات في هذه الصفحة. اكتبها بنفسك أو أوقف التصحيح.', null, null, 8000);
+    const why = !total ? '<b>لم أجد قائمة الدرجة</b> — اخترها بنفسك' : (marked < total ? '<b>لم أستطع اختيار كل الدرجات</b> — راجعها' : (!commented ? '<b>لم أجد مربع التعليق</b>' : ''));
+    gBar((why ? '⚠ ' + why : '✅ كتبت الدرجة النهائية والتعليق') + '. اضغط <b>«درجة التسليم»</b> للحفظ، وبعدها أفتح الطالب التالي. ' + pos,
+      [['نسخ تقرير للمطوّر', () => { try { navigator.clipboard.writeText(gradeDebug()).then(() => showToast('نُسخ التقرير — أرسله لأ. محمد مجدي')); } catch (e) { prompt('انسخ هذا التقرير:', gradeDebug()); } }, true],
+       ['تخطَّ هذا الطالب', () => { location.href = job.subUrl; }, true], ['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
   }
   // ---------- التشغيل ----------
   function addButton(label, fn) {
@@ -723,7 +771,7 @@
     addButton('📋 لصق من التحضير الآلي', runPrep);
   }
   // التصحيح التلقائي (يعمل فقط لو بدأه المعلم، وعلى نفس الواجب)
-  const gjob = getJob();
+  const gjob = uw.__tahdirGradeRan ? null : getJob(); uw.__tahdirGradeRan = true;
   if (IS_HWLIST) scanTasks();
   if (gjob && IS_SUBS && aidOf(path) === gjob.aid) runSubmissions(gjob);
   else if (gjob && IS_MARK && aidOf(path) === gjob.aid) runMark(gjob);

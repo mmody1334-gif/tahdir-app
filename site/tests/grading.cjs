@@ -11,8 +11,8 @@ function nour(url) {
   if (/homeworks\/index/.test(u.pathname)) return page('المهام الإلكترونية', `<table><tbody id=tb></tbody></table>`, `setTimeout(()=>{tb.innerHTML='<tr><td><input type=checkbox></td><td>تبادل الغازات في الإنسان</td><td>2</td><td>2026-10-10 19:43:10</td><td>2026-10-18 02:05:00</td><td><a href="#">معاينة</a><ul><li><a href="/teacher/questions/list">قائمة المفردات</a></li><li><a href="/teacher/lectures/submissions/cid:${ENC}/aid:${AID}/tid:X">التسليمات</a></li></ul></td></tr>'},700)`);
   if (/lectures\/submissions/.test(u.pathname)) return page('التسليمات', `<table><tbody>${students.map((s, i) => `<tr><td>${s[0]}</td><td>العاشر</td><td>${graded[i] || s[1] ? 2 : 0}</td><td>${graded[i] || s[1] ? 'تم التصحيح' : ''}</td><td><a href="/teacher/lectures/mark_submission/cid:${ENC}/aid:${AID}/sid:${i}">الدرجة</a></td></tr>`).join('')}</tbody></table>`);
   if (/mark_submission/.test(u.pathname)) { const sid = +u.pathname.match(/sid:(\d+)/)[1];
-    return page('الدرجة', `<h3>${students[sid][0]}</h3><div>1/ <select id=q1><option>0</option><option>1</option></select></div><div>1/ <select id=q2><option>0</option><option>1</option></select></div><div id=cm></div><button id=save type=button>درجة التسليم</button><button type=button>إلغاء</button>`,
-      `window.CKEDITOR={instances:{comments:{status:'ready',d:'',getData(){return this.d},setData(v){this.d=v;cm.innerHTML=v},updateElement(){}}}};save.onclick=()=>{location.href='/teacher/lectures/__save?sid=${sid}&q1='+q1.value+'&q2='+q2.value+'&c='+encodeURIComponent(CKEDITOR.instances.comments.d)};`); }
+    return page('الدرجة', `<h3>${students[sid][0]}</h3><div>1/ <select id=q1 style=display:none><option value=''>اختر</option><option>0</option><option>1</option></select><div class=nice-select><ul><li data-value=0>0</li><li data-value=1>1</li></ul></div></div>${process.env.ODD && sid === 1 ? '<div>1/ <span class=pill id=q2>0</span></div>' : "<div>1/ <select id=q2><option value=''></option><option>0</option><option>1</option></select></div>"}<div id=cm></div><button id=save type=button>درجة التسليم</button><button type=button>إلغاء</button>`,
+      `window.CKEDITOR={instances:{comments:{status:'ready',d:'',getData(){return this.d},setData(v){this.d=v;cm.innerHTML=v},updateElement(){}}}};save.onclick=()=>{location.href='/teacher/lectures/__save?sid=${sid}&q1='+q1.value+'&q2='+(q2.value||q2.textContent)+'&c='+encodeURIComponent(CKEDITOR.instances.comments.d)};`); }
   return page('الرئيسية', '<h1>الرئيسية</h1>');
 }
 (async () => {
@@ -22,7 +22,7 @@ function nour(url) {
   await c.exposeBinding('__gm', (src, op, k, v) => { if (op === 'set') store[k] = v; else delete store[k];
     // مثل Tampermonkey: القيم تتزامن بين كل التبويبات
     c.pages().forEach(pg => { if (pg !== src.page) pg.evaluate(([op, k, v]) => { if (window.__S) { if (op === 'set') window.__S[k] = v; else delete window.__S[k]; } }, [op, k, v]).catch(() => {}); }); });
-  await c.exposeBinding('__open', async (_, u) => { const p = await c.newPage(); hook(p); await p.goto(u); });
+  await c.exposeBinding('__open', async (_, u) => { const p = await c.newPage(); await p.goto(u); });
   await c.route('https://lms.moe.gov.om/**', r => {
     const u = r.request().url();
     if (/__save/.test(u)) { const q = new URL(u).searchParams; graded[+q.get('sid')] = true; saves++; console.log('   teacher saved sid', q.get('sid'), 'q1', q.get('q1'), 'q2', q.get('q2'), 'comment', q.get('c'));
@@ -48,18 +48,10 @@ function nour(url) {
   console.log('site tasks:', await p.$$eval('.gr-tasks tbody tr', e => e.map(x => x.innerText.replace(/\s+/g, ' ').slice(0, 80))));
   await p.screenshot({ path: OUT + 'gr_tasks.png', fullPage: true });
   console.log('saved on server:', Object.keys((await (await p.request.get(B + '/api/nour/tasks')).json()).tasks).length);
-  // start grading from the site
-  const gp = c.waitForEvent('page'); await p.click('[data-g]'); const s = await gp; await s.waitForLoadState();
-  await s.waitForURL(/mark_submission/, { timeout: 15000 }); await s.waitForTimeout(2500);
-  console.log('mark page 1:', s.url().replace(/.*sid:/, 'sid:'), 'q1', await s.inputValue('#q1'), 'q2', await s.inputValue('#q2'), 'comment', await s.textContent('#cm'), '| tool saved?', saves);
-  console.log('bar:', (await s.textContent('#tahdir-grade-bar')).slice(0, 120));
-  await s.screenshot({ path: OUT + 'gr_mark.png' });
-  // المعلم يحفظ بنفسه ← الأداة تفتح الطالب التالي
-  await s.click('#save'); await s.waitForURL(/mark_submission\/.*sid:1/, { timeout: 15000 }); await s.waitForTimeout(2200);
-  console.log('mark page 2:', s.url().replace(/.*sid:/, 'sid:'), 'q1', await s.inputValue('#q1'), 'comment', await s.textContent('#cm'));
-  await s.click('#save'); await s.waitForTimeout(3500);
-  console.log('after last:', s.url().replace(/.*\/teacher/, ''), '| bar:', (await s.textContent('#tahdir-grade-bar').catch(() => '')).slice(0, 90));
-  console.log('graded:', graded, 'saves by teacher:', saves, '(student 3 was already graded and was skipped)');
-  await s.screenshot({ path: OUT + 'gr_done.png' });
+  // start grading from the site (autosave on: no teacher clicks at all)
+  const t0 = Date.now(); const gp = c.waitForEvent('page'); await p.click('[data-g]'); const sp = await gp;
+  for (let i = 0; i < 16 && !(await sp.textContent('#tahdir-grade-bar').catch(() => '')).includes('انتهى'); i++) await sp.waitForTimeout(500);
+  console.log('autosave run:', ((Date.now() - t0) / 1000).toFixed(1) + 's', '| graded:', graded, '| saves:', saves, '| bar:', (await sp.textContent('#tahdir-grade-bar')).slice(0, 80));
+  await sp.screenshot({ path: OUT + 'gr_done.png' });
   console.log('errors', errs); await b.close();
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
