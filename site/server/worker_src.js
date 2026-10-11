@@ -37,6 +37,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS rooms(code TEXT PRIMARY KEY, owner INTEGER NOT NULL, title TEXT, grade TEXT, data TEXT NOT NULL, state TEXT NOT NULL, qi INTEGER NOT NULL DEFAULT -1, q_started INTEGER, dur INTEGER NOT NULL DEFAULT 20, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS players(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, name TEXT NOT NULL, token TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, ans_qi INTEGER NOT NULL DEFAULT -1, ans_choice INTEGER, ans_ok INTEGER, ans_pts INTEGER, ans_at INTEGER, joined_at INTEGER NOT NULL, UNIQUE(code, name))`,
   `CREATE INDEX IF NOT EXISTS pl_code ON players(code)`,
+  `CREATE TABLE IF NOT EXISTS nour_tasks(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS exports(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT, format TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
@@ -453,6 +454,17 @@ export default {
       if (p === '/api/me') return json({ name: me.name, username: me.username, role: me.role });
       if (p === '/quiz') return html('quiz');
       if (p === '/games') return html('games');
+      if (p === '/grading') return html('grading');
+      if (p === '/api/nour/tasks') {
+        if (m === 'POST') {
+          const b = await body(req), data = JSON.stringify(b.tasks || {});
+          if (data.length > 300000) return json({ error: 'كبير جدًا' }, 400);
+          await env.DB.prepare('INSERT INTO nour_tasks(user_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at').bind(me.id, data, now()).run();
+          return json({ ok: true });
+        }
+        const r = await env.DB.prepare('SELECT data, updated_at FROM nour_tasks WHERE user_id = ?').bind(me.id).first();
+        return json({ tasks: r ? JSON.parse(r.data) : {}, updated_at: r ? r.updated_at : null });
+      }
       if (p === '/remedial') return html('remedial');
       if (p === '/summaries') return html('summaries');
       if (p === '/api/study') {
@@ -511,7 +523,7 @@ export default {
       }
       if (p === '/api/event' && m === 'POST') {
         const b = await body(req);
-        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'game_play', 'game_live', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word'].includes(b.type) ? b.type : null;
+        const type = ['view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw', 'game_play', 'game_live', 'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word', 'grade_start', 'tasks_fetch'].includes(b.type) ? b.type : null;
         if (!type) return json({ error: 'bad' }, 400);
         let l = LESSONS.find(x => x.id === +b.lesson_id);
         if (!l && +b.lesson_id >= CUSTOM_BASE) { const r = await env.DB.prepare('SELECT data FROM custom_lessons WHERE id = ?').bind(+b.lesson_id).first(); if (r) { try { l = { ...JSON.parse(r.data), id: +b.lesson_id }; } catch {} } }

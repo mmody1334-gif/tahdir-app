@@ -19,7 +19,8 @@ for l in lessons:
 rd = lambda f: open(os.path.join(HERE, f), encoding='utf-8').read()
 common = rd('common.js')
 TOOL_VER = re.search(r'@version\s+(\S+)', rd('tahdir-noor.user.js')).group(1)
-common = common.replace('__TOOLVER__', TOOL_VER)
+TOOL_FORCE = re.search(r"MIN_REQUIRED = '([^']+)'", rd('tahdir-noor.user.js')).group(1)
+common = common.replace('__TOOLVER__', TOOL_VER).replace('__TOOLFORCE__', TOOL_FORCE)
 
 extra_css = '''
 .whobar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -449,6 +450,20 @@ extra_css += '''
 .menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 .menu-list #logoutBtn{color:var(--danger,#b23a2b)}
 .modal.locked{backdrop-filter:blur(3px)}
+/* ---------- grading page ---------- */
+.gr{padding-block:22px 60px;display:grid;gap:14px}
+.gr-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow)}
+.gr-card h3{margin:0 0 6px;font-size:1rem;color:var(--main-d)}
+.gr-steps{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;list-style:none;font-size:.82rem}
+.gr-steps li{background:var(--main-l);border-radius:999px;padding:4px 10px}
+.gr-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.gr-row .qsel{width:auto;min-width:220px}
+.gr-tasks{width:100%;border-collapse:collapse;font-size:.9rem}
+.gr-tasks th,.gr-tasks td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start}
+.gr-tasks th{font-size:.78rem;color:var(--mute);font-weight:700}
+.gr-tasks td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.gr-note{font-size:.82rem;background:var(--accent-l,#fff8e6);border-radius:10px;padding:8px 12px}
+.gr-empty{color:var(--mute);text-align:center;padding:18px}
 /* ---------- study pages ---------- */
 .edit-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fff8e6);border-radius:10px;padding:6px 12px;margin-bottom:8px}
 .study-paper{outline:none;font-size:15px}
@@ -544,7 +559,8 @@ TOP = lambda extra: f'''<header class="top">{HELIX}<div class="wrap top-in">
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات')]
+              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'),
+              ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا')]
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'
@@ -584,6 +600,8 @@ SUMMARIES = TOP('<div class="stats"><span class="stat">ملخصات الدروس
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="اختيار الملخص"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
+GRADING = TOP('<div class="stats"><span class="stat">تصحيح الواجبات تلقائيًا</span><span class="stat">تجريبي</span></div>').replace('%BTNS%', NAV('grading')) + '''
+<main class="wrap gr" id="gr"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 PLAY = '<main class="pl" id="pl"></main>'
 
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
@@ -599,6 +617,7 @@ PAGES = {
   'quiz': page('التقويم · التحضير الآلي', QUIZ, rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · التحضير الآلي', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
   'play': page('تحدي التحضير الآلي', PLAY, rd('client_play.js')),
+  'grading': page('تصحيح الواجبات · التحضير الآلي', GRADING, rd('client_grading.js')),
   'remedial': page('الخطط العلاجية · التحضير الآلي', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
   'summaries': page('ملخصات الدروس · التحضير الآلي', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
 }

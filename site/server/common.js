@@ -53,7 +53,7 @@ function logout(){api('/api/logout',{}).then(function(){location.href='/';},func
 function fmtDate(t){if(!t)return '—';var d=new Date(t);return d.toLocaleDateString('ar-OM',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('ar-OM',{hour:'2-digit',minute:'2-digit'});}
 function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if(s<60)return 'الآن';if(s<3600)return 'منذ '+Math.floor(s/60)+' دقيقة';if(s<86400)return 'منذ '+Math.floor(s/3600)+' ساعة';var d=Math.floor(s/86400);return d===1?'أمس':'منذ '+d+' يوم';}
 // ---------- أداة نور (مشتركة لكل الصفحات) ----------
-var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST='__TOOLVER__',IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
+var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST='__TOOLVER__',TOOL_FORCE='__TOOLFORCE__',IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
 function verCmp(a,b){a=String(a||'').split('.');b=String(b||'').split('.');for(var i=0;i<3;i++){var d=(parseInt(a[i],10)||0)-(parseInt(b[i],10)||0);if(d)return d;}return 0;}
 function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
 // إضافة المتصفح الرسمية (Chrome / Edge): تتحدث من المتجر تلقائيًا ولا تحتاج أي إعداد
@@ -61,7 +61,7 @@ var EXT_STORE={chrome:'',edge:''};
 function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
 function browserKind(){var u=navigator.userAgent;return /Edg\//.test(u)?'edge':(/Firefox/.test(u)?'firefox':(/Chrome/.test(u)?'chrome':''));}
 function extUrl(){return EXT_STORE[browserKind()]||'';}
-function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_LATEST)>=0;}
+function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_FORCE)>=0;}
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
   var v=toolVersion(),ok=toolOk()||hasExt(),eu=extUrl();

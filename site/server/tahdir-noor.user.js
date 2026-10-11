@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.1.0
+// @version      3.2.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -20,12 +20,16 @@
 
 (function () {
   'use strict';
-  const VERSION = '3.1.0';
+  const VERSION = '3.2.0';
+  const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
   const CID_KEY = 'tahdir_last_cid';
   const GRADES_KEY = 'tahdir_grade_cids';
+  const TASKS_KEY = 'tahdir_nour_tasks';   // المهام الإلكترونية التي قرأتها الأداة من نور (لكل صف)
+  const JOB_KEY = 'tahdir_grade_job';      // مهمة تصحيح جارية
+  const FETCH_KEY = 'tahdir_fetch_tasks';  // طلب من الموقع لجلب مهام صف معيّن
   const NOUR = 'https://lms.moe.gov.om';
   const MAX_AGE = 3 * 60 * 60 * 1000; // الواجب المُرسل يبقى صالحًا 3 ساعات
 
@@ -93,6 +97,25 @@
       // نفتح نور مباشرة على صفحة هذا الصف (أو الرئيسية أول مرة لنتعرف على أرقام الصفوف)
       GM_openInTab(routeUrl(kind, data.grade || '', data.subject || ''), { active: true });
     }
+    // ---- التصحيح التلقائي: الموقع يطلب المهام المحفوظة، أو جلبها من نور، أو بدء التصحيح ----
+    const reply = (type, obj) => document.dispatchEvent(new CustomEvent('tahdir-' + type, { detail: JSON.stringify(obj) }));
+    const mine = () => de.getAttribute('data-tahdir-tool') === VERSION;
+    document.addEventListener('tahdir-v3-get-tasks', () => { if (mine()) reply('tasks', { tasks: GM_getValue(TASKS_KEY, {}) || {}, job: GM_getValue(JOB_KEY, null) }); });
+    document.addEventListener('tahdir-v3-fetch-tasks', e => {
+      if (!mine()) return; let d; try { d = JSON.parse(String(e.detail)); } catch (x) { return; }
+      const map = GM_getValue(GRADES_KEY, {}) || {}, cid = cidFor(map, d.grade || '', d.subject || '');
+      GM_setValue(FETCH_KEY, { grade: d.grade || '', subject: d.subject || '', ts: Date.now() });
+      reply('fetch-ack', { cid: cid || '' });
+      GM_openInTab(cid ? NOUR + '/teacher/homeworks/index/cid:' + cid : NOUR + '/teacher', { active: true });
+    });
+    document.addEventListener('tahdir-v3-grade', e => {
+      if (!mine()) return; let d; try { d = JSON.parse(String(e.detail)); } catch (x) { return; }
+      if (!d || !/^https:\/\/lms\.moe\.gov\.om\/teacher\/lectures\/submissions\//.test(String(d.subUrl || ''))) return;
+      const aid = (String(d.subUrl).match(/\/aid:([^/?#]+)/) || [])[1] || '';
+      GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aid, title: String(d.title || ''), comment: String(d.comment || 'أحسنت').slice(0, 300), visited: [], filled: 0, ts: Date.now(), active: true, autosave: false });
+      reply('grade-ack', { ok: true });
+      GM_openInTab(d.subUrl, { active: true });
+    });
     // أسماء أحداث جديدة: النسخ القديمة (حتى 3.0) لا تسمعها فلا تفتح نور مرتين
     document.addEventListener('tahdir-v3-send-hw', e => onSend('hw', e));
     document.addEventListener('tahdir-v3-send-prep', e => onSend('prep', e));
@@ -108,6 +131,9 @@
   const IS_HW = /\/questions\/add_bulk_questions\//.test(path);
   const IS_PREP = /\/courses\/add_preparation\//.test(path);
   const IS_TASK = /\/homeworks\/(create|edit|add)\//.test(path);
+  const IS_HWLIST = /\/homeworks\/index\//.test(path);
+  const IS_SUBS = /\/lectures\/submissions\//.test(path);
+  const IS_MARK = /\/lectures\/mark_submission\//.test(path);
   const cidMatch = path.match(/\/cid:([^/]+)/);
   if (cidMatch && typeof GM_setValue !== 'undefined') GM_setValue(CID_KEY, cidMatch[1]);
   const GRADE_RE = /(الخامس|السادس|السابع|الثامن|التاسع|العاشر|الحادي\s*عشر|الثاني\s*عشر)\s*$/;
@@ -535,6 +561,151 @@
     return any ? { ok: true } : { ok: false, error: 'لم يتم إيجاد القوائم' };
   }
 
+
+  // ================= التصحيح التلقائي للواجبات =================
+  // المسار: المهام الإلكترونية ← التسليمات ← «الدرجة» لكل طالب ← الدرجة النهائية + تعليق «أحسنت».
+  // المرحلة الأولى: لا تضغط «درجة التسليم» (الحفظ) أبدًا — المعلم يراجع ويحفظ بنفسه، ثم تفتح الأداة الطالب التالي.
+  function gBar(html, buttons) {
+    let bar = document.getElementById('tahdir-grade-bar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'tahdir-grade-bar';
+      Object.assign(bar.style, { position: 'fixed', top: '0', left: '0', right: '0', zIndex: 999998, background: '#3b1d8f', color: '#fff', padding: '9px 16px', fontFamily: 'Tahoma, sans-serif', fontSize: '13.5px', direction: 'rtl', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 2px 10px rgba(0,0,0,.25)', lineHeight: '1.7' });
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = ''; const t = document.createElement('span'); t.style.flex = '1'; t.innerHTML = html; bar.appendChild(t);
+    (buttons || []).forEach(([label, fn, ghost]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+      Object.assign(b.style, { background: ghost ? 'transparent' : '#fff', color: ghost ? '#fff' : '#3b1d8f', border: ghost ? '1px solid rgba(255,255,255,.6)' : 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px' });
+      b.onclick = fn; bar.appendChild(b);
+    });
+    return bar;
+  }
+  function getJob() { const j = GM_getValue(JOB_KEY, null); if (!j || !j.active || Date.now() - j.ts > 6 * 3600000) return null; return j; }
+  function stopJob(msg) { const j = GM_getValue(JOB_KEY, null); if (j) { j.active = false; GM_setValue(JOB_KEY, j); } const b = document.getElementById('tahdir-grade-bar'); if (b) b.remove(); if (msg) showToast(msg, null, null, 6000); }
+  function aidOf(u) { return (String(u || '').match(/\/aid:([^/?#]+)/) || [])[1] || ''; }
+  // نعرض كل صفوف الجدول في صفحة واحدة لو كان DataTables
+  function showAllRows() {
+    try { const $ = uw.jQuery; if ($ && $.fn && $.fn.dataTable) $('table.dataTable').each(function () { try { const t = $(this).DataTable(); if (t.page.len() !== -1 && t.page.info().pages > 1) t.page.len(-1).draw(false); } catch (e) { } }); } catch (e) { }
+  }
+  async function waitRows(sel, ms) {
+    for (let i = 0; i < (ms || 15000) / 300; i++) {
+      const rows = Array.from(document.querySelectorAll(sel)).filter(r => r.querySelector('a[href]'));
+      if (rows.length) return rows;
+      await sleep(300);
+    }
+    return [];
+  }
+  // 1) صفحة «المهام الإلكترونية»: نقرأ المهام ونحفظها، ونضيف زر «صحّح تلقائيًا» بجانب كل مهمة
+  function courseOfCid(cid) {
+    const map = GM_getValue(GRADES_KEY, {}) || {}; let grade = '', subject = '';
+    Object.keys(map).forEach(k => { if (map[k] === cid) { if (k.indexOf('|') > 0) { subject = k.split('|')[0]; grade = k.split('|')[1]; } else if (!grade) grade = k; } });
+    const f = GM_getValue(FETCH_KEY, null);
+    if (!grade && f && Date.now() - f.ts < 15 * 60000) { grade = f.grade; subject = f.subject; }
+    return { grade, subject };
+  }
+  async function scanTasks() {
+    showAllRows(); await sleep(400);
+    const rows = await waitRows('table tbody tr', 15000);
+    showAllRows(); await sleep(300);
+    const cid = (path.match(/\/cid:([^/?#]+)/) || [])[1] || '';
+    const course = courseOfCid(cid);
+    const tasks = [];
+    Array.from(document.querySelectorAll('table tbody tr')).forEach(tr => {
+      const sub = Array.from(tr.querySelectorAll('a[href*="/lectures/submissions/"]'))[0];
+      if (!sub) return;
+      const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.textContent || '').replace(/\s+/g, ' ').trim());
+      const dates = tds.filter(t => /^\d{4}-\d{2}-\d{2}/.test(t));
+      const title = tds.find(t => t && !/^\d/.test(t) && !/معاينة|التسليمات|قائمة المفردات|إحصائيات/.test(t)) || '';
+      const count = tds.find(t => /^\d{1,3}$/.test(t)) || '';
+      tasks.push({ title, count: +count || 0, published: dates[0] || '', due: dates[1] || '', subUrl: new URL(sub.getAttribute('href'), location.href).href, aid: aidOf(sub.getAttribute('href')) });
+      if (!tr.querySelector('.tahdir-grade-btn')) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'tahdir-grade-btn'; b.textContent = '✓ صحّح تلقائيًا';
+        Object.assign(b.style, { background: '#3b1d8f', color: '#fff', border: 'none', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', fontFamily: 'Tahoma, sans-serif', fontSize: '12px', marginInlineStart: '6px' });
+        b.onclick = () => startJob({ subUrl: new URL(sub.getAttribute('href'), location.href).href, title });
+        const cell = tr.querySelector('td:last-child') || tr; cell.appendChild(b);
+      }
+    });
+    if (!tasks.length) return;
+    const all = GM_getValue(TASKS_KEY, {}) || {};
+    all[cid] = { cid, grade: course.grade, subject: course.subject, tasks, ts: Date.now(), url: location.href };
+    GM_setValue(TASKS_KEY, all);
+    const f = GM_getValue(FETCH_KEY, null);
+    if (f && Date.now() - f.ts < 15 * 60000) { GM_deleteValue(FETCH_KEY); showToast('✓ حُفظت ' + tasks.length + ' مهمة في موقع «التحضير الآلي». ارجع للموقع واختر المهمة لتصحيحها.', null, null, 9000); }
+  }
+  function startJob(d) {
+    GM_setValue(JOB_KEY, { subUrl: d.subUrl, aid: aidOf(d.subUrl), title: d.title || '', comment: 'أحسنت', visited: [], filled: 0, ts: Date.now(), active: true, autosave: false });
+    location.href = d.subUrl;
+  }
+  // 2) صفحة «التسليمات»: نفتح أول طالب لم يُصحَّح بعد
+  async function runSubmissions(job) {
+    gBar('⏳ التصحيح التلقائي: «' + escHtml(job.title) + '» — أبحث عن تسليمات لم تُصحَّح…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+    showAllRows();
+    await waitRows('table tbody tr', 15000);
+    showAllRows(); await sleep(600);
+    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+    const items = rows.map(tr => {
+      const a = Array.from(tr.querySelectorAll('a[href*="/lectures/mark_submission/"]'))[0];
+      const name = ((tr.querySelector('td') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+      return a ? { href: new URL(a.getAttribute('href'), location.href).href, name, graded: /تم التصحيح/.test(tr.textContent || '') } : null;
+    }).filter(Boolean);
+    const left = items.filter(x => !x.graded && job.visited.indexOf(x.href) < 0);
+    const done = items.filter(x => x.graded).length;
+    if (!items.length) { gBar('لم أجد تسليمات في هذه الصفحة.', [['إغلاق', () => stopJob(), true]]); return; }
+    if (!left.length) {
+      gBar('✅ انتهى التصحيح: «' + escHtml(job.title) + '» — ' + done + ' من ' + items.length + ' تسليم مصحَّح.', [['إغلاق', () => stopJob(), false]]);
+      const j = GM_getValue(JOB_KEY, null); if (j) { j.active = false; j.finished = Date.now(); GM_setValue(JOB_KEY, j); }
+      return;
+    }
+    const next = left[0];
+    gBar('✍ التصحيح التلقائي: «' + escHtml(job.title) + '» — مصحَّح ' + done + ' من ' + items.length + '. أفتح تسليم: <b>' + escHtml(next.name) + '</b>…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+    job.visited.push(next.href); job.ts = Date.now(); GM_setValue(JOB_KEY, job);
+    await sleep(900);
+    if (getJob()) location.href = next.href;
+  }
+  // 3) صفحة «الدرجة» لطالب: الدرجة النهائية لكل سؤال + «أحسنت» في التعليقات — بدون حفظ
+  function setSelectMax(sel) {
+    const opts = Array.from(sel.options).map(o => ({ o, n: parseFloat(o.value !== '' ? o.value : o.text) })).filter(x => !isNaN(x.n));
+    if (!opts.length) return false;
+    const best = opts.reduce((a, b) => (b.n > a.n ? b : a));
+    if (sel.value === best.o.value) return true;
+    sel.value = best.o.value; best.o.selected = true;
+    sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
+    try { const $ = uw.jQuery; if ($) $(sel).trigger('change').trigger('chosen:updated').trigger('change.select2'); } catch (e) { }
+    return true;
+  }
+  async function runMark(job) {
+    gBar('⏳ أكتب الدرجة والتعليق…', [['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+    let sels = [];
+    for (let i = 0; i < 60; i++) {
+      sels = Array.from(document.querySelectorAll('select')).filter(s => Array.from(s.options).length >= 2 && Array.from(s.options).every(o => /^\s*\d+(\.\d+)?\s*$/.test(o.value !== '' ? o.value : o.text)));
+      if (sels.length) break; await sleep(250);
+    }
+    let marked = 0; sels.forEach(s => { if (setSelectMax(s)) marked++; });
+    // التعليق: محرر CKEditor تحت «التعليقات» (أو مربع نص عادي)
+    let commented = false;
+    for (let i = 0; i < 40 && !commented; i++) {
+      const CK = uw.CKEDITOR;
+      if (CK && CK.instances) {
+        const ids = Object.keys(CK.instances);
+        const inst = ids.map(k => CK.instances[k]).find(x => x && x.status === 'ready');
+        if (inst) {
+          const cur = String(inst.getData() || '').replace(/<[^>]+>|&nbsp;/g, '').trim();
+          if (!cur) inst.setData('<p>' + escHtml(job.comment || 'أحسنت') + '</p>');
+          try { inst.updateElement(); } catch (e) { }
+          commented = true; break;
+        }
+      }
+      const ta = Array.from(document.querySelectorAll('textarea')).find(t => t.offsetParent !== null);
+      if (ta && !(CK && Object.keys(CK.instances || {}).length)) { if (!ta.value.trim()) setVal(ta, job.comment || 'أحسنت'); commented = true; break; }
+      await sleep(300);
+    }
+    job.filled = (job.filled || 0) + 1; GM_setValue(JOB_KEY, job);
+    const saveBtn = Array.from(document.querySelectorAll('button, input[type=submit], a.btn')).find(b => /درجة التسليم/.test(b.textContent || b.value || ''));
+    if (saveBtn) { saveBtn.style.outline = '4px solid #f2c66d'; saveBtn.style.outlineOffset = '3px'; try { saveBtn.scrollIntoView({ block: 'center' }); } catch (e) { } }
+    gBar('✅ كتبت الدرجة النهائية (' + marked + ' ' + (marked === 1 ? 'سؤال' : 'أسئلة') + ')' + (commented ? ' وتعليق «' + escHtml(job.comment || 'أحسنت') + '»' : ' — <b>لم أجد مربع التعليق</b>') +
+      '. راجع ثم اضغط <b>«درجة التسليم»</b> للحفظ، وبعدها أفتح الطالب التالي تلقائيًا.', [['تخطَّ هذا الطالب', () => { location.href = job.subUrl; }, true], ['إيقاف', () => stopJob('أوقفت التصحيح التلقائي.'), true]]);
+    if (!marked) showToast('لم أجد قوائم الدرجات في هذه الصفحة. اكتبها بنفسك أو أوقف التصحيح.', null, null, 8000);
+  }
   // ---------- التشغيل ----------
   function addButton(label, fn) {
     if (document.getElementById('tahdir-paste-btn')) return;
@@ -551,6 +722,11 @@
   } else if (IS_PREP) {
     addButton('📋 لصق من التحضير الآلي', runPrep);
   }
+  // التصحيح التلقائي (يعمل فقط لو بدأه المعلم، وعلى نفس الواجب)
+  const gjob = getJob();
+  if (IS_HWLIST) scanTasks();
+  if (gjob && IS_SUBS && aidOf(path) === gjob.aid) runSubmissions(gjob);
+  else if (gjob && IS_MARK && aidOf(path) === gjob.aid) runMark(gjob);
   const pending = getPending();
   const prepPending = getPending(PREP_KEY);
   if (IS_PREP && prepPending) { clearPending(PREP_KEY); fillPrepAuto(prepPending.data); }
