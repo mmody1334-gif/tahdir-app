@@ -355,6 +355,10 @@ button.lv-opt{cursor:pointer}
 .pl-o:disabled{opacity:.5}.pl-o.sel{opacity:1;outline:4px solid #fff}
 
 /* ---------- subject switch ---------- */
+.subj-pick{display:flex;align-items:center;gap:8px;margin:0 2px 12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px 10px}
+.subj-pick .subj-ic{font-size:1.35rem}
+.subj-pick .subj-l{font-size:.78rem;color:var(--mute);font-weight:700}
+.subj-pick select{flex:1;min-width:0;font:inherit;font-weight:700;font-size:.92rem;border:0;background:transparent;color:var(--ink);padding:4px 2px;cursor:pointer}
 .subj-sw{display:flex;gap:4px;margin:0 2px 12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px}
 .subj-sw button{flex:1;font:inherit;font-size:.86rem;font-weight:700;border:0;border-radius:9px;padding:8px 6px;background:transparent;color:var(--mute);cursor:pointer}
 .subj-sw button.on{background:var(--main);color:#fff}
@@ -524,10 +528,10 @@ def auth_shell(card):
   <div class="auth-brand">
     <div class="logo">{LOGO}</div>
     <h1>التحضير الآلي</h1>
-    <p>تحضير الدروس جاهز للإرسال إلى منصة نور، مرتّب حسب فهرس الكتاب: العلوم للصف الخامس، والأحياء من التاسع إلى الثاني عشر.</p>
+    <p>تحضير الدروس جاهز للإرسال إلى منصة نور، مرتّب حسب فهرس الكتاب المدرسي: العلوم، والأحياء، والكيمياء، والعلوم البيئية، واللغة الإنجليزية.</p>
     <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
   </div>
-  <div class="auth-facts"><span>5 صفوف</span><span>الفصل الدراسي الأول</span><span>نسخ بضغطة واحدة</span></div>
+  <div class="auth-facts"><span>مواد متعددة</span><span>الفصل الدراسي الأول</span><span>نسخ بضغطة واحدة</span></div>
 </section>
 <section class="auth-panel">{PROMO}{card}</section>
 </main>'''
@@ -580,7 +584,7 @@ APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span>
 <div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «التحضير الآلي» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
 <div class="wrap layout"><aside class="tree" id="tree" aria-label="الصفوف والوحدات والدروس"></aside>
 <main class="panel" id="panel"><div class="welcome">{CELL}<h2>جارٍ تحميل الدروس…</h2></div></main></div>
-<p class="foot">التحضير الآلي لمادتي الأحياء والعلوم، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
+<p class="foot">التحضير الآلي، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
 
 QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبارات القصيرة ومراجعات الوحدات</span><span class="stat">وفق وثيقة تقويم تعلم الطلبة</span></div>').replace('%BTNS%',
   NAV('quiz')) + '''

@@ -1,7 +1,7 @@
 # هل يوجد اختبار مطابق للمواصفات من بنك الأسئلة لكل مجموعة دروس متتالية؟ (بحث شامل)
 import json, itertools, collections, sys
 L = json.load(open('data/lessons.json')); Q = json.load(open('data/quiz_bank.json'))
-NUM = {'الخامس':5,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12}
+NUM = {'الخامس':5,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12}
 def spec(g):
     if g >= 11: return dict(total=10, t={'AO1':3,'AO2':7}, mcq=2, long=(4,5), smax=3, items=(5,99))
     if g == 10: return dict(total=10, t={'معرفة':4,'تطبيق':4,'استدلال':2}, mcq=2, long=(3,4), smax=2, items=(5,7))
@@ -40,13 +40,15 @@ def feasible(items, sp, hi):
     return False, f"mcq={dict(mc)} longs={[(x['ao'],x['marks']) for x in longs]} shorts={collections.Counter((x['ao'],x['marks']) for x in shorts)}"
 by = collections.defaultdict(list)
 for q in Q: by[q['lesson_id']].append(q)
-for gname, g in NUM.items():
-    ls = [l for l in L if l['grade']==gname and l.get('subject','') != 'اللغة الإنجليزية']
+subj = lambda l: l.get('subject') or ('العلوم' if l['grade'] == 'الخامس' else 'الأحياء')
+for sname, gname in sorted({(subj(l), l['grade']) for l in L if subj(l) != 'اللغة الإنجليزية'}):
+    g = NUM[gname]
+    ls = [l for l in L if l['grade']==gname and subj(l) == sname]
     bad = []; tot = 0
     for k in range(2, 6):
         for i in range(len(ls) - k + 1):
             ids = [l['id'] for l in ls[i:i+k]]; items = [q for x in ids for q in by[x]]
             tot += 1; ok, why = feasible(items, spec(g), g >= 11)
             if not ok: bad.append((k, [l['title'][:25] for l in ls[i:i+k]], why))
-    print(gname, 'infeasible', len(bad), 'of', tot)
+    print(sname, gname, 'infeasible', len(bad), 'of', tot)
     for b in bad[:4]: print('   ', b)

@@ -3,10 +3,18 @@
 guard();
 var GRADE_ORDER=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function ckey(l){return (l.subject||'')+'|'+l.grade;}
+var LEGACY_SUBJ={'':1,'الأحياء':1,'العلوم':1,'اللغة الإنجليزية':1};
+function toolMin(l,v){return LEGACY_SUBJ[l.subject||'']?v:'3.4.0';}
 function isEn(l){return /انجليز|إنجليز|English/i.test(l.subject||'');}
-var group=null;try{group=localStorage.getItem('tahdir_group');}catch(e){}
-function groups(){var g={};lessons.forEach(function(l){g[isEn(l)?'en':'sci']=1;});return Object.keys(g);}
-function inGroup(l){var gs=groups();if(gs.length<2)return true;return (isEn(l)?'en':'sci')===group;}
+// المواد: كل معلم يختار مادته ثم تظهر صفوفها
+var SUBJ_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};
+var SUBJ_ORDER=['العلوم','الأحياء','الكيمياء','الفيزياء','العلوم البيئية','الرياضيات','اللغة العربية','اللغة الإنجليزية','الدراسات الاجتماعية','التربية الإسلامية','تقنية المعلومات'];
+var subj=null;try{subj=localStorage.getItem('tahdir_subject');}catch(e){}
+function subjOf(l){return l.subject||'';}
+function subjIcon(s){return SUBJ_ICON[s]||'📘';}
+function subjects(){var s={};lessons.forEach(function(l){s[subjOf(l)]=1;});return Object.keys(s).sort(function(a,b){var x=SUBJ_ORDER.indexOf(a),y=SUBJ_ORDER.indexOf(b);return (x<0?99:x)-(y<0?99:y)||a.localeCompare(b,'ar');});}
+function gradeRange(s){var g=lessons.filter(function(l){return subjOf(l)===s;}).map(function(l){return GRADE_ORDER.indexOf(l.grade);}).filter(function(i){return i>=0;});if(!g.length)return '';var a=Math.min.apply(null,g)+1,b=Math.max.apply(null,g)+1;return a===b?'الصف '+GRADE_ORDER[a-1]:'الصفوف '+a+'–'+b;}
+function inGroup(l){var ss=subjects();if(ss.length<2)return true;return subjOf(l)===subj;}
 var me=null,lessons=[],currentId=null,openGrades={},openUnits={},viewed={};
 var DEF_SETTINGS={level:['التذكُّر','الإبداع'],strategies:['التعلم التعاوني','التعلم التشاركي','التعلم الذاتي'],resources:['الكتاب','السبورة التقليدية','جهاز عرض البيانات','الوسائط المتعددة (سمعية - بصرية)']};
 var settings=JSON.parse(JSON.stringify(DEF_SETTINGS));
@@ -51,15 +59,15 @@ function lessonsOf(g,u){return lessons.filter(function(l){return ckey(l)===g&&St
 function isEmpty(l){return !(l.pre_learning||l.outcomes||l.activities_teach);}
 
 function renderTree(){
-  var tree=$('tree'),gs=groups();
-  if(gs.length>1&&gs.indexOf(group)<0)group=gs[0]==='sci'||gs.indexOf('sci')>=0?'sci':gs[0];
-  tree.innerHTML=(gs.length>1?'<div class="subj-sw" role="tablist"><button type="button" data-grp="sci" class="'+(group==='sci'?'on':'')+'">🧬 الأحياء والعلوم</button><button type="button" data-grp="en" class="'+(group==='en'?'on':'')+'">🔤 English</button></div>':'')+'<h2 class="tree-h">الكتاب المدرسي</h2>';
-  Array.prototype.forEach.call(tree.querySelectorAll('[data-grp]'),function(b){b.onclick=function(){group=b.getAttribute('data-grp');try{localStorage.setItem('tahdir_group',group);}catch(e){}renderTree();};});
+  var tree=$('tree'),ss=subjects();
+  if(ss.length>1&&ss.indexOf(subj)<0)subj=ss[0];
+  tree.innerHTML=(ss.length>1?'<label class="subj-pick"><span class="subj-ic" aria-hidden="true">'+subjIcon(subj)+'</span><span class="subj-l">المادة</span><select id="subjSel" aria-label="اختر المادة">'+ss.map(function(x){return '<option value="'+esc(x)+'"'+(x===subj?' selected':'')+'>'+esc(x)+' · '+esc(gradeRange(x))+'</option>';}).join('')+'</select></label>':'')+'<h2 class="tree-h">'+(ss.length>1?subjIcon(subj)+' '+esc(subj):'الكتاب المدرسي')+'</h2>';
+  if($('subjSel'))$('subjSel').onchange=function(){subj=this.value;try{localStorage.setItem('tahdir_subject',subj);}catch(e){}renderTree();};
   grades().forEach(function(g){
     var gDiv=document.createElement('div');gDiv.className='g-block';
     var count=lessons.filter(function(l){return ckey(l)===g;}).length,gp=g.split('|');
     var gBtn=document.createElement('button');gBtn.className='g-btn';gBtn.type='button';
-    gBtn.innerHTML='<span class="g-name">الصف '+esc(gp[1])+(multiSubj()?' <span class="muted">· '+esc(gp[0])+'</span>':'')+'</span><span class="g-meta">'+count+' درس <span class="chev">▾</span></span>';
+    gBtn.innerHTML='<span class="g-name">الصف '+esc(gp[1])+'</span><span class="g-meta">'+count+' درس <span class="chev">▾</span></span>';
     var gBody=document.createElement('div');gBody.className='g-body';
     if(openGrades[g]||lessons.some(function(l){return l.id===currentId&&ckey(l)===g;}))gBody.classList.add('open');
     unitsOf(g).forEach(function(u){
@@ -163,8 +171,10 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
 function sendToNour(kind,json,okMsg,minVer,fallback){
-  if(!toolOk(IN_APP||hasExt()?minVer:TOOL_FORCE)){
-    if(!IN_APP&&toolVersion()&&!hasExt()){forceToolUpdate();return false;}
+  var need=IN_APP||hasExt()?minVer:(verCmp(minVer,TOOL_FORCE)>0?minVer:TOOL_FORCE);
+  if(!toolOk(need)){
+    if(!IN_APP&&toolVersion()&&!hasExt()&&!toolOk()){forceToolUpdate();return false;}
+    if(toolVersion()){toolDialog('لإرسال تحضير هذه المادة إلى نور حدّث «أداة نور» إلى الإصدار '+TOOL_LATEST+' (اضغط «تثبيت الأداة» ثم «تحديث» في Tampermonkey).');return false;}
     toolDialog(toolVersion()?'أداة نور عندك قديمة. حدّثها مرة واحدة وبعدها تتحدث تلقائيًا.':'الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك.');
     return false;
   }
@@ -179,10 +189,10 @@ function sendToNour(kind,json,okMsg,minVer,fallback){
 }
 function sendHw(l){
   if(!hwItems(l).length){toast('لا توجد أسئلة في هذا الواجب');return;}
-  if(sendToNour('hw',buildHwJson(l),'أُرسل الواجب ✓ تابع في نور',isMcq(l)?'2.6':'2.3',function(){copyText(buildHwJson(l));track('copy_hw',l);}))track('send_hw',l,'send');
+  if(sendToNour('hw',buildHwJson(l),'أُرسل الواجب ✓ تابع في نور',toolMin(l,isMcq(l)?'2.6':'2.3'),function(){copyText(buildHwJson(l));track('copy_hw',l);}))track('send_hw',l,'send');
 }
 function sendPrep(l){
-  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',isEn(l)?'2.9':'2.3',function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
+  if(sendToNour('prep',buildCopyJson(l),'أُرسل التحضير ✓ تابع في نور',toolMin(l,isEn(l)?'2.9':'2.3'),function(){copyText(buildCopyJson(l));track('copy_json',l);}))track('send_prep',l,'send');
 }
 function buildHwText(l){var L='أبجدهو';return 'واجب: '+(l.title||'')+'\n\n'+hwItems(l).map(function(x,i){return (i+1)+'- '+x.text+(x.choices?'\n'+x.choices.map(function(c,k){return '   '+L[k]+') '+c;}).join('\n'):'');}).join('\n\n');}
 function renderLesson(l){

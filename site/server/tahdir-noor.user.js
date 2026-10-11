@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.3.0
+// @version      3.4.0
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -20,7 +20,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '3.3.0';
+  const VERSION = '3.4.0';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
@@ -62,7 +62,16 @@
   function clearPending(key) { if (typeof GM_deleteValue !== 'undefined') GM_deleteValue(key || PENDING_KEY); }
   // رابط الصفحة المطلوبة لهذا الصف في نور
   function subjKey(subject, grade) { return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '') + '|' + grade; }
-  function cidFor(map, grade, subject) { return (subject && map[subjKey(subject, grade)]) || map[grade]; }
+  // مفتاح المادة بدون «ال» (نور قد يكتب «كيمياء» أو «الكيمياء»)
+  function subjKey2(subject, grade) { return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/(^|\s)ال/g, '$1').replace(/\s+/g, '') + '|' + grade; }
+  function cidFor(map, grade, subject) {
+    if (!subject) return map[grade];
+    const hit = map[subjKey(subject, grade)] || map[subjKey2(subject, grade)];
+    if (hit) return hit;
+    // لا نخلط المواد: نرجع لرقم الصف فقط إذا لم نتعرّف على أي مادة أخرى لهذا الصف
+    const others = Object.keys(map).filter(k => k.indexOf('|') > 0 && k.split('|')[1] === grade);
+    return others.length ? null : map[grade];
+  }
   function routeUrl(kind, grade, subject) {
     const map = GM_getValue(GRADES_KEY, {}) || {};
     const cid = cidFor(map, grade, subject);
@@ -147,7 +156,7 @@
       if (m && c) {
         const g = m[1].replace(/\s+/g, ' '), subj = t.split('/')[0].trim();
         if (map[g] !== c[1]) { map[g] = c[1]; changed = true; }
-        if (subj && subj !== t) { const k = subjKey(subj, g); if (map[k] !== c[1]) { map[k] = c[1]; changed = true; } }
+        if (subj && subj !== t) { [subjKey(subj, g), subjKey2(subj, g)].forEach(k => { if (map[k] !== c[1]) { map[k] = c[1]; changed = true; } }); }
       }
     });
     if (changed) GM_setValue(GRADES_KEY, map);
