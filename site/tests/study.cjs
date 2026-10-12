@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787', OUT = __dirname + '/';
 (async () => {
   const b = await chromium.launch(); const errs = [];
@@ -13,7 +14,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   console.log('menu:', await p.$$eval('#menuList a, #menuList button', e => e.filter(x => !x.hidden).map(x => x.textContent.trim())));
   await p.screenshot({ path: OUT + 'n_menu.png' });
   await p.click('#menuList a[href="/remedial"]'); await p.waitForURL(B + '/remedial');
-  await p.waitForSelector('#courseSel'); await p.selectOption('#courseSel', 'الأحياء|العاشر'); await p.waitForSelector('[data-lid]');
+  await p.waitForSelector('#courseSel'); await pickC(p, '#courseSel', 'الأحياء|العاشر'); await p.waitForSelector('[data-lid]');
   const ids = await p.$$eval('[data-lid]:not([disabled])', e => e.slice(0, 2).map(x => x.getAttribute('data-lid')));
   for (const i of ids) await p.check(`[data-lid="${i}"]`);
   await p.fill('#h_teacher', 'محمد مجدي'); await p.dispatchEvent('#h_teacher', 'change');
@@ -32,11 +33,11 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // save + list
   await p.click('#saveBtn'); await p.waitForTimeout(500); console.log('saved list:', await p.$$eval('#savedList li', e => e.map(x => x.textContent.slice(0, 60))));
   // English remedial
-  await p.selectOption('#courseSel', 'اللغة الإنجليزية|التاسع'); await p.waitForSelector('[data-lid]'); await p.check('[data-lid]:not([disabled]) >> nth=3');
+  await pickC(p, '#courseSel', 'اللغة الإنجليزية|التاسع'); await p.waitForSelector('[data-lid]'); await p.check('[data-lid]:not([disabled]) >> nth=3');
   await p.click('#makeBtn'); await p.waitForSelector('#stTbl'); console.log('EN weak:', await p.$$eval('#paper td', e => e.filter(x => /Grammar|Vocabulary/.test(x.textContent)).map(x => x.textContent.trim()).slice(0, 3)));
   await p.click('[data-part="sheet"]'); await p.waitForTimeout(200); await p.screenshot({ path: OUT + 'r_sheet_en.png', fullPage: true });
   // summaries
-  await p.goto(B + '/summaries'); await p.waitForSelector('#courseSel'); await p.selectOption('#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-lid]');
+  await p.goto(B + '/summaries'); await p.waitForSelector('#courseSel'); await pickC(p, '#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-lid]');
   await p.check('[data-lid] >> nth=0'); await p.click('#makeBtn'); await p.waitForSelector('#paper h3');
   console.log('summary sections:', await p.$$eval('#paper b', e => e.map(x => x.textContent).slice(0, 6)));
   await p.screenshot({ path: OUT + 's_lesson.png', fullPage: true });

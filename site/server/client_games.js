@@ -56,7 +56,7 @@ function bestFor(g){var n=gnum(),b=g.best||g.grades;return n>=b[0]&&n<=b[1];}
 // ---------- الواجهة الجانبية ----------
 function unitsList(){var m={},order=[];data.lessons.forEach(function(l){var k=String(l.unit);if(!m[k]){m[k]={unit:k,name:l.unit_name||'',lessons:[]};order.push(k);}m[k].lessons.push(l);});return order.map(function(k){return m[k];});}
 function renderSide(){
-  var h='<section class="qcard"><h3>1. الصف والمادة</h3><select id="courseSel" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'"'+(course&&c.key===course.key?' selected':'')+'>'+esc(c.subject)+' — الصف '+esc(c.grade)+'</option>';}).join('')+'</select></section>';
+  var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel')+'</section>';
   h+='<section class="qcard"><h3>2. الدروس</h3><div class="lpick">';
   unitsList().forEach(function(u){
     h+='<div class="lp-unit"><div class="lp-uh"><label><input type="checkbox" data-unit="'+esc(u.unit)+'"'+(u.lessons.every(function(l){return sel[l.id];})?' checked':'')+'> '+(isEn()?esc(u.name||'Unit '+u.unit):'الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):''))+'</label></div>';
@@ -66,7 +66,7 @@ function renderSide(){
   h+='</div><p class="muted small" id="selInfo"></p></section>';
   h+='<section class="qcard"><h3>الفرق</h3><div class="teams-ed" id="teamsEd"></div><div class="qrow"><button type="button" class="btn small" id="addTeam">+ فريق</button><label class="small"><input type="checkbox" id="sndChk"'+(sound?' checked':'')+'> الأصوات</label></div></section>';
   $('gside').innerHTML=h;
-  $('courseSel').onchange=function(){selectCourse(this.value);};
+  bindCoursePick(courses,'courseSel',selectCourse);
   Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)sel[id]=1;else delete sel[id];info();if(!game)renderHome();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-unit]'),function(b){b.onchange=function(){var u=unitsList().filter(function(x){return x.unit===b.getAttribute('data-unit');})[0];u.lessons.forEach(function(l){if(b.checked)sel[l.id]=1;else delete sel[l.id];});renderSide();if(!game)renderHome();};});
   $('addTeam').onclick=function(){if(teams.length>=6)return;teams.push({name:'الفريق '+(teams.length+1),score:0});saveTeams();renderTeams();};
@@ -508,7 +508,7 @@ Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   me=r[0];initNav(me);
   courses=(r[1].courses||[]).sort(function(a,b){return ((GRADE_NUM[a.grade]||99)-(GRADE_NUM[b.grade]||99))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('gmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2></div>';return;}
-  var last=lsGet('tahdir_games_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses[0];
+  var last=lsGet('tahdir_games_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
   selectCourse(c.key);
 },function(e){$('gmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});
 })();

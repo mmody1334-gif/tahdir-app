@@ -27,6 +27,7 @@ function pullFromTool(){
     return changed;
   });
 }
+function grKey(){var last=lsGet('tahdir_grade_course','');return courses.some(function(c){return c.key===last;})?last:(courses.length?cpDefault(courses).key:'');}
 function render(){
   var ready=toolReady(),v=toolVersion();
   var comment=lsGet('tahdir_grade_comment','أحسنت');
@@ -37,7 +38,7 @@ function render(){
     h+='<section class="gr-card"><div class="gr-note">'+(v?'التصحيح التلقائي يحتاج «أداة نور» الإصدار '+NEED+' أو أحدث، وعندك '+esc(v)+'.':'التصحيح التلقائي يعمل من خلال «أداة نور» على متصفحك.')+
       ' <button type="button" class="btn small primary" id="grTool">'+(v?'حدّث الأداة':'ثبّت الأداة')+'</button></div></section>';
   }
-  h+='<section class="gr-card"><h3>1. اجلب المهمات من نور</h3><div class="gr-row"><select id="grCourse" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'">'+esc(courseName(c))+'</option>';}).join('')+'</select>'+
+  h+='<section class="gr-card"><h3>1. اجلب المهمات من نور</h3><div class="gr-row">'+coursePick(courses,grKey(),'grCourse')+
     '<button type="button" class="btn primary" id="grFetch"'+(ready?'':' disabled')+'>اجلب المهمات من نور</button>'+
     '<label class="gr-row small"><input type="checkbox" id="grAuto"'+(lsGet('tahdir_grade_autosave',true)?' checked':'')+'> احفظ تلقائيًا وانتقل للطالب التالي</label>'+
     '<label class="gr-row small" style="margin-inline-start:auto">التعليق للطالب <input id="grComment" class="qsel" style="min-width:160px" value="'+esc(comment)+'" maxlength="120"></label></div>'+
@@ -55,8 +56,7 @@ function render(){
   h+='<p class="gr-note" style="margin:10px 0 0">الطلاب الذين لم يسلّموا، ومن صُحِّح من قبل، لا تلمسهم الأداة. لو لم تجد قائمة الدرجة أو مربع التعليق في صفحة طالب تقف ولا تحفظ. تقدر توقفها في أي لحظة من زر «إيقاف» أعلى صفحة نور.</p></section>';
   $('gr').innerHTML=h;
   if($('grTool'))$('grTool').onclick=function(){toolDialog('');};
-  var last=lsGet('tahdir_grade_course','');if(last&&courses.some(function(c){return c.key===last;}))$('grCourse').value=last;
-  $('grCourse').onchange=function(){lsSet('tahdir_grade_course',this.value);};
+  bindCoursePick(courses,'grCourse',function(k){lsSet('tahdir_grade_course',k);});
   $('grComment').onchange=function(){lsSet('tahdir_grade_comment',this.value.trim()||'أحسنت');};
   $('grAuto').onchange=function(){lsSet('tahdir_grade_autosave',this.checked);};
   $('grFetch').onclick=function(){

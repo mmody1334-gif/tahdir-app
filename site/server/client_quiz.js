@@ -189,8 +189,9 @@ function checks(d){
   return out;
 }
 // ---------- الواجهة ----------
+var QX=function(c){return c.quiz_items?'':' (بدون بنك أسئلة)';};
 function renderSide(){
-  var h='<section class="qcard"><h3>1. الصف والمادة</h3><select id="courseSel" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'"'+(course&&c.key===course.key?' selected':'')+'>'+esc(c.subject)+' — الصف '+esc(c.grade)+(c.quiz_items?'':' (بدون بنك أسئلة)')+'</option>';}).join('')+'</select>'+
+  var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel',QX)+
     '<div class="seg" role="tablist"><button type="button" class="'+(mode==='quiz'?'on':'')+'" data-mode="quiz">اختبار قصير</button><button type="button" class="'+(mode==='review'?'on':'')+'" data-mode="review">مراجعة نهاية الوحدة</button></div></section>';
   if(!course){$('qside').innerHTML=h;bindSide();return;}
   var units=unitsList();
@@ -223,7 +224,7 @@ function unitsList(){
   return order.sort(function(a,b){return parseInt(a,10)-parseInt(b,10);}).map(function(k){return m[k];});
 }
 function bindSide(){
-  $('courseSel').onchange=function(){selectCourse(this.value);};
+  bindCoursePick(courses,'courseSel',selectCourse,QX);
   Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'),function(b){b.onclick=function(){mode=b.getAttribute('data-mode');renderSide();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)cfg.lessons[id]=1;else delete cfg.lessons[id];var n=Object.keys(cfg.lessons).length;if(n>5)toast('الوثيقة: الاختبار القصير يغطي من 2 إلى 5 دروس');};});
   if($('qnoSel'))$('qnoSel').onchange=function(){cfg.quizNo=this.value;if(doc&&doc.kind==='quiz'){doc.quizNo=this.value;renderDoc();}};
@@ -436,7 +437,7 @@ Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
   courses=(r[1].courses||[]).filter(function(c){return !/انجليز|إنجليز|English/i.test(c.subject);}).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
-  var last=lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses.filter(function(x){return x.quiz_items;})[0]||courses[0];
+  var last=lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
   selectCourse(c.key);
 },function(e){$('qmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});
 })();

@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787', OUT = __dirname + '/';
 (async () => {
   const b = await chromium.launch(); const errs = [];
@@ -7,7 +8,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await p.goto(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.fill('#password2', 'Bio@2026x'); await p.click('#setupForm button[type=submit]');
   await p.waitForURL(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForURL(B + '/admin');
   await p.goto(B + '/games'); await p.waitForSelector('#courseSel');
-  await p.selectOption('#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('g12 order:', await p.$$eval('.g-cards > *', e => e.map(x => x.tagName === 'H3' ? '## ' + x.textContent : x.querySelector('b').textContent + (x.classList.contains('off') ? '(off)' : ''))));
   await p.screenshot({ path: OUT + 't_home12.png', fullPage: true });
   const play = async id => { await p.click(`[data-game="${id}"]`); await p.waitForSelector('#stage'); };
@@ -33,9 +34,9 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await play('links'); await p.waitForSelector('.lk-pair'); await p.click('#lkShow'); console.log('link answer:', (await p.textContent('#lkAns')).slice(0, 90));
   await p.screenshot({ path: OUT + 't_links.png' }); await p.click('#gBack');
   // grade 10 + grade 9 visibility
-  await p.selectOption('#courseSel', 'الأحياء|العاشر'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'الأحياء|العاشر'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('g10 teen cards:', await p.$$eval('.g-card', e => e.slice(0, 5).map(x => x.querySelector('b').textContent + (x.classList.contains('off') ? '(off)' : '') + '[' + x.querySelector('.g-tags').innerText.replace(/\s+/g, ' ') + ']')));
-  await p.selectOption('#courseSel', 'الأحياء|التاسع'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'الأحياء|التاسع'); await p.waitForSelector('[data-unit="1"]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('g9 last cards:', await p.$$eval('.g-card', e => e.slice(-5).map(x => x.querySelector('b').textContent + '[' + x.querySelector('.g-tags').innerText.replace(/\s+/g, ' ') + ']')));
   console.log('errors', errs); await b.close();
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

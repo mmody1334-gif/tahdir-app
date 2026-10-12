@@ -1,5 +1,6 @@
 // التصحيح التلقائي: محاكاة Tampermonkey + صفحات نور (المهام ← التسليمات ← الدرجة) — بدون أي ضغط على «درجة التسليم» من الأداة
 const { chromium } = require('playwright'); const fs = require('fs');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787', OUT = __dirname + '/';
 const TOOL = fs.readFileSync(__dirname + '/../server/tahdir-noor.user.js', 'utf8').replace("location.hostname === 'tahdir.hudhaifa-bio.workers.dev'", "location.hostname === 'localhost'");
 const ENC = 'wo2aAuKy_OMAN', AID = '8Jsj3W2RjM_OMAN';
@@ -40,7 +41,7 @@ function nour(url) {
   await p.goto(B + '/app'); await p.waitForTimeout(800); await p.click('#menuBtn'); console.log('menu has grading:', await p.isVisible('#menuList a[href="/grading"]'));
   await p.click('#menuList a[href="/grading"]'); await p.waitForURL(B + '/grading'); await p.waitForSelector('#grFetch'); await p.waitForTimeout(1600);
   await p.screenshot({ path: OUT + 'gr_empty.png', fullPage: true });
-  await p.selectOption('#grCourse', 'الأحياء|العاشر');
+  await pickC(p, '#grCourse', 'الأحياء|العاشر');
   const np = c.waitForEvent('page'); await p.click('#grFetch'); const idx = await np; await idx.waitForLoadState(); await idx.waitForTimeout(2500);
   console.log('index url:', idx.url().replace('https://lms.moe.gov.om', ''), '| buttons on Nour:', await idx.$$eval('.tahdir-grade-btn', e => e.length));
   await idx.screenshot({ path: OUT + 'gr_nour_index.png' });

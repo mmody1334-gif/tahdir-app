@@ -1,5 +1,6 @@
 // يتحقق من مطابقة الاختبار القصير لجدول المواصفات في كل الصفوف، مع اختيارات دروس عشوائية
 const { chromium } = require('playwright');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787';
 (async () => {
   const b = await chromium.launch(); const c = await b.newContext(); const p = await c.newPage();
@@ -8,7 +9,7 @@ const B = 'http://localhost:8787';
   await p.goto(B + '/quiz'); await p.waitForSelector('#courseSel');
   console.log('quiz courses:', await p.$$eval('#courseSel option', o => o.map(x => x.textContent)));
   for (const g of ['العلوم|الخامس', 'الأحياء|التاسع', 'الأحياء|العاشر', 'الأحياء|الحادي عشر', 'الأحياء|الثاني عشر']) {
-    await p.selectOption('#courseSel', g); await p.waitForSelector('[data-lid]'); await p.waitForTimeout(300);
+    await pickC(p, '#courseSel', g); await p.waitForSelector('[data-lid]'); await p.waitForTimeout(300);
     const r = await p.evaluate(async () => {
       const all = [...document.querySelectorAll('[data-lid]:not([disabled])')].map(x => x.getAttribute('data-lid'));
       let ok = 0, fails = {}, N = 40, mcqMax = 0, mcqCounts = {};

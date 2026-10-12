@@ -132,7 +132,7 @@ function summaryHtml(){
 }
 // ---------- الواجهة ----------
 function renderSide(){
-  var h='<section class="qcard"><h3>1. الصف والمادة</h3><select id="courseSel" class="qsel">'+courses.map(function(c){return '<option value="'+esc(c.key)+'"'+(course&&c.key===course.key?' selected':'')+'>'+esc(c.subject)+' — الصف '+esc(c.grade)+'</option>';}).join('')+'</select>';
+  var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel');
   if(!REM)h+='<div class="seg"><button type="button" class="'+(sumMode==='lesson'?'on':'')+'" data-sm="lesson">ملخص درس</button><button type="button" class="'+(sumMode==='unit'?'on':'')+'" data-sm="unit">ملخص وحدة</button></div>';
   h+='</section>';
   if(!course||!data){$('qside').innerHTML=h;bindSide();return;}
@@ -157,7 +157,7 @@ function renderSide(){
   $('qside').innerHTML=h;bindSide();loadSaved();
 }
 function bindSide(){
-  $('courseSel').onchange=function(){selectCourse(this.value);};
+  bindCoursePick(courses,'courseSel',selectCourse);
   Array.prototype.forEach.call(document.querySelectorAll('[data-sm]'),function(b){b.onclick=function(){sumMode=b.getAttribute('data-sm');renderSide();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked){if(Object.keys(sel).length>=6){b.checked=false;toast('اختر 6 دروس كحد أقصى');return;}sel[id]=1;}else delete sel[id];};});
   if($('unitSel'))$('unitSel').onchange=function(){unitSel=this.value;};
@@ -302,7 +302,7 @@ Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
   courses=(r[1].courses||[]).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
-  var last=lsGet('tahdir_study_course')||lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||courses[0];
+  var last=lsGet('tahdir_study_course')||lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
   selectCourse(c.key);
 },function(e){$('qmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});
 })();

@@ -376,6 +376,7 @@ button.lv-opt{cursor:pointer}
 .qsel,.hdr-f input,.hdr-f select,.ed input,.ed select,.ed textarea{width:100%;font:inherit;font-size:.88rem;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 .ed textarea{resize:vertical;line-height:1.7}
 .qsel.sm{width:auto;min-width:90px}
+.cpick{display:flex;flex-wrap:wrap;gap:8px}.cp-l{flex:1 1 150px;display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}.cp-l[hidden]{display:none}.cp-l .qsel{width:100%;min-width:0;font-weight:600}.gr-row .cpick{flex:1 1 320px}
 .qrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;font-size:.88rem}
 .small{font-size:.78rem}
 .seg{display:flex;gap:4px;margin-top:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px}

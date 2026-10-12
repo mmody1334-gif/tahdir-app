@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787', OUT = __dirname + '/';
 (async () => {
   const b = await chromium.launch(); const errs = [];
@@ -7,7 +8,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await p.goto(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.fill('#password2', 'Bio@2026x'); await p.click('#setupForm button[type=submit]');
   await p.waitForURL(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForURL(B + '/admin');
   await p.goto(B + '/app'); await p.waitForSelector('#menuBtn'); await p.click('#menuBtn'); await p.click('#menuList a[href="/games"]'); await p.waitForURL(B + '/games');
-  await p.waitForSelector('#courseSel'); await p.selectOption('#courseSel', 'الأحياء|الحادي عشر'); await p.waitForSelector('[data-unit]');
+  await p.waitForSelector('#courseSel'); await pickC(p, '#courseSel', 'الأحياء|الحادي عشر'); await p.waitForSelector('[data-unit]');
   await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('sel info:', await p.textContent('#selInfo'));
   console.log('cards:', await p.$$eval('.g-card', e => e.map(x => x.querySelector('b').textContent + (x.classList.contains('off') ? '(off)' : '') + ' [' + x.querySelector('.g-tags').innerText.replace(/\s+/g, ' ') + ']')));
@@ -36,16 +37,16 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // cards
   await play('cards'); await p.click('#fc'); console.log('flashcard flipped:', await p.$eval('#fc', e => e.classList.contains('flip'))); await p.screenshot({ path: OUT + 'g_cards.png' }); await p.click('#gBack');
   // grade 5 word search
-  await p.selectOption('#courseSel', 'العلوم|الخامس'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="3"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'العلوم|الخامس'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="3"]'); await p.waitForTimeout(200);
   await play('words'); await p.waitForSelector('.ws-c'); console.log('grade5 words:', await p.$$eval('.ws-list span.w', e => e.map(x => x.textContent)));
   await p.screenshot({ path: OUT + 'g_words5.png' }); await p.click('#gBack');
   // English
-  await p.selectOption('#courseSel', 'اللغة الإنجليزية|التاسع'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'اللغة الإنجليزية|التاسع'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="1"]'); await p.waitForTimeout(200);
   console.log('EN cards:', await p.$$eval('.g-card', e => e.map(x => x.querySelector('b').textContent + (x.classList.contains('off') ? '(off)' : ''))));
   await play('words'); await p.waitForSelector('.ws-c'); console.log('EN words:', await p.$$eval('.ws-list span.w', e => e.map(x => x.textContent)));
   await p.screenshot({ path: OUT + 'g_words_en.png' }); await p.click('#gBack');
   // ---- live challenge (grade 12)
-  await p.selectOption('#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="2"]'); await p.waitForTimeout(200);
+  await pickC(p, '#courseSel', 'الأحياء|الثاني عشر'); await p.waitForSelector('[data-unit]'); await p.check('[data-unit="2"]'); await p.waitForTimeout(200);
   await play('live'); await p.fill('#lvN', '3'); await p.click('#lvGo'); await p.waitForSelector('.lv-code');
   const code = (await p.textContent('.lv-code')).replace(/\D/g, ''); console.log('room code', code);
   await p.screenshot({ path: OUT + 'g_live_lobby.png' });

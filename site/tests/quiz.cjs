@@ -1,5 +1,6 @@
 // اختبار شامل: صفحة التقويم + لوحة التحكم الجديدة (تقرير، مواد ودروس، صفوف مسموحة)
 const { chromium } = require('playwright');
+async function pickC(p, sel, key) { const s = key.split('|')[0]; if (await p.isVisible(sel + 'Subj')) { if (await p.inputValue(sel + 'Subj') !== s) { await p.selectOption(sel + 'Subj', s); await p.waitForTimeout(600); } } if (await p.inputValue(sel) !== key) await p.selectOption(sel, key); }
 const B = 'http://localhost:8787', OUT = __dirname + '/';
 (async () => {
   const b = await chromium.launch(); const errs = [];
@@ -33,7 +34,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   // open quiz page
   await p1.click('#menuBtn'); await p1.click('#menuList a[href="/quiz"]'); await p1.waitForURL(B + '/quiz'); await p1.waitForSelector('#courseSel');
   console.log('quiz courses:', await p1.$$eval('#courseSel option', o => o.map(x => x.textContent)));
-  await p1.selectOption('#courseSel', 'الأحياء|الحادي عشر'); await p1.waitForSelector('[data-lid]');
+  await pickC(p1, '#courseSel', 'الأحياء|الحادي عشر'); await p1.waitForSelector('[data-lid]');
   const lids = await p1.$$eval('[data-lid]:not([disabled])', e => e.slice(0, 3).map(x => x.getAttribute('data-lid')));
   for (const id of lids) await p1.check(`[data-lid="${id}"]`);
   await p1.click('#makeBtn'); await p1.waitForSelector('#paper .qi');
@@ -73,7 +74,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await p1.emulateMedia({ media: 'print' });
   // grade 12 quiz
   await p1.emulateMedia({ media: 'screen' });
-  await p1.selectOption('#courseSel', 'الأحياء|الثاني عشر'); await p1.waitForSelector('[data-lid]');
+  await pickC(p1, '#courseSel', 'الأحياء|الثاني عشر'); await p1.waitForSelector('[data-lid]');
   const l12 = await p1.$$eval('[data-lid]:not([disabled])', e => e.slice(5, 9).map(x => x.getAttribute('data-lid')));
   for (const id of l12) await p1.check(`[data-lid="${id}"]`);
   await p1.click('#makeBtn'); await p1.waitForSelector('#paper .qi');
@@ -105,7 +106,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await ap.goto(B + '/quiz'); await ap.waitForSelector('#courseSel');
   for (const g of ['الأحياء|التاسع', 'الأحياء|العاشر']) {
     for (const tot of ['x']) {
-      await ap.selectOption('#courseSel', g); await ap.waitForSelector('[data-lid]'); await ap.waitForTimeout(200);
+      await pickC(ap, '#courseSel', g); await ap.waitForSelector('[data-lid]'); await ap.waitForTimeout(200);
       const ids = await ap.$$eval('[data-lid]:not([disabled])', e => e.slice(0, 3).map(x => x.getAttribute('data-lid')));
       for (const id of ids) await ap.check(`[data-lid="${id}"]`);
       await ap.click('#makeBtn'); await ap.waitForSelector('#paper .qi');
