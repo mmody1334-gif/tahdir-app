@@ -9,6 +9,7 @@ const PRIVACY = __PRIVACY__;
 const QBANK = __QBANK__;
 const GPACK = __GPACK__;
 const STUDY = __STUDY__;
+const FINALS = __FINALS__;
 const BUILD = __BUILD__;
 LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 'العلوم' : 'الأحياء'; if (!l.term) l.term = 1; });
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
@@ -467,6 +468,14 @@ export default {
       }
       if (p === '/remedial') return html('remedial');
       if (p === '/summaries') return html('summaries');
+      if (p === '/finals') return html('finals');
+      if (p === '/api/finals') {
+        const key = url.searchParams.get('key') || '', sc = scopeOf(me);
+        if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
+        const G = FINALS[key]; if (!G) return json({ error: 'لا توجد اختبارات لهذا الصف.' }, 404);
+        const lessons = {}; (await allLessons(env)).filter(l => courseKey(l) === key).forEach(l => { lessons[l.id] = { title: l.title, unit: l.unit }; });
+        return json({ ...G, lessons });
+      }
       if (p === '/api/study') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);

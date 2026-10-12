@@ -20,7 +20,9 @@ const DB = {
   async batch(list) { const out = []; sq.exec('BEGIN'); try { for (const s of list) out.push(await s.run()); sq.exec('COMMIT'); } catch (e) { sq.exec('ROLLBACK'); throw e; } return out; }
 };
 const port = +(process.argv[2] || 8787);
+import { readFileSync, existsSync } from 'node:fs';
 http.createServer(async (req, res) => {
+  if (req.url.startsWith('/fin/')) { const f = dir + '../finals/img/' + decodeURIComponent(req.url.slice(5)); if (existsSync(f)) { res.writeHead(200, { 'content-type': 'image/webp' }); res.end(readFileSync(f)); return; } }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   headers.set('CF-Connecting-IP', req.headers['x-test-ip'] || '127.0.0.1');

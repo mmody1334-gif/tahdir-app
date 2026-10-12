@@ -29,20 +29,15 @@ jobs:
         with: { name: worker-js, path: site/dist/worker.js, retention-days: 30 }
       - name: Deploy to Cloudflare
         env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CF_ACCOUNT }}
         run: |
-          if [ -z "$CF_TOKEN" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN secret is not set yet — built but not deployed. Upload site/dist/worker.js manually or add the secret."
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN secret is not set yet — built but not deployed."
             exit 0
           fi
-          printf '{"main_module":"worker.js","compatibility_date":"2025-06-01","bindings":[{"type":"d1","name":"DB","id":"%s"}]}' "$CF_D1" > /tmp/meta.json
-          code=$(curl -sS -o /tmp/cf.json -w '%{http_code}' -X PUT \
-            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$CF_SCRIPT" \
-            -H "Authorization: Bearer $CF_TOKEN" \
-            -F "metadata=@/tmp/meta.json;type=application/json" \
-            -F "worker.js=@site/dist/worker.js;type=application/javascript+module")
-          python3 -c "import json;d=json.load(open('/tmp/cf.json'));print('success:',d.get('success'));print(d.get('errors'))"
-          [ "$code" = "200" ] || { echo "::error::Cloudflare upload failed (HTTP $code)"; exit 1; }
+          mkdir -p site/dist/assets/fin && cp -r site/finals/img/. site/dist/assets/fin/
+          cd site && npx --yes wrangler@3.114.0 deploy && cd ..
           want=$(git rev-parse --short HEAD)
           for i in 1 2 3 4 5 6; do
             got=$(curl -s "$SITE/version" | python3 -c "import sys,json;print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)

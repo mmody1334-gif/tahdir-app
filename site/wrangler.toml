@@ -1,0 +1,13 @@
+# نشر الموقع مع الأصول الثابتة (صور أسئلة الاختبارات النهائية)
+name = "tahdir"
+main = "dist/worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tahdir"
+database_id = "43c1825c-d8d8-401a-a77b-2ec6897f457a"
+
+[assets]
+directory = "dist/assets"

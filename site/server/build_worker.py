@@ -430,6 +430,14 @@ button.lv-opt{cursor:pointer}
 .parts{display:grid;gap:8px;margin:8px 0}
 .parts label{display:flex;gap:8px;align-items:center;font-size:.92rem}
 #printArea{display:none}
+.fin-units{display:flex;flex-direction:column;gap:6px}.fin-u{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:start;font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);cursor:pointer}
+.fin-u span{color:var(--muted)}.fin-u em{font-style:normal;font-size:.78rem;color:var(--muted)}.fin-u.on{border-color:var(--brand,#0e7c66);background:color-mix(in srgb,var(--brand,#0e7c66) 10%,var(--bg));}
+.fin-head h2{margin:0 0 2px}.fin-lesson h3{margin:18px 0 8px;font-size:1rem;border-inline-start:4px solid var(--brand,#0e7c66);padding-inline-start:8px}
+.fin-q{border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 12px;background:var(--card,#fff)}.fin-q header{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:8px}
+.fin-q .chip{font-size:.74rem;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}.fin-q .chip.strong{color:var(--ink);font-weight:700}.fin-q .chip.lesson{color:var(--brand,#0e7c66)}
+.fin-q img{display:block;width:100%;max-width:780px;margin:0 auto;height:auto;background:#fff;border-radius:6px}.fin-pick{margin-inline-end:4px}
+.fin-ans{margin-top:8px;font-size:.9rem}.fin-ans summary{cursor:pointer;font-weight:700;color:var(--brand,#0e7c66)}.fin-a{padding:6px 10px;border-inline-start:3px solid var(--line);margin-top:6px;line-height:1.7}
+#printArea .fin-pq{page-break-inside:avoid;margin:0 0 10px}#printArea .fin-pq img{max-width:100%}#printArea .fin-pn{font-weight:bold;font-size:12pt}#printArea .fin-pn small{font-weight:normal;font-size:9pt;color:#555}
 @media print{
   @page{size:A4;margin:12mm}
   body.printing>*:not(#printArea){display:none!important}
@@ -564,7 +572,7 @@ TOP = lambda extra: f'''<header class="top">{HELIX}<div class="wrap top-in">
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'),
+              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا')]
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
@@ -605,6 +613,10 @@ SUMMARIES = TOP('<div class="stats"><span class="stat">ملخصات الدروس
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="اختيار الملخص"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
+FINALS_PAGE = TOP('<div class="stats"><span class="stat">الاختبارات النهائية السابقة</span><span class="stat">أسئلة الوزارة مصنّفة حسب الوحدة والدرس</span></div>').replace('%BTNS%', NAV('finals')) + '''
+<div class="wrap qlayout"><aside class="qside" id="fside" aria-label="اختيار الوحدة"></aside>
+<main class="panel" id="fmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<div id="printArea"></div>'''
 GRADING = TOP('<div class="stats"><span class="stat">تصحيح الواجبات تلقائيًا</span><span class="stat">تجريبي</span></div>').replace('%BTNS%', NAV('grading')) + '''
 <main class="wrap gr" id="gr"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 PLAY = '<main class="pl" id="pl"></main>'
@@ -613,6 +625,7 @@ ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span><
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
 
+FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'finals.json')) else {}
 PAGES = {
   'css': CSS,
   'login': page('التحضير الآلي', LOGIN, rd('client_login.js')),
@@ -624,6 +637,7 @@ PAGES = {
   'play': page('تحدي التحضير الآلي', PLAY, rd('client_play.js')),
   'grading': page('تصحيح الواجبات · التحضير الآلي', GRADING, rd('client_grading.js')),
   'remedial': page('الخطط العلاجية · التحضير الآلي', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
+  'finals': page('الاختبارات النهائية · التحضير الآلي', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · التحضير الآلي', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
 }
 src = rd('worker_src.js')
@@ -634,6 +648,7 @@ src = src.replace('__ICONS__', rd('icons.json'))
 src = src.replace('__STUDY__', json.dumps(json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__GPACK__', json.dumps(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
+src = src.replace('__FINALS__', json.dumps(FIN, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))
 src = src.replace('__PRIVACY__', json.dumps(rd('privacy.html'), ensure_ascii=False))
 import base64 as _b64
