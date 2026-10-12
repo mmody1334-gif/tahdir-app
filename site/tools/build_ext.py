@@ -20,8 +20,8 @@ big = Image.open(io.BytesIO(base64.b64decode(icons['/icon-512.png']))).convert('
 for n in (16, 32, 48, 128): big.resize((n, n), Image.LANCZOS).save(os.path.join(OUT, f'icon{n}.png'))
 sites = ['https://lms.moe.gov.om/*', 'https://tahdir.hudhaifa-bio.workers.dev/*'] + (['http://localhost/*'] if test else [])
 man = {
-  'manifest_version': 3, 'name': 'التحضير الآلي — أداة نور', 'short_name': 'أداة نور', 'version': ver,
-  'description': 'ترسل التحضير والواجب من موقع «التحضير الآلي» إلى منصة نور وتملأ الحقول تلقائيًا. لا تضغط حفظ أبدًا.',
+  'manifest_version': 3, 'name': 'الكبسولة — أداة نور', 'short_name': 'أداة نور', 'version': ver,
+  'description': 'ترسل التحضير والواجب من موقع «الكبسولة» إلى منصة نور وتملأ الحقول تلقائيًا. لا تضغط حفظ أبدًا.',
   'author': 'أ. محمد مجدي', 'homepage_url': 'https://tahdir.hudhaifa-bio.workers.dev/',
   'permissions': ['storage'],
   'background': {'service_worker': 'background.js'},
@@ -29,7 +29,7 @@ man = {
     {'matches': sites, 'js': ['bridge.js'], 'run_at': 'document_start'},
     {'matches': sites, 'js': ['main.js'], 'run_at': 'document_idle', 'world': 'MAIN'}],
   'icons': {str(n): f'icon{n}.png' for n in (16, 32, 48, 128)},
-  'action': {'default_icon': {str(n): f'icon{n}.png' for n in (16, 32)}, 'default_title': 'التحضير الآلي — أداة نور'},
+  'action': {'default_icon': {str(n): f'icon{n}.png' for n in (16, 32)}, 'default_title': 'الكبسولة — أداة نور'},
   'minimum_chrome_version': '111'
 }
 json.dump(man, open(os.path.join(OUT, 'manifest.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)

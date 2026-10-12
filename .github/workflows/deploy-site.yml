@@ -1,5 +1,5 @@
 name: deploy-site
-# يبني موقع «التحضير الآلي» وينشره على Cloudflare تلقائيًا عند أي تعديل في مجلد site/
+# يبني موقع «الكبسولة» وينشره على Cloudflare تلقائيًا عند أي تعديل في مجلد site/
 on:
   push:
     branches: [main]

@@ -7,7 +7,7 @@ function post(path,b){return fetch(path,{method:'POST',headers:{'Content-Type':'
 function view(h){$('pl').innerHTML=h;}
 function joinForm(err){
   var c=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');
-  view('<form class="pl-card" id="jf"><h1>🎮 تحدي التحضير الآلي</h1>'+(err?'<p class="pl-err">'+esc(err)+'</p>':'')+
+  view('<form class="pl-card" id="jf"><h1>🎮 تحدي الكبسولة</h1>'+(err?'<p class="pl-err">'+esc(err)+'</p>':'')+
     '<label>رمز التحدي<input id="jc" class="ltr" inputmode="numeric" maxlength="6" value="'+esc(c)+'" placeholder="123456" required></label>'+
     '<label>اسمك<input id="jn" maxlength="24" placeholder="مثال: أحمد 9/2" required autocomplete="off"></label><button class="pl-go" type="submit">دخول ▶</button></form>');
   $(c?'jn':'jc').focus();

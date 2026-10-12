@@ -239,7 +239,7 @@ function chooseParts(title){
 }
 function forOut(html){return clean(html).replace(/ contenteditable="false"/g,'').replace(/<span class="cb"[^>]*>/g,'<span>');}
 var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-function fileName(){return String(doc.title||'التحضير الآلي').replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
+function fileName(){return String(doc.title||'الكبسولة').replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
 function serverFile(format,html,win){
   toast('جارٍ التجهيز…');
   return api('/api/export',{format:format,name:fileName(),html:supify(html)}).then(function(r){

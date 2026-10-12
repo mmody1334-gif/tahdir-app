@@ -63,7 +63,7 @@ function browserKind(){var u=navigator.userAgent;return /Edg\//.test(u)?'edge':(
 function extUrl(){return EXT_STORE[browserKind()]||'';}
 function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_FORCE)>=0;}
 function toolDialog(reason){
-  if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «التحضير الآلي»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
+  if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «الكبسولة»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
   var v=toolVersion(),ok=toolOk()||hasExt(),eu=extUrl();
   if(eu&&!hasExt()){
     var bn=browserKind()==='edge'?'Edge':'Chrome';
@@ -76,7 +76,7 @@ function toolDialog(reason){
    '<li>اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة اللي تفتح اضغط <b>«تثبيت»</b> (أو «تحديث»).</li>'+
    '<li>ارجع لهنا وحدّث الصفحة.</li></ol>'+
 
-   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «التحضير الآلي»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
+   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
   return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
 // تحديث إجباري: لو الأداة مثبتة بإصدار أقدم من المنشور على الموقع، لا يكمل المعلم حتى يحدّثها
@@ -105,7 +105,7 @@ function forceToolUpdate(){
     '<p class="m-msg">المتصفح ما زال يشغّل الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_LATEST)+'</b>.</p>'+
     (tried?
       '<p class="m-msg">غالبًا عندك نسخة قديمة من الأداة مثبتة مرتين، أو لم يُضغط زر «تحديث» في صفحة Tampermonkey. الحل النهائي (دقيقة واحدة):</p>'+
-      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «التحضير الآلي» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>':
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «الكبسولة» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>':
       '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b> (أو Install).</li><li>ارجع لهنا — النافذة تختفي وحدها بعد التحديث. لو ما اختفت اضغط «تم التحديث».</li></ol>')+
     '<div class="m-actions"><button type="button" class="btn" id="mReload">'+(tried?'تم':'تم التحديث')+'</button><button type="button" class="btn primary" id="mOk">'+(tried?'تثبيت الأداة من جديد':'تحديث الأداة الآن')+'</button></div>';
   ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
@@ -130,7 +130,7 @@ function initNav(me){
     var place=function(){if(window.innerWidth<=700){ml.style.top=ml.style.left='';return;}var r=mb.getBoundingClientRect();ml.style.top=(r.bottom+8)+'px';ml.style.left=Math.max(8,Math.min(r.left,window.innerWidth-ml.offsetWidth-8))+'px';};
     mb.onclick=function(e){e.stopPropagation();var o=ml.hidden;ml.hidden=!o;mb.setAttribute('aria-expanded',o?'true':'false');if(o)place();};
     window.addEventListener('resize',function(){if(!ml.hidden)place();});window.addEventListener('scroll',function(){if(!ml.hidden)close();},{passive:true});
-    document.addEventListener('click',function(e){if(!ml.hidden&&!ml.contains(e.target))close();});
+    document.addEventListener('click',function(e){if(!ml.hidden&&(!ml.contains(e.target)||(e.target.closest&&e.target.closest('button,a'))))close();});
     document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
   }
   if($('logoutBtn'))$('logoutBtn').onclick=logout;
@@ -185,3 +185,17 @@ function toggleFull(el){
   if(fn&&!IN_APP){try{var r=fn.call(el);done=true;if(r&&r.catch)r.catch(function(){el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');});}catch(e){done=false;}}
   if(!done){el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');}
 }
+// رسالة ترحيبية لمرة واحدة بعد تغيير الهوية إلى «الكبسولة»
+(function(){
+  var K='kbs_welcome_v1';
+  if(navigator.webdriver)return;
+  try{if(localStorage.getItem(K))return;}catch(e){return;}
+  setTimeout(function(){
+    if(!document.querySelector('header.top'))return;
+    var ov=$('modal');if(!ov||!ov.hidden)return;
+    try{localStorage.setItem(K,'1');}catch(e){}
+    var h='<p class="m-msg">يسعدنا أن نقدّم لكم <b>«الكبسولة»</b>، الاسم والشكل الجديدان للمنصة. حساباتكم والتحضير والقيم الثابتة كما هي دون أي تغيير.</p>'+
+      '<p class="m-msg"><b>لمستخدمي تطبيق الموبايل:</b> احذفوا التطبيق القديم «التحضير الآلي»، ثم حمّلوا تطبيق «الكبسولة» الجديد.</p>';
+    dialog({title:'مرحبًا بكم في «الكبسولة» 💊',html:h,okText:'⬇ تحميل التطبيق الجديد (أندرويد)',cancelText:'حسنًا'}).then(function(r){if(r)location.href=APK_URL;});
+  },900);
+})();

@@ -7,6 +7,15 @@ DIST = os.path.join(HERE, '..', 'dist')
 os.makedirs(DIST, exist_ok=True)
 theme = json.load(open(os.path.join(DATA, 'theme.json'), encoding='utf-8'))
 base_css, HELIX, CELL, LOGO = theme['css'], theme['HELIX'], theme['CELL'], theme['LOGO']
+# هوية «الكبسولة»: الشعار وشعارا البانر (الوزارة ورؤية عُمان 2040) وألوان فاتحة متناسقة
+import base64 as _b64
+_BR = os.path.join(DATA, 'brand')
+LOGO = open(os.path.join(_BR, 'logo.svg'), encoding='utf-8').read().replace('<svg ', '<svg class="kb-logo" aria-hidden="true" ', 1)
+_img = lambda f: '/brand/' + f
+BRAND_ICONS = {'/brand/' + f: _b64.b64encode(open(os.path.join(_BR, f), 'rb').read()).decode() for f in ('moe.png', 'vision.png')}
+BANNER = f'''<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{LOGO}</div><div class="kb-name"><b>الكبسولة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>'''
+base_css = base_css.replace('--bg:#f1f7f4; --paper:#ffffff; --ink:#10261f; --mute:#58726a; --line:#d4e5de;', '--bg:#f6f4ee; --paper:#ffffff; --ink:#10261f; --mute:#5b6d67; --line:#e2e0d6;', 1)
+base_css = base_css.replace('--main:#0c7a63; --main-d:#08503f; --main-l:#e1f3ec; --leaf:#5fae3c; --accent:#c4861a; --accent-l:#fbf0db', '--main:#1f8a70; --main-d:#0b3b33; --main-l:#e3f1eb; --leaf:#e0a93b; --accent:#c98a1e; --accent-l:#fbf0db', 1)
 lessons = json.load(open(os.path.join(DATA, 'lessons.json'), encoding='utf-8'))
 qbank = json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8'))
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
@@ -53,6 +62,39 @@ TOOL_FORCE = re.search(r"MIN_REQUIRED = '([^']+)'", rd('tahdir-noor.user.js')).g
 common = common.replace('__TOOLVER__', TOOL_VER).replace('__TOOLFORCE__', TOOL_FORCE)
 
 extra_css = '''
+/* ---------- هوية الكبسولة: بانر فاتح وألوان متناسقة ---------- */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.kb-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1200px;margin:0 auto;padding:10px 16px;box-sizing:border-box}
+.kb-banner img{height:clamp(44px,8vw,78px);width:auto;display:block}
+.kb-mid{display:flex;align-items:center;gap:12px;min-width:0}
+.kb-mark .kb-logo{width:clamp(62px,10vw,104px);height:auto;display:block}
+.kb-name{display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.kb-name b{font-family:"Cairo",var(--f-display);font-weight:800;font-size:clamp(1.6rem,4.6vw,2.7rem);color:#0b3b33}
+.kb-name span{font-size:clamp(.78rem,1.8vw,1rem);font-weight:700;color:#c98a1e;margin-top:4px}
+.top{color:#10261f!important;background:#fff!important;border-bottom:3px solid #e0a93b!important}
+.top .helix{display:none}
+.top .top-in{border-top:1px solid #ece9df;padding-block:10px 12px}
+.top .by{color:#5b6d67}
+.top .stat{background:#f6f4ee;border-color:#e2e0d6;color:#0b3b33}
+.top .btn.ghost{background:#f6f4ee;border-color:#d9d6ca;color:#0b3b33}
+.top .btn.ghost:hover{background:#e3f1eb;border-color:#1f8a70}
+.whobar .btn[aria-current]{background:#e3f1eb!important;border-color:#1f8a70!important;color:#0b3b33}
+.top .menu-btn{background:#0b3b33;color:#fff;border-color:#0b3b33}
+.top .menu-btn:hover{background:#1f8a70}
+.top .btn.pulse{color:#0b3b33}
+.auth{color:#10261f!important;background:radial-gradient(900px 500px at 85% -10%,rgba(224,169,59,.18),transparent 60%),#f6f4ee!important}
+.auth{grid-template-rows:auto 1fr}
+.kb-band{grid-column:1/-1;background:#fff;border-bottom:3px solid #e0a93b}
+.auth-brand h1{display:none}
+.auth-brand .logo{width:auto;height:auto;background:none!important;border:0!important;margin-bottom:6px}
+.auth-brand .logo .kb-logo{width:150px;height:auto}
+.auth-brand h1{color:#0b3b33}
+.auth-brand .school{border-color:#e0a93b;background:#fff;color:#0b3b33}
+.auth-facts span{background:#fff;border-color:#e2e0d6;color:#0b3b33}
+.auth-card{box-shadow:0 20px 60px rgba(11,59,51,.14)}
+@media (max-width:860px){.auth-brand .logo .kb-logo{width:96px}}
+@media (max-width:520px){.kb-banner{padding:8px 10px;gap:6px}.kb-mid{gap:6px}}
+@media print{.kb-banner{display:none}}
 .whobar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .who{font-size:.86rem;opacity:.95;padding-inline-end:4px}
 .ltr{direction:ltr;unicode-bidi:isolate}
@@ -533,10 +575,10 @@ def pack(js):
 def page(title, body, script):
     return ('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-            '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#07493b">'
+            '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#f6f4ee">'
             '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">'
             '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
-            '<meta name="apple-mobile-web-app-title" content="التحضير الآلي"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            '<meta name="apple-mobile-web-app-title" content="الكبسولة"><meta name="apple-mobile-web-app-status-bar-style" content="default">'
             f'<title>{title}</title>{FONTS}<style>%CSS%</style></head><body>{body}'
             '<div class="modal" id="modal" hidden><div class="modal-box" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>'
             '<div class="toast" id="toast" role="status" aria-live="polite"></div>'
@@ -556,7 +598,7 @@ def _helix():
 BIG_HELIX = _helix()
 
 PROMO = '''<aside class="get-app" id="getApp" aria-label="حمّل التطبيق">
-  <h3>📱 حمّل تطبيق «التحضير الآلي»</h3>
+  <h3>📱 حمّل تطبيق «الكبسولة»</h3>
   <p>على موبايلك: التحضير والواجب يتبعتوا لنور بضغطة، والأداة مدمجة بدون أي إعداد.</p>
   <div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ تحميل للأندرويد</a></div>
   <details><summary>📲 على الآيفون</summary><ol><li>افتح الموقع من متصفح Safari.</li><li>اضغط زر «مشاركة» ⬆ أسفل الشاشة.</li><li>اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».</li></ol></details>
@@ -564,11 +606,11 @@ PROMO = '''<aside class="get-app" id="getApp" aria-label="حمّل التطبي�
 </aside>'''
 
 def auth_shell(card):
-    return f'''<main class="auth">
-<section class="auth-art">{BIG_HELIX}
+    return f'''<main class="auth"><div class="kb-band">{BANNER}</div>
+<section class="auth-art">
   <div class="auth-brand">
     <div class="logo">{LOGO}</div>
-    <h1>التحضير الآلي</h1>
+    <h1>الكبسولة</h1>
     <p>تحضير الدروس جاهز للإرسال إلى منصة نور، مرتّب حسب فهرس الكتاب المدرسي: العلوم، والأحياء، والكيمياء، والعلوم البيئية، وتقنية المعلومات، واللغة الإنجليزية.</p>
     <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
   </div>
@@ -598,8 +640,8 @@ SETUP = auth_shell('''<form class="auth-card" id="setupForm" novalidate>
   <button class="btn primary go" type="submit">إنشاء الحساب</button>
 </form>''')
 
-TOP = lambda extra: f'''<header class="top">{HELIX}<div class="wrap top-in">
-  <div class="brand"><div class="logo">{LOGO}</div><div><h1>التحضير الآلي</h1>
+TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
+  <div class="brand"><div><h1 class="sr-only">الكبسولة</h1>
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
@@ -622,10 +664,10 @@ def NAV(active, extra=''):
 
 APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span> درسًا</span><span class="stat"><span id="statFilled">0</span> بتحضير جاهز</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%',
   NAV('app')) + f'''
-<div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «التحضير الآلي» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
+<div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «الكبسولة» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
 <div class="wrap layout"><aside class="tree" id="tree" aria-label="الصفوف والوحدات والدروس"></aside>
 <main class="panel" id="panel"><div class="welcome">{CELL}<h2>جارٍ تحميل الدروس…</h2></div></main></div>
-<p class="foot">التحضير الآلي، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
+<p class="foot">الكبسولة، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
 
 QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبارات القصيرة ومراجعات الوحدات</span><span class="stat">وفق وثيقة تقويم تعلم الطلبة</span></div>').replace('%BTNS%',
   NAV('quiz')) + '''
@@ -660,23 +702,23 @@ ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span><
 FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'finals.json')) else {}
 PAGES = {
   'css': CSS,
-  'login': page('التحضير الآلي', LOGIN, rd('client_login.js')),
-  'setup': page('إعداد التحضير الآلي', SETUP, rd('client_login.js')),
-  'app': page('التحضير الآلي', APP, rd('client_app.js')),
-  'admin': page('لوحة التحكم · التحضير الآلي', ADMIN, rd('client_admin.js')),
-  'quiz': page('التقويم · التحضير الآلي', QUIZ, rd('client_quiz.js')),
-  'games': page('الألعاب التعليمية · التحضير الآلي', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
-  'play': page('تحدي التحضير الآلي', PLAY, rd('client_play.js')),
-  'grading': page('تصحيح الواجبات · التحضير الآلي', GRADING, rd('client_grading.js')),
-  'remedial': page('الخطط العلاجية · التحضير الآلي', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
-  'finals': page('الاختبارات النهائية · التحضير الآلي', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
-  'summaries': page('ملخصات الدروس · التحضير الآلي', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
+  'login': page('الكبسولة', LOGIN, rd('client_login.js')),
+  'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
+  'app': page('الكبسولة', APP, rd('client_app.js')),
+  'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
+  'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js')),
+  'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
+  'play': page('تحدي الكبسولة', PLAY, rd('client_play.js')),
+  'grading': page('تصحيح الواجبات · الكبسولة', GRADING, rd('client_grading.js')),
+  'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
+  'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
+  'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
 }
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
-src = src.replace('__ICONS__', rd('icons.json'))
+src = src.replace('__ICONS__', json.dumps({**json.loads(rd('icons.json')), **BRAND_ICONS}))
 src = src.replace('__STUDY__', json.dumps(json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__GPACK__', json.dumps(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))

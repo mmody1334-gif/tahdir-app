@@ -74,7 +74,7 @@ const B = 'http://localhost:8787', OUT = __dirname + '/';
   await p1.emulateMedia({ media: 'print' });
   // grade 12 quiz
   await p1.emulateMedia({ media: 'screen' });
-  await pickC(p1, '#courseSel', 'الأحياء|الثاني عشر'); await p1.waitForSelector('[data-lid]');
+  await pickC(p1, '#courseSel', 'الأحياء|الثاني عشر'); await p1.waitForTimeout(900); await p1.waitForSelector('[data-lid]');
   const l12 = await p1.$$eval('[data-lid]:not([disabled])', e => e.slice(5, 9).map(x => x.getAttribute('data-lid')));
   for (const id of l12) await p1.check(`[data-lid="${id}"]`);
   await p1.click('#makeBtn'); await p1.waitForSelector('#paper .qi');

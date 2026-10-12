@@ -1,8 +1,8 @@
 import UIKit
 import WebKit
 
-// التحضير الآلي — تطبيق آيفون/آيباد.
-// ثلاث شاشات أصلية: موقع التحضير الآلي، منصة نور، والإعدادات.
+// الكبسولة — تطبيق آيفون/آيباد.
+// ثلاث شاشات أصلية: موقع الكبسولة، منصة نور، والإعدادات.
 // أداة نور (نفس سكربت الموقع) تُحقن تلقائيًا وتُحدَّث من الموقع عند كل تشغيل.
 // التطبيق لا يضغط حفظ أو نشر في نور أبدًا؛ هذا يبقى للمعلم.
 
@@ -10,7 +10,7 @@ enum Config {
     static let site = URL(string: "https://tahdir.hudhaifa-bio.workers.dev/")!
     static let nour = URL(string: "https://lms.moe.gov.om/teacher")!
     static let tool = URL(string: "https://tahdir.hudhaifa-bio.workers.dev/tool/tahdir-noor.user.js")!
-    static let green = UIColor(red: 14/255, green: 124/255, blue: 102/255, alpha: 1)
+    static let green = UIColor(red: 31/255, green: 138/255, blue: 112/255, alpha: 1)
 }
 
 /// مخزن مشترك بين الشاشتين (بديل GM_getValue/GM_setValue في Tampermonkey).
@@ -82,7 +82,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 
 final class MainTabs: UITabBarController {
-    let site = WebScreen(home: Config.site, title: "التحضير الآلي", icon: "book.closed")
+    let site = WebScreen(home: Config.site, title: "الكبسولة", icon: "book.closed")
     let nour = WebScreen(home: Config.nour, title: "منصة نور", icon: "graduationcap")
     let settings = SettingsScreen(style: .insetGrouped)
 
@@ -265,7 +265,7 @@ final class SettingsScreen: UITableViewController {
     override func numberOfSections(in tableView: UITableView) -> Int { rows.count }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection s: Int) -> Int { rows[s].count }
     override func tableView(_ tableView: UITableView, titleForFooterInSection s: Int) -> String? {
-        s == 2 ? "التحضير الآلي — إعداد أ. محمد مجدي، معلم الأحياء، مدرسة حذيفة بن محصن. الإصدار \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")" : nil
+        s == 2 ? "الكبسولة — إعداد أ. محمد مجدي، معلم الأحياء، مدرسة حذيفة بن محصن. الإصدار \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")" : nil
     }
     override func tableView(_ tableView: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
         let c = tableView.dequeueReusableCell(withIdentifier: "c", for: ip)
@@ -282,7 +282,7 @@ final class SettingsScreen: UITableViewController {
         case (0, 0): Tool.shared.refresh(); toast("جاري تحديث الأداة من الموقع")
         case (0, 1): Store.shared.all = [:]; toast("تم مسح بيانات الأداة المؤقتة")
         case (1, 0):
-            let a = UIAlertController(title: "تسجيل الخروج", message: "سيتم الخروج من موقع التحضير الآلي ومن منصة نور على هذا الجهاز.", preferredStyle: .alert)
+            let a = UIAlertController(title: "تسجيل الخروج", message: "سيتم الخروج من موقع الكبسولة ومن منصة نور على هذا الجهاز.", preferredStyle: .alert)
             a.addAction(UIAlertAction(title: "إلغاء", style: .cancel))
             a.addAction(UIAlertAction(title: "خروج", style: .destructive) { [weak self] _ in
                 let types = WKWebsiteDataStore.allWebsiteDataTypes()
@@ -293,7 +293,7 @@ final class SettingsScreen: UITableViewController {
             })
             present(a, animated: true)
         default:
-            let a = UIAlertController(title: "التحضير الآلي", message: "تحضير الدروس والواجبات جاهزة للإرسال إلى منصة نور مباشرة. يختار التطبيق الدرس ويملأ الحقول، ويبقى الحفظ والنشر للمعلم.", preferredStyle: .alert)
+            let a = UIAlertController(title: "الكبسولة", message: "تحضير الدروس والواجبات جاهزة للإرسال إلى منصة نور مباشرة. يختار التطبيق الدرس ويملأ الحقول، ويبقى الحفظ والنشر للمعلم.", preferredStyle: .alert)
             a.addAction(UIAlertAction(title: "حسنًا", style: .default))
             present(a, animated: true)
         }

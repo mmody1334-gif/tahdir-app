@@ -1,0 +1,14 @@
+const { chromium } = require('playwright');
+const B='http://localhost:8787', O='/tmp/claude-0/-home-claude-tahdir-app/0c317531-7d49-5838-9e9a-1ef869cbd305/scratchpad/brand/shots/';
+(async()=>{const b=await chromium.launch();const c=await b.newContext({viewport:{width:1366,height:820}});const p=await c.newPage();
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(B+'/');await p.screenshot({path:O+'setup.png'});
+await p.fill('#username','mohamed');await p.fill('#password','Bio@2026x');await p.fill('#password2','Bio@2026x');await p.click('#setupForm button[type=submit]');
+await p.waitForURL(B+'/');await p.waitForTimeout(1200);await p.screenshot({path:O+'login.png'});
+await p.fill('#username','mohamed');await p.fill('#password','Bio@2026x');await p.click('#loginBtn');await p.waitForURL(B+'/admin');
+await p.waitForTimeout(1500);await p.screenshot({path:O+'admin_welcome.png'});
+await p.goto(B+'/app');await p.waitForTimeout(1500);await p.screenshot({path:O+'app.png'});
+const r=await p.request.get(B+'/brand/moe.png');console.log('moe',r.status());
+const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,storageState:await c.storageState()});const mp=await m.newPage();await mp.goto(B+'/quiz');await mp.waitForTimeout(1500);await mp.screenshot({path:O+'m_quiz.png'});
+const m2=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2});const mp2=await m2.newPage();await mp2.goto(B+'/');await mp2.waitForTimeout(1500);await mp2.screenshot({path:O+'m_login.png'});
+console.log('errors',errs);await b.close();})();

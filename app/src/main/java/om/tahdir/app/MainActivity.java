@@ -34,8 +34,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 /**
- * التحضير الآلي — تطبيق أندرويد.
- * شاشتان: موقع التحضير الآلي، ومنصة نور. الأداة (نفس سكربت Tampermonkey) تُحقن تلقائيًا في الشاشتين،
+ * الكبسولة — تطبيق أندرويد.
+ * شاشتان: موقع الكبسولة، ومنصة نور. الأداة (نفس سكربت Tampermonkey) تُحقن تلقائيًا في الشاشتين،
  * وتُحدَّث من الموقع عند كل تشغيل، فلا حاجة لإضافات أو Tampermonkey.
  * التطبيق لا يضغط حفظ أو نشر في نور أبدًا؛ هذا يبقى للمعلم.
  */
@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
     static final String SITE = "https://tahdir.hudhaifa-bio.workers.dev/";
     static final String NOUR = "https://lms.moe.gov.om/teacher";
     static final String TOOL_URL = SITE + "tool/tahdir-noor.user.js";
-    static final int GREEN = Color.parseColor("#0E7C66");
+    static final int GREEN = Color.parseColor("#0B3B33");
     static final int FILE_REQ = 7;
 
     WebView site, nour, current;
@@ -89,7 +89,7 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         int pad = dp(6);
         bar.setPadding(pad, pad, pad, pad);
-        tabSite = tab("التحضير الآلي");
+        tabSite = tab("الكبسولة");
         tabNour = tab("منصة نور");
         Button reload = tab("↻");
         bar.addView(tabSite, new LinearLayout.LayoutParams(0, dp(42), 1f));
@@ -142,8 +142,8 @@ public class MainActivity extends Activity {
         current = w;
         site.setVisibility(w == site ? View.VISIBLE : View.GONE);
         nour.setVisibility(w == nour ? View.VISIBLE : View.GONE);
-        tabSite.setBackgroundColor(w == site ? Color.parseColor("#0A5C4C") : Color.TRANSPARENT);
-        tabNour.setBackgroundColor(w == nour ? Color.parseColor("#0A5C4C") : Color.TRANSPARENT);
+        tabSite.setBackgroundColor(w == site ? Color.parseColor("#1F8A70") : Color.TRANSPARENT);
+        tabNour.setBackgroundColor(w == nour ? Color.parseColor("#1F8A70") : Color.TRANSPARENT);
     }
 
     WebView makeWebView() {
@@ -184,7 +184,7 @@ public class MainActivity extends Activity {
                 view.loadDataWithBaseURL(null, "<html dir='rtl'><meta name='viewport' content='width=device-width,initial-scale=1'>"
                     + "<body style='font-family:sans-serif;text-align:center;padding:60px 24px;color:#163'>"
                     + "<h2>لا يوجد اتصال بالإنترنت</h2><p>تأكد من الاتصال ثم اضغط إعادة المحاولة.</p>"
-                    + "<button style='background:#0E7C66;color:#fff;border:0;border-radius:10px;padding:12px 26px;font-size:16px' onclick=\"location.href='" + u + "'\">إعادة المحاولة</button></body></html>",
+                    + "<button style='background:#1F8A70;color:#fff;border:0;border-radius:10px;padding:12px 26px;font-size:16px' onclick=\"location.href='" + u + "'\">إعادة المحاولة</button></body></html>",
                     "text/html", "utf-8", u);
             }
         });

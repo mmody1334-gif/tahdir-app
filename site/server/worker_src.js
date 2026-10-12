@@ -1,4 +1,4 @@
-// التحضير الآلي — Cloudflare Worker + D1
+// الكبسولة — Cloudflare Worker + D1
 // إعداد: أ. محمد مجدي — مدرسة حذيفة بن محصن
 const LESSONS = __LESSONS__;
 const PAGES = __PAGES__;
@@ -51,7 +51,7 @@ LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
 const courseKey = l => (l.subject || '') + '|' + (l.grade || '');
 const CUSTOM_BASE = 100000;
-const MANIFEST = JSON.stringify({ name: 'التحضير الآلي', short_name: 'التحضير', lang: 'ar', dir: 'rtl', start_url: '/', scope: '/', display: 'standalone', background_color: '#f3f7f5', theme_color: '#07493b',
+const MANIFEST = JSON.stringify({ name: 'الكبسولة', short_name: 'الكبسولة', lang: 'ar', dir: 'rtl', start_url: '/', scope: '/', display: 'standalone', background_color: '#f6f4ee', theme_color: '#f6f4ee',
   icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] });
 
 const SESSION_DAYS = 30;
@@ -533,7 +533,7 @@ export default {
       }
       if (p === '/api/export' && m === 'POST') {
         const b = await body(req), id = rand(20), fmt = b.format === 'print' ? 'print' : 'doc';
-        const name = String(b.name || 'التحضير الآلي').replace(/[\\/:*?"<>|\r\n]+/g, '-').slice(0, 100);
+        const name = String(b.name || 'الكبسولة').replace(/[\\/:*?"<>|\r\n]+/g, '-').slice(0, 100);
         await env.DB.batch([
           env.DB.prepare('DELETE FROM exports WHERE created_at < ?').bind(now() - 86400000),
           env.DB.prepare('INSERT INTO exports(id,user_id,name,format,body,created_at) VALUES(?,?,?,?,?,?)').bind(id, me.id, name, fmt, String(b.html || '').slice(0, 1900000), now())
