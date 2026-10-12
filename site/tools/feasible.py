@@ -1,7 +1,7 @@
 # هل يوجد اختبار مطابق للمواصفات من بنك الأسئلة لكل مجموعة دروس متتالية؟ (بحث شامل)
 import json, itertools, collections, sys
 L = json.load(open('data/lessons.json')); Q = json.load(open('data/quiz_bank.json'))
-NUM = {'الخامس':5,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12}
+NUM = {'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12}
 def spec(g):
     if g >= 11: return dict(total=10, t={'AO1':3,'AO2':7}, mcq=2, long=(4,5), smax=3, items=(5,99))
     if g == 10: return dict(total=10, t={'معرفة':4,'تطبيق':4,'استدلال':2}, mcq=2, long=(3,4), smax=2, items=(5,7))
