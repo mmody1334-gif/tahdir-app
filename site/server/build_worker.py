@@ -9,6 +9,36 @@ theme = json.load(open(os.path.join(DATA, 'theme.json'), encoding='utf-8'))
 base_css, HELIX, CELL, LOGO = theme['css'], theme['HELIX'], theme['CELL'], theme['LOGO']
 lessons = json.load(open(os.path.join(DATA, 'lessons.json'), encoding='utf-8'))
 qbank = json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8'))
+# أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
+def fin_items():
+    p = os.path.join(DATA, 'finals.json')
+    if not os.path.exists(p): return []
+    F = json.load(open(p, encoding='utf-8'))
+    GN = {'الخامس': 5, 'السادس': 6, 'السابع': 7, 'الثامن': 8, 'التاسع': 9, 'العاشر': 10, 'الحادي عشر': 11, 'الثاني عشر': 12}
+    LO = {'AO1': 'معرفة', 'AO2': 'تطبيق', 'AO3': 'استدلال', 'معرفة': 'معرفة', 'تطبيق': 'تطبيق', 'استدلال': 'استدلال'}
+    HI = {'AO1': 'AO1', 'AO2': 'AO2', 'AO3': 'AO2', 'معرفة': 'AO1', 'تطبيق': 'AO2', 'استدلال': 'AO2'}
+    out = []
+    for key, G in F.items():
+        subj, grade = key.split('|')
+        if subj in ('تقنية المعلومات', 'اللغة الإنجليزية'): continue
+        g = GN.get(grade, 0); hi = g >= 11
+        smax = 3 if hi else 2; lrange = (4, 5) if hi else ((3, 4) if g >= 9 else ())
+        for q in G['q']:
+            ao = (HI if hi else LO).get(str(q.get('ao') or '').strip())
+            m = q.get('m')
+            if not ao or not q.get('l') or not isinstance(m, (int, float)) or m != int(m): continue
+            m = int(m); t = q.get('t')
+            if t == 'mcq':
+                if m != 1: continue
+                typ = 'mcq'
+            elif m <= smax: typ = 'short'
+            elif lrange and m in lrange and ao not in ('معرفة', 'AO1'): typ = 'long'
+            else: continue
+            pa = G['papers'].get(q['p'], {})
+            out.append({'qid': 'f' + q['id'], 'lesson_id': q['l'], 'type': typ, 'stem': q.get('x', ''), 'img': q['im'], 'iw': q.get('w'), 'ih': q.get('h'),
+                        'src': 'امتحان الوزارة ' + str(pa.get('year', '')) + (' - ' + pa['session'] if pa.get('session') else ''),
+                        'answer': q.get('a', ''), 'choices': [], 'marks': m, 'ao': ao, 'difficulty': '', 'outcome': q.get('c', ''), 'notes': ''})
+    return out
 try:
     sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=HERE, capture_output=True, text=True).stdout.strip()
 except Exception:

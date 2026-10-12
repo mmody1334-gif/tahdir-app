@@ -10,6 +10,42 @@ const QBANK = __QBANK__;
 const GPACK = __GPACK__;
 const STUDY = __STUDY__;
 const FINALS = __FINALS__;
+// أسئلة الاختبارات النهائية للعلوم تدخل بنك الاختبار القصير بصورتها الأصلية، بأهداف تقويم الوثيقة
+const FG = { 'الخامس': 5, 'السادس': 6, 'السابع': 7, 'الثامن': 8, 'التاسع': 9, 'العاشر': 10, 'الحادي عشر': 11, 'الثاني عشر': 12 };
+const AO_LO = { AO1: 'معرفة', AO2: 'تطبيق', AO3: 'استدلال', 'معرفة': 'معرفة', 'تطبيق': 'تطبيق', 'استدلال': 'استدلال' };
+const AO_HI = { AO1: 'AO1', AO2: 'AO2', AO3: 'AO2', 'معرفة': 'AO1', 'تطبيق': 'AO2', 'استدلال': 'AO2' };
+// تقنية المعلومات: مستويات الوثيقة (تذكر وفهم/تطبيق/استدلال)، والإجابة القصيرة 1–2 والطويلة 3 درجات
+function itBank(key, items) {
+  if (!/تقنية/.test(key)) return items;
+  return items.map(q => {
+    let ao = q.ao;
+    if (ao === 'معرفة' || ao === 'AO1') ao = 'تذكر وفهم';
+    else if (ao === 'AO2') ao = /مرتفع/.test(q.difficulty || '') ? 'استدلال' : 'تطبيق';
+    let type = q.type;
+    if (type !== 'mcq' && q.marks === 3 && ao !== 'تذكر وفهم') type = 'long';
+    else if (type === 'long' && q.marks <= 2) type = 'short';
+    return { ...q, ao, type };
+  });
+}
+function finQuizItems(key) {
+  const G = FINALS[key]; if (!G) return [];
+  const [subj, grade] = key.split('|'); if (subj === 'تقنية المعلومات' || subj === 'اللغة الإنجليزية') return [];
+  const g = FG[grade] || 0, hi = g >= 11, smax = hi ? 3 : 2, lr = hi ? [4, 5] : (g >= 9 ? [3, 4] : []);
+  const out = [];
+  for (const q of G.q) {
+    const ao = (hi ? AO_HI : AO_LO)[String(q.ao || '').trim()], m = q.m;
+    if (!ao || !q.l || typeof m !== 'number' || m !== Math.floor(m)) continue;
+    let type;
+    if (q.t === 'mcq') { if (m !== 1) continue; type = 'mcq'; }
+    else if (m <= smax) type = 'short';
+    else if (lr.includes(m) && ao !== 'معرفة' && ao !== 'AO1') type = 'long';
+    else continue;
+    const pa = G.papers[q.p] || {};
+    out.push({ qid: 'f' + q.id, lesson_id: q.l, type, stem: q.x || '', img: q.im, iw: q.w, ih: q.h, src: 'امتحان الوزارة ' + (pa.year || '') + (pa.session ? ' - ' + pa.session : ''),
+      answer: q.a || '', choices: [], marks: m, ao, difficulty: '', outcome: q.c || '', notes: '' });
+  }
+  return out;
+}
 const BUILD = __BUILD__;
 LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 'العلوم' : 'الأحياء'; if (!l.term) l.term = 1; });
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
@@ -493,7 +529,7 @@ export default {
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
         const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
         const ids = new Set(ls.map(l => l.id));
-        return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, term: l.term || 1 })), items: QBANK.filter(q => ids.has(q.lesson_id)) });
+        return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, term: l.term || 1 })), items: itBank(key, QBANK.filter(q => ids.has(q.lesson_id)).concat(finQuizItems(key).filter(q => ids.has(q.lesson_id)))) });
       }
       if (p === '/api/export' && m === 'POST') {
         const b = await body(req), id = rand(20), fmt = b.format === 'print' ? 'print' : 'doc';

@@ -4,7 +4,7 @@ guard();
 // ---------- ثوابت ----------
 var GRADE_NUM={'الأول':1,'الثاني':2,'الثالث':3,'الرابع':4,'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
 var HI_AO=['AO1','AO2'],LO_AO=['معرفة','تطبيق','استدلال'];
-var AO_TXT={AO1:'AO1 · المعرفة والفهم',AO2:'AO2 · التطبيق والتحليل والتقييم','معرفة':'معرفة','تطبيق':'تطبيق','استدلال':'استدلال'};
+var AO_TXT={'تذكر وفهم':'تذكر وفهم',AO1:'AO1 · المعرفة والفهم',AO2:'AO2 · التطبيق والتحليل والتقييم','معرفة':'معرفة','تطبيق':'تطبيق','استدلال':'استدلال'};
 var TYPE_TXT={mcq:'اختيار من متعدد',short:'إجابة قصيرة',long:'إجابة طويلة'};
 var QNO=['الأول','الثاني','الثالث','الرابع'];
 var DEF_HDR={dir:'المديرية العامة للتربية والتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
@@ -15,8 +15,10 @@ function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function track(type,detail,title){try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,grade:course&&course.grade,detail:detail||'',title:title||''})});}catch(e){}}
 function gnum(g){return GRADE_NUM[g]||99;}
-function isHi(){return course&&gnum(course.grade)>=11;}
-function aoList(){return isHi()?HI_AO:LO_AO;}
+function isIT(){return !!course&&/تقنية/.test(course.subject||'');}
+function isHi(){return course&&gnum(course.grade)>=11&&!isIT();}
+function aoList(){return isIT()?IT_AO:(isHi()?HI_AO:LO_AO);}
+var IT_AO=['تذكر وفهم','تطبيق','استدلال'];
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
@@ -25,6 +27,11 @@ function pick(a){return a[Math.floor(Math.random()*a.length)];}
 // جدول مواصفات الاختبار القصير الرسمي (الصفوف 5–12)
 function spec(){
   var g=gnum(course.grade);
+  if(isIT()){ // وثيقة تقويم تقنية المعلومات (الاختبار القصير): تذكر وفهم 50% · تطبيق 30% · استدلال 20%
+    if(g>=11)return {total:10,targets:{'تذكر وفهم':5,'تطبيق':3,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:1,marks:[3]},shortMax:2,items:[6,8],label:'11–12 (تقنية المعلومات)'};
+    if(g>=9)return {total:20,targets:{'تذكر وفهم':10,'تطبيق':6,'استدلال':4},mcqCount:4,mcqAos:2,long:{count:1,marks:[3]},shortMax:2,items:[12,18],label:'9–10 (تقنية المعلومات)'};
+    return {total:10,targets:{'تذكر وفهم':5,'تطبيق':3,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[6,10],label:'5–8 (تقنية المعلومات)'};
+  }
   if(g>=11)return {total:10,targets:{AO1:3,AO2:7},mcq:{AO1:1,AO2:1},mcqCount:2,long:{count:1,marks:[4,5]},shortMax:3,items:[5,99],label:'11–12'};
   if(g===10)return {total:10,targets:{'معرفة':4,'تطبيق':4,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:1,marks:[3,4]},shortMax:2,items:[5,7],label:'10'};
   if(g===9)return {total:15,targets:{'معرفة':6,'تطبيق':6,'استدلال':3},mcqCount:3,mcqAos:2,long:{count:1,marks:[3,4]},shortMax:2,items:[9,12],label:'9'};
@@ -33,7 +40,7 @@ function spec(){
 // في الصفوف 5–8 لا توجد مفردة طويلة: المفردات الطويلة بدرجتين تُستخدم كمفردات قصيرة
 function prepPool(pool,sp){
   return pool.map(function(x){if(!sp.long.count&&x.type==='long'&&x.marks<=sp.shortMax){var y=clone(x);y.type='short';return y;}return x;})
-    .filter(function(x){return x.type==='mcq'||(x.type==='short'&&x.marks<=sp.shortMax)||(x.type==='long'&&sp.long.count&&sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة');});
+    .filter(function(x){return x.type==='mcq'||(x.type==='short'&&x.marks<=sp.shortMax)||(x.type==='long'&&sp.long.count&&sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة'&&x.ao!=='تذكر وفهم');});
 }
 
 // ---------- تكوين الاختبار تلقائيًا (بحث دقيق يطابق جدول المواصفات) ----------
@@ -67,7 +74,8 @@ function assemble(pool,sp,lessonIds){
       var pickd=mc.concat(lg);opts.forEach(function(o){pickd=pickd.concat(pick(o));});
       var nI=pickd.length;if(nI<sp.items[0]||nI>sp.items[1])continue;
       var cov={};pickd.forEach(function(x){cov[x.lesson_id]=(cov[x.lesson_id]||0)+1;});
-      var spread=Object.keys(cov).length*10-Math.max.apply(null,Object.keys(cov).map(function(k){return cov[k];}))+Math.random();
+      var nImg=pickd.filter(function(x){return x.img;}).length;
+      var spread=Object.keys(cov).length*10-Math.max.apply(null,Object.keys(cov).map(function(k){return cov[k];}))+Math.min(nImg,Math.ceil(nI/2))*4+Math.random()*3;
       if(spread>bestScore){bestScore=spread;best=pickd;}
     }
     if(best&&Object.keys(best.reduce(function(m,x){m[x.lesson_id]=1;return m;},{})).length>=Math.min(lessonIds.length,best.length)&&att>8)break;
@@ -115,6 +123,12 @@ function itemHtml(it,n,tno,word,ctrl){
   var stem=it.table?relabel(it.stem,tno):it.stem;
   var h='<div class="qi" data-i="'+(n-1)+'" style="margin:0 0 '+(word?'10pt':'16px')+';page-break-inside:avoid">';
   if(ctrl)h+=ctrl;
+  if(it.img){ // سؤال من امتحان الوزارة بصورته الأصلية (فيه الرسم والاختيارات وأسطر الإجابة)
+    var W=word?Math.min(560,it.iw||560):0;
+    h+='<p style="margin:0 0 4px"><b>'+n+')</b> <span style="font-size:'+(word?'9pt':'.78em')+';color:#555">('+esc(it.src||'من امتحانات الوزارة')+' — '+it.marks+' '+(it.marks==1?'درجة':'درجات')+')</span></p>'+
+      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;'+(W?'width:'+W+'px;':'')+'margin:0 auto">';
+    return h+'</div>';
+  }
   h+='<p style="margin:0 0 4px"><b>'+n+')</b> '+rich(stem)+'</p>';
   if(it.table&&it.table.rows){
     h+='<table class="qt" style="border-collapse:collapse;margin:6px auto 6px;min-width:55%">'+(it.table.caption?'<caption style="font-weight:bold;padding:2px">'+esc(relabel(it.table.caption,tno))+'</caption>':'');
@@ -149,7 +163,7 @@ function keyHtml(d,word){
   h+='<table class="keyt" style="width:100%;border-collapse:collapse"><thead><tr>'+th('المفردة')+th('الإجابة')+th('الدرجة')+(hi?th('المعلومات الإضافية')+th('الوحدة'):'')+th('هدف التعلم')+th('هدف التقويم')+(hi?th('مستوى الصعوبة'):'')+'</tr></thead><tbody>';
   d.items.forEach(function(it,i){
     if(it.table)tno++;
-    var ans=it.type==='mcq'?rich((it.choices||[])[it.correct]||''):rich(it.table?relabel(it.answer,tno):it.answer);
+    var ans=(it.type==='mcq'&&!it.img)?rich((it.choices||[])[it.correct]||''):rich(it.table?relabel(it.answer,tno):it.answer);
     var notes=it.notes?rich(it.table?relabel(it.notes,tno):it.notes):'';
     if(!hi&&notes)ans+='<div style="font-size:.85em;color:#444">'+notes+'</div>';
     var L=lessonOf(it);
@@ -181,7 +195,7 @@ function checks(d){
     var a={};mc.forEach(function(x){a[x.ao]=1;});
     out.push([mc.length===sp.mcqCount&&Object.keys(a).length>=2,'اختيار من متعدد: '+mc.length+' (المطلوب '+sp.mcqCount+' تغطي هدفي تقويم على الأقل)']);
   }
-  if(sp.long.count)out.push([lg.length===1&&lg.every(function(x){return sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة';}),'إجابة طويلة: '+lg.length+(lg.length?' ('+lg.map(function(x){return x.marks;}).join('، ')+' درجات)':'')+' — مفردة واحدة من '+sp.long.marks[0]+' إلى '+sp.long.marks[sp.long.marks.length-1]+' درجات'+(isHi()?'':' وليست من مستوى المعرفة')]);
+  if(sp.long.count)out.push([lg.length===1&&lg.every(function(x){return sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة'&&x.ao!=='تذكر وفهم';}),'إجابة طويلة: '+lg.length+(lg.length?' ('+lg.map(function(x){return x.marks;}).join('، ')+' درجات)':'')+' — مفردة واحدة من '+sp.long.marks[0]+' إلى '+sp.long.marks[sp.long.marks.length-1]+' درجات'+(isHi()?'':' وليست من مستوى المعرفة')]);
   else out.push([lg.length===0,'إجابة طويلة: '+lg.length+' (لا توجد في الصفوف 5–8)']);
   out.push([sh.every(function(x){return x.marks<=sp.shortMax;}),'الإجابة القصيرة: '+sh.length+' مفردة، كل منها من 1 إلى '+sp.shortMax+' درجة']);
   var ls={};items.forEach(function(x){ls[x.lesson_id]=1;});var n=Object.keys(ls).length;
@@ -261,6 +275,19 @@ function newDoc(kind,items,extra){
   doc.spec=kind==='quiz'?spec(cfg.total):null;
   dirty=true;paperView='quiz';renderDoc();
 }
+// نموذج آخر للاختبار نفسه: نفس الدروس والمواصفات بأسئلة مختلفة قدر الإمكان
+function remakeDoc(){
+  if(!doc)return;
+  var ids=(doc.lessons&&doc.lessons.length?doc.lessons:doc.items.map(function(x){return x.lesson_id;})).map(Number).filter(function(v,i,a){return a.indexOf(v)===i;});
+  if(!course||course.key!==doc.course){var c=courses.filter(function(x){return x.key===doc.course;})[0];if(c){selectCourse(c.key).then(remakeDoc);return;}}
+  var cur={};doc.items.forEach(function(x){cur[x.qid]=1;});
+  var pool=poolFor(ids),fresh=pool.filter(function(x){return !cur[x.qid];}),it=assemble(fresh,spec(),ids);
+  if(!it.length||!checks(Object.assign({},doc,{items:it})).every(function(c){return c[0];}))it=assemble(pool,spec(),ids);
+  if(!it.length){toast('لا توجد مفردات كافية لنموذج آخر');return;}
+  var same=it.filter(function(x){return cur[x.qid];}).length;
+  doc.items=it;doc.lessons=ids;doc.id=null;doc.title='';dirty=true;renderDoc();
+  toast(same?'نموذج آخر ('+(it.length-same)+' مفردة جديدة من '+it.length+')':'نموذج آخر بأسئلة جديدة كلها');
+}
 function make(){
   if(!course)return;
   if(mode==='quiz'){
@@ -286,7 +313,7 @@ function renderDoc(){
   if(!doc){welcome();return;}
   var ck=checks(doc),allOk=ck.every(function(c){return c[0];});
   var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title||titleText(doc))+'" aria-label="اسم الاختبار في قائمتك"><div class="muted small">'+(doc.id?'محفوظ في اختباراتي':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
-    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'?'<button type="button" class="btn" id="remakeBtn">نسخة أخرى</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
+    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'?'<button type="button" class="btn" id="remakeBtn">🔁 نموذج آخر</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
     '<div class="checks no-print '+(allOk?'ok':'warn')+'"><b>'+(doc.kind==='review'?'المراجعة':(allOk?'✓ مطابق لمواصفات الاختبار القصير في وثيقة التقويم':'⚠ راجع النقاط المعلّمة'))+'</b><ul>'+ck.map(function(c){return '<li class="'+(c[0]?'y':'n')+'">'+(c[0]?'✓':'⚠')+' '+esc(c[1])+'</li>';}).join('')+'</ul></div>'+
     '<div class="ptabs no-print" role="tablist"><button type="button" class="ltab'+(paperView==='quiz'?' on':'')+'" data-pv="quiz">ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+'</button><button type="button" class="ltab'+(paperView==='key'?' on':'')+'" data-pv="key">نموذج الإجابة</button></div>'+
     '<div class="paper" id="paper">'+(paperView==='quiz'?quizHtml(doc,false,true):keyHtml(doc,false))+'</div>';
@@ -296,7 +323,7 @@ function renderDoc(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-act]'),function(b){b.onclick=function(){itemAct(b.getAttribute('data-act'),+b.getAttribute('data-i'));};});
   $('docTitle').onchange=function(){doc.title=this.value.trim();dirty=true;};
   $('printBtn').onclick=printDoc;$('wordBtn').onclick=wordDoc;$('saveBtn').onclick=saveDoc;$('addBtn').onclick=addItem;
-  if($('remakeBtn'))$('remakeBtn').onclick=function(){var ids=doc.lessons&&doc.lessons.length?doc.lessons:Object.keys(cfg.lessons).map(Number);var it=assemble(poolFor(ids),spec(),ids);if(it.length){doc.items=it;dirty=true;renderDoc();toast('نسخة جديدة من الاختبار نفسه');}};
+  if($('remakeBtn'))$('remakeBtn').onclick=remakeDoc;
 }
 function itemAct(a,i){
   var it=doc.items[i];if(!it)return;
