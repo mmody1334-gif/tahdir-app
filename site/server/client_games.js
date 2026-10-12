@@ -117,7 +117,7 @@ function renderHome(){
 function stage(title,inner){
   return '<div class="g-stage" id="stage"><div class="g-bar"><button type="button" class="btn small" id="gBack">→ الألعاب</button><b class="g-title">'+esc(title)+'</b><span class="g-bar-r"><button type="button" class="btn small" id="gFull">⛶ ملء الشاشة</button></span></div><div class="g-score" id="gScore"></div><div class="gm-body" id="gBody">'+inner+'</div></div>';
 }
-function bindStage(){$('gBack').onclick=renderHome;$('gFull').onclick=function(){var s=$('stage');try{if(document.fullscreenElement)document.exitFullscreen();else (s.requestFullscreen||s.webkitRequestFullscreen).call(s);}catch(e){}};}
+function bindStage(){$('gBack').onclick=renderHome;$('gFull').onclick=function(){toggleFull($('stage'));};}
 function renderScore(showButtons,val){
   var el=$('gScore');if(!el)return;
   el.innerHTML=teams.map(function(t,i){return '<div class="sc" style="--tc:'+TEAM_COLORS[i]+'"><span class="sc-n">'+esc(t.name)+'</span><span class="sc-v">'+t.score+'</span>'+(showButtons?'<span class="sc-b"><button type="button" data-plus="'+i+'">+'+val+'</button><button type="button" data-minus="'+i+'">−'+val+'</button></span>':'')+'</div>';}).join('');

@@ -242,7 +242,7 @@ var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function fileName(){return String(doc.title||'التحضير الآلي').replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}
 function serverFile(format,html,win){
   toast('جارٍ التجهيز…');
-  return api('/api/export',{format:format,name:fileName(),html:html}).then(function(r){
+  return api('/api/export',{format:format,name:fileName(),html:supify(html)}).then(function(r){
     if(win){try{win.location.href=r.url;return;}catch(e){}}
     leavingOk=Date.now();var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
   },function(e){if(win)try{win.close();}catch(x){}toast(e.message);});
@@ -253,8 +253,7 @@ function printDoc(){
     if(!ps)return;track(KIND==='remedial'?'remedial_print':'summary_print',ps.join('+'),doc.title);
     if(!IN_APP&&!MOBILE){
       var a=$('printArea');a.innerHTML=ps.map(function(k){return '<div class="ppage">'+forOut(doc.parts[k])+'</div>';}).join('');
-      document.body.classList.add('printing');
-      setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},60);
+      doPrint(fileName());
       return;
     }
     var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}

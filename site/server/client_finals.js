@@ -57,17 +57,32 @@ function renderMain(){
   $('fmain').innerHTML=h;
   Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'),function(b){b.onchange=function(){var id=b.getAttribute('data-pick');if(b.checked)picked[id]=1;else delete picked[id];renderSide();};});
 }
+var MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+function finName(title){return (title+' - '+course.subject+' - الصف '+course.grade).replace(/[\\/:*?"<>|]+/g,'-').slice(0,100);}
+function printHtml(qs,title,abs){
+  var O=abs?location.origin:'';
+  return '<div class="ppage pg"><h2 style="text-align:center;margin:0 0 4px">'+esc(title)+'</h2><p style="text-align:center;margin:0 0 10px;font-size:11pt">'+esc(course.subject)+' — الصف '+esc(course.grade)+'</p>'+
+    qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img src="'+O+'/fin/'+esc(q.im)+'" style="max-width:100%"></div>';}).join('')+'</div>'+
+    (showAns?'<div class="ppage pg"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+supify(esc(q.a)).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
+}
 function printQs(qs,title){
   if(!qs.length)return;
-  var a=$('printArea');
-  a.innerHTML='<div class="ppage"><h2 style="text-align:center;margin:0 0 4px">'+esc(title)+'</h2><p style="text-align:center;margin:0 0 10px;font-size:11pt">'+esc(course.subject)+' — الصف '+esc(course.grade)+'</p>'+
-    qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img src="/fin/'+esc(q.im)+'"></div>';}).join('')+'</div>'+
-    (showAns?'<div class="ppage"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+esc(q.a).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
+  track('finals_print',title+' ('+qs.length+')');
+  if(IN_APP||MOBILE){ // التطبيق والموبايل: صفحة طباعة مستقلة تُفتح في المتصفح
+    var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}
+    toast('جارٍ التجهيز…');
+    api('/api/export',{format:'print',name:finName(title),html:printHtml(qs,title,true)}).then(function(r){
+      if(w){try{w.location.href=r.url;return;}catch(e){}}
+      var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
+      if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');
+    },function(e){if(w)try{w.close();}catch(x){}toast(e.message);});
+    return;
+  }
+  var a=$('printArea');a.innerHTML=printHtml(qs,title,false);
   var imgs=a.querySelectorAll('img'),left=imgs.length;
-  function go(){document.body.classList.add('printing');setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},80);}
+  function go(){doPrint(finName(title));}
   if(!left)return go();
   Array.prototype.forEach.call(imgs,function(im){if(im.complete){if(--left===0)go();}else im.onload=im.onerror=function(){if(--left===0)go();};});
-  track('finals_print',title+' ('+qs.length+')');
 }
 function bindSide(){
   bindCoursePick(courses,'courseSel',selectCourse);

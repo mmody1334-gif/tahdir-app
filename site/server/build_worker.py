@@ -430,6 +430,7 @@ button.lv-opt{cursor:pointer}
 .parts{display:grid;gap:8px;margin:8px 0}
 .parts label{display:flex;gap:8px;align-items:center;font-size:.92rem}
 #printArea{display:none}
+.pseudo-fs{position:fixed!important;inset:0!important;z-index:9999!important;width:100vw!important;height:100vh!important;max-width:none!important;margin:0!important;border-radius:0!important;overflow:auto!important;background:var(--bg,#fff)}body.pseudo-fs-on{overflow:hidden}
 .fin-units{display:flex;flex-direction:column;gap:6px}.fin-u{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:start;font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);cursor:pointer}
 .fin-u span{color:var(--muted)}.fin-u em{font-style:normal;font-size:.78rem;color:var(--muted)}.fin-u.on{border-color:var(--brand,#0e7c66);background:color-mix(in srgb,var(--brand,#0e7c66) 10%,var(--bg));}
 .fin-head h2{margin:0 0 2px}.fin-lesson h3{margin:18px 0 8px;font-size:1rem;border-inline-start:4px solid var(--brand,#0e7c66);padding-inline-start:8px}
@@ -439,7 +440,8 @@ button.lv-opt{cursor:pointer}
 .fin-ans{margin-top:8px;font-size:.9rem}.fin-ans summary{cursor:pointer;font-weight:700;color:var(--brand,#0e7c66)}.fin-a{padding:6px 10px;border-inline-start:3px solid var(--line);margin-top:6px;line-height:1.7}
 #printArea .fin-pq{page-break-inside:avoid;margin:0 0 10px}#printArea .fin-pq img{max-width:100%}#printArea .fin-pn{font-weight:bold;font-size:12pt}#printArea .fin-pn small{font-weight:normal;font-size:9pt;color:#555}
 @media print{
-  @page{size:A4;margin:12mm}
+  @page{size:A4;margin:0}
+  #printArea .prw{width:100%;border-collapse:collapse}#printArea .prw>thead>tr>td,#printArea .prw>tfoot>tr>td,#printArea .prw>tbody>tr>td{padding:0 12mm;border:0}#printArea .prsp{height:11mm}
   body.printing>*:not(#printArea){display:none!important}
   body.printing #printArea{display:block!important;color:#000;font-family:"Simplified Arabic","Traditional Arabic","Cairo",Tahoma,serif;font-size:14pt;line-height:1.6}
   body.printing{background:#fff!important}

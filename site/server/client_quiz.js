@@ -377,7 +377,7 @@ function fileName(){return (doc.title||titleText(doc)).replace(/[\\/:*?"<>|]+/g,
 // التحميل من السيرفر برابط حقيقي: يعمل في التطبيق وفي متصفح الموبايل والكمبيوتر
 function serverFile(format,html,win){
   toast('جارٍ التجهيز…');
-  return api('/api/export',{format:format,name:fileName(),html:html}).then(function(r){
+  return api('/api/export',{format:format,name:fileName(),html:supify(html)}).then(function(r){
     if(win){try{win.location.href=r.url;return;}catch(e){}}
     leavingOk=Date.now();var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
   },function(e){if(win)try{win.close();}catch(x){}toast(e.message);});
@@ -389,8 +389,7 @@ function printDoc(){
     track('quiz_print',p,titleText(doc));
     if(!IN_APP&&!MOBILE){ // الكمبيوتر: طباعة مباشرة من الصفحة
       var a=$('printArea');a.innerHTML=(p!=='key'?'<div class="ppage">'+quizHtml(doc,false,false)+'</div>':'')+(p!=='quiz'?'<div class="ppage">'+keyHtml(doc,false)+'</div>':'');
-      document.body.classList.add('printing');
-      setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';},500);},60);
+      doPrint(fileName());
       return;
     }
     // الموبايل والتطبيق: صفحة طباعة مستقلة (في التطبيق تُفتح في Chrome)
