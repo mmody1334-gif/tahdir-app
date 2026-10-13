@@ -125,7 +125,7 @@ function itemHtml(it,n,tno,word,ctrl){
   if(ctrl)h+=ctrl;
   if(it.img){ // سؤال من امتحان الوزارة بصورته الأصلية (فيه الرسم والاختيارات وأسطر الإجابة)
     var W=word?Math.min(560,it.iw||560):0;
-    h+='<p style="margin:0 0 4px"><b>'+n+')</b> <span style="font-size:'+(word?'9pt':'.78em')+';color:#555">('+esc(it.src||'من امتحانات الوزارة')+' — '+it.marks+' '+(it.marks==1?'درجة':'درجات')+')</span></p>'+
+    h+='<p style="margin:0 0 4px"><b>'+n+')</b></p>'+
       '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;'+(W?'width:'+W+'px;':'')+'margin:0 auto">';
     return h+'</div>';
   }
