@@ -37,7 +37,7 @@ function hardItems(key, ls) {
   ls.forEach(l => {
     const c = all.filter(q => q.lesson_id === l.id && lvl(q) >= 2 && q.stem).sort((x, y) => score(y) - score(x));
     const pick = [], seen = new Set();
-    for (const q of c) { const k = String(q.stem).slice(0, 60); if (seen.has(k)) continue; seen.add(k); pick.push({ type: q.type, stem: q.stem, choices: q.choices || [], correct: q.correct, answer: q.answer || '', marks: q.marks || 1, ao: q.ao, img: q.img || '' }); if (pick.length >= 6) break; }
+    for (const q of c) { const k = String(q.stem).slice(0, 60); if (seen.has(k)) continue; seen.add(k); pick.push({ type: q.type, stem: String(q.stem).replace(/\*\*/g, ''), choices: q.choices || [], correct: q.correct, answer: q.answer || '', marks: q.marks || 1, ao: q.ao, img: q.img || '' }); if (pick.length >= 6) break; }
     if (pick.length) out[l.id] = pick;
   });
   return out;
