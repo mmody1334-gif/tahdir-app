@@ -719,10 +719,19 @@ src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separat
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
 src = src.replace('__ICONS__', json.dumps({**json.loads(rd('icons.json')), **BRAND_ICONS}))
-src = src.replace('__STUDY__', json.dumps(json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
-src = src.replace('__GPACK__', json.dumps(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
+# الحزم الكبيرة (الملخصات والألعاب والاختبارات النهائية) تُنشر ملفات ثابتة باسم مشتق من محتواها، ويحمّلها العامل عند الحاجة
+import hashlib as _hl
+_PK = {'study': json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), 'games': json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), 'finals': FIN}
+_PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
+_PH = _hl.sha256(b''.join(_PB.values())).hexdigest()[:24]
+import shutil as _sh
+if os.path.isdir(os.path.join(DIST, 'assets', 'd')):
+    for _o in os.listdir(os.path.join(DIST, 'assets', 'd')):
+        if _o != _PH: _sh.rmtree(os.path.join(DIST, 'assets', 'd', _o), ignore_errors=True)
+_PD = os.path.join(DIST, 'assets', 'd', _PH); os.makedirs(_PD, exist_ok=True)
+for k, b in _PB.items(): open(os.path.join(_PD, k + '.json'), 'wb').write(b)
+src = src.replace('__PACKDIR__', json.dumps('/d/' + _PH + '/'))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
-src = src.replace('__FINALS__', json.dumps(FIN, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))
 src = src.replace('__PRIVACY__', json.dumps(rd('privacy.html'), ensure_ascii=False))
 import base64 as _b64

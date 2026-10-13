@@ -21,13 +21,14 @@ const DB = {
 };
 const port = +(process.argv[2] || 8787);
 import { readFileSync, existsSync } from 'node:fs';
+const ASSETS = { fetch: async rq => { const f = dir + '../dist/assets' + decodeURIComponent(new URL(rq.url).pathname); return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': 'application/json' } }) : new Response('nf', { status: 404 }); } };
 http.createServer(async (req, res) => {
   if (req.url.startsWith('/fin/')) { const f = dir + '../finals/img/' + decodeURIComponent(req.url.slice(5)); if (existsSync(f)) { res.writeHead(200, { 'content-type': 'image/webp' }); res.end(readFileSync(f)); return; } }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   headers.set('CF-Connecting-IP', req.headers['x-test-ip'] || '127.0.0.1');
   const r = new Request('http://localhost:' + port + req.url, { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks) });
-  const out = await worker.fetch(r, { DB });
+  const out = await worker.fetch(r, { DB, ASSETS });
   const h = {}; out.headers.forEach((v, k) => { if (k !== 'set-cookie') h[k] = v; });
   const sc = out.headers.getSetCookie ? out.headers.getSetCookie() : [];
   if (sc.length) h['set-cookie'] = sc;

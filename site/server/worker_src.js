@@ -7,9 +7,20 @@ const ICONS = __ICONS__;
 const APK = __APK__;
 const PRIVACY = __PRIVACY__;
 const QBANK = __QBANK__;
-const GPACK = __GPACK__;
-const STUDY = __STUDY__;
-const FINALS = __FINALS__;
+let GPACK = {};
+let STUDY = { lessons: {}, units: {} };
+let FINALS = {};
+const PACKDIR = __PACKDIR__;
+let PACKS_OK = null;
+async function loadPacks(env, url) {
+  if (PACKS_OK) return PACKS_OK;
+  PACKS_OK = (async () => {
+    const get = async n => { const r = await env.ASSETS.fetch(new Request(new URL(PACKDIR + n + '.json', url.origin))); if (!r.ok) throw new Error('pack ' + n + ' ' + r.status); return r.json(); };
+    const [s, g, f] = await Promise.all([get('study'), get('games'), get('finals')]);
+    STUDY = s; GPACK = g; FINALS = f; return true;
+  })().catch(e => { PACKS_OK = null; throw e; });
+  return PACKS_OK;
+}
 // أسئلة الاختبارات النهائية للعلوم تدخل بنك الاختبار القصير بصورتها الأصلية، بأهداف تقويم الوثيقة
 const FG = { 'الخامس': 5, 'السادس': 6, 'السابع': 7, 'الثامن': 8, 'التاسع': 9, 'العاشر': 10, 'الحادي عشر': 11, 'الثاني عشر': 12 };
 const AO_LO = { AO1: 'معرفة', AO2: 'تطبيق', AO3: 'استدلال', 'معرفة': 'معرفة', 'تطبيق': 'تطبيق', 'استدلال': 'استدلال' };
@@ -467,6 +478,7 @@ export default {
       if (!env.DB) return new Response('اربط قاعدة بيانات D1 بالاسم DB من إعدادات الـ Worker.', { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       await ensureSchema(env.DB);
       const url = new URL(req.url), p = url.pathname, m = req.method;
+      if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live)/.test(p)) await loadPacks(env, url);
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 
       let mm0;
@@ -477,7 +489,7 @@ export default {
       if (p === '/download/tahdir.apk') return new Response(Uint8Array.from(atob(APK), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Disposition': 'attachment; filename="tahdir.apk"', 'Cache-Control': 'no-cache' } });
       if (ICONS[p]) return new Response(Uint8Array.from(atob(ICONS[p]), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' } });
       if (p === '/manifest.webmanifest') return new Response(MANIFEST, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
-      if (p === '/version') return json(BUILD);
+      if (p === '/version') { let packs = false; try { packs = await loadPacks(env, url); } catch (e) { packs = String(e.message || e); } return json({ ...BUILD, packs }); }
       if ((mm0 = p.match(/^\/x\/([a-f0-9]{40})$/))) return exportFile(req, env, mm0[1]);
       if (p === '/robots.txt') return new Response('User-agent: *\nDisallow: /', { headers: { 'Content-Type': 'text/plain' } });
       if (p === '/setup') return (await adminCount()) ? redirect('/') : html('setup');

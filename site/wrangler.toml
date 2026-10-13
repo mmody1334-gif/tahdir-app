@@ -11,3 +11,4 @@ database_id = "43c1825c-d8d8-401a-a77b-2ec6897f457a"
 
 [assets]
 directory = "dist/assets"
+binding = "ASSETS"

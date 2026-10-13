@@ -40,7 +40,8 @@ jobs:
           cd site && npx --yes wrangler@3.114.0 deploy && cd ..
           want=$(git rev-parse --short HEAD)
           for i in 1 2 3 4 5 6; do
-            got=$(curl -s "$SITE/version" | python3 -c "import sys,json;print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+            v=$(curl -s "$SITE/version"); echo "$v"
+            got=$(echo "$v" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('sha','') if d.get('packs') is True else 'nopacks')" 2>/dev/null || true)
             echo "live: $got  want: $want"; [ "$got" = "$want" ] && exit 0; sleep 10
           done
           echo "::error::live site does not show the new version"; exit 1
