@@ -44,13 +44,13 @@ function fallbackSummary(l){ // درس مضاف بلا ملخص جاهز: نبن
 // ---------- الأنشطة الصفية: أسئلة أعلى مستوى (تطبيق واستدلال) لكل درس ----------
 function classHtml(ls,key){
   var en=isEnC(),AR='أبجد'.split('');
-  var title=en?(key?'Answer key – ':'')+'Class activities (challenge) – Grade 9':(key?'إجابات ':'')+'الأنشطة الصفية (أسئلة تحدٍّ) في مادة '+course.subject+' للصف '+course.grade;
+  var title=en?(key?'Answer key – ':'')+'Class activities (challenge) – Grade 9':(key?'إجابات ':'')+'الأنشطة الصفية (أسئلة متوسطة وأسئلة تحدٍّ) في مادة '+course.subject+' للصف '+course.grade;
   var h=sheetHead(title,en,!key),n=0,any=false,hard=(data&&data.hard)||{};
   if(!key)h+='<p style="margin:2px 0 8px;font-size:.95em">'+(en?'Work in pairs or groups. Show your reasoning.':'تُنفَّذ داخل الصف فرديًا أو في مجموعات. وضّح خطوات تفكيرك وحلّك.')+'</p>';
   ls.forEach(function(l){var it=hard[l.id];if(!it||!it.length)return;any=true;
     h+='<h3 style="font-size:1.08em;margin:14px 0 4px;border-bottom:1.5px solid #000">'+(en?'Lesson: ':'الدرس: ')+esc(l.title)+'</h3>';
     it.forEach(function(q){n++;
-      var lab=(q.ao==='استدلال'||q.ao==='AO2')?(en?'Reasoning':'استدلال'):(en?'Application':'تطبيق');
+      var lab=(q.mid?(en?'Medium':'متوسط')+' · ':(en?'Challenge':'تحدٍّ')+' · ')+((q.ao==='استدلال'||q.ao==='AO2')?(en?'Reasoning':'استدلال'):(q.ao==='تطبيق'?(en?'Application':'تطبيق'):(en?'Knowledge':'معرفة')));
       h+='<div style="margin:8px 0 10px;page-break-inside:avoid"><b>'+(en?'Q':'س')+n+'.</b> <span style="font-size:.8em;border:1px solid #888;border-radius:8px;padding:0 6px">'+lab+' · '+q.marks+(en?' mark(s)':' درجة')+'</span><div style="margin-top:3px">'+esc(q.stem).replace(/\n/g,'<br>')+'</div>';
       if(q.img)h+='<img src="'+location.origin+'/fin/'+esc(q.img)+'" alt="" style="display:block;max-width:100%;margin:6px auto">';
       if(q.type==='mcq'&&q.choices&&q.choices.length)h+='<div style="margin:4px 0">'+q.choices.map(function(c,i){return '<span style="display:inline-block;min-width:45%;margin:2px 0">'+(en?String.fromCharCode(65+i):AR[i])+') '+esc(c)+'</span>';}).join('')+'</div>';

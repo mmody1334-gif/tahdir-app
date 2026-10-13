@@ -46,9 +46,16 @@ function hardItems(key, ls) {
   const dif = q => ({ 'مرتفعة': 2, 'متوسطة': 1 }[q.difficulty] || 0);
   const score = q => lvl(q) * 10 + dif(q) * 4 + Math.min(q.marks || 1, 5) * 2 + (q.type === 'long' ? 3 : 0) + (q.img ? 4 : 0) - (q.type === 'mcq' ? 6 : 0);
   ls.forEach(l => {
-    const c = all.filter(q => q.lesson_id === l.id && lvl(q) >= 2 && q.stem).sort((x, y) => score(y) - score(x));
+    // أسئلة متوسطة (سؤالان على الأقل) ثم أسئلة تحدٍّ أعلى مستوى
+    const mine = all.filter(q => q.lesson_id === l.id && q.stem);
+    const isMid = q => q.difficulty === 'متوسطة' || (lvl(q) === 2 && (q.marks || 1) <= 2);
+    const mid = mine.filter(q => isMid(q) && q.type !== 'long').sort((x, y) => (y.marks || 1) - (x.marks || 1));
+    const hard = mine.filter(q => lvl(q) >= 2).sort((x, y) => score(y) - score(x));
     const pick = [], seen = new Set();
-    for (const q of c) { const k = String(q.stem).slice(0, 60); if (seen.has(k)) continue; seen.add(k); pick.push({ type: q.type, stem: String(q.stem).replace(/\*\*/g, ''), choices: q.choices || [], correct: q.correct, answer: q.answer || '', marks: q.marks || 1, ao: q.ao, img: q.img || '' }); if (pick.length >= 6) break; }
+    const add = q => { const k = String(q.stem).slice(0, 60); if (seen.has(k)) return false; seen.add(k); pick.push({ type: q.type, stem: String(q.stem).replace(/\*\*/g, ''), choices: q.choices || [], correct: q.correct, answer: q.answer || '', marks: q.marks || 1, ao: q.ao, img: q.img || '', mid: isMid(q) }); return true; };
+    let nm = 0; for (const q of mid) { if (nm >= 2) break; if (add(q)) nm++; }
+    for (const q of hard) { if (pick.length >= 7) break; add(q); }
+    pick.sort((x, y) => (y.mid ? 1 : 0) - (x.mid ? 1 : 0));
     if (pick.length) out[l.id] = pick;
   });
   return out;
