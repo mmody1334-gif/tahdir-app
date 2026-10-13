@@ -27,6 +27,21 @@ function itBank(key, items) {
     return { ...q, ao, type };
   });
 }
+// «الأنشطة الصفية»: أسئلة أعلى مستوى لكل درس (تطبيق/استدلال، درجات أعلى، صعوبة أعلى، وأسئلة الوزارة بالرسوم)
+function hardItems(key, ls) {
+  const ids = new Set(ls.map(l => l.id)), out = {};
+  const all = itBank(key, QBANK.filter(q => ids.has(q.lesson_id)).concat(finQuizItems(key).filter(q => ids.has(q.lesson_id))));
+  const lvl = q => ({ 'استدلال': 3, 'AO2': 3, 'تطبيق': 2, 'AO1': 1, 'معرفة': 1 }[q.ao] || 1);
+  const dif = q => ({ 'مرتفعة': 2, 'متوسطة': 1 }[q.difficulty] || 0);
+  const score = q => lvl(q) * 10 + dif(q) * 4 + Math.min(q.marks || 1, 5) * 2 + (q.type === 'long' ? 3 : 0) + (q.img ? 4 : 0) - (q.type === 'mcq' ? 6 : 0);
+  ls.forEach(l => {
+    const c = all.filter(q => q.lesson_id === l.id && lvl(q) >= 2 && q.stem).sort((x, y) => score(y) - score(x));
+    const pick = [], seen = new Set();
+    for (const q of c) { const k = String(q.stem).slice(0, 60); if (seen.has(k)) continue; seen.add(k); pick.push({ type: q.type, stem: q.stem, choices: q.choices || [], correct: q.correct, answer: q.answer || '', marks: q.marks || 1, ao: q.ao, img: q.img || '' }); if (pick.length >= 6) break; }
+    if (pick.length) out[l.id] = pick;
+  });
+  return out;
+}
 function finQuizItems(key) {
   const G = FINALS[key]; if (!G) return [];
   const [subj, grade] = key.split('|'); if (subj === 'تقنية المعلومات' || subj === 'اللغة الإنجليزية') return [];
@@ -518,7 +533,7 @@ export default {
         const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
         const study = {}, units = {};
         ls.forEach(l => { if (STUDY.lessons[l.id]) study[l.id] = STUDY.lessons[l.id]; const u = STUDY.units[key + '|' + l.unit]; if (u) units[l.unit] = u; });
-        return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, outcomes: l.outcomes || '', concepts: l.concepts || '' })), study, units });
+        return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, outcomes: l.outcomes || '', concepts: l.concepts || '' })), study, units, hard: hardItems(key, ls) });
       }
       if (p === '/api/games/data') { const d = await gamesData(env, me, url.searchParams.get('key') || ''); return d.error ? json(d, 403) : json(d); }
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);

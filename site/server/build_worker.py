@@ -646,7 +646,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط والأنشطة العلاجية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا')]
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
@@ -679,7 +679,7 @@ GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب الت�
   NAV('games')) + '''
 <div class="wrap qlayout"><aside class="qside" id="gside" aria-label="اختيار الدروس"></aside>
 <main class="panel" id="gmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>'''
-REMEDIAL = TOP('<div class="stats"><span class="stat">الخطط والأنشطة العلاجية</span><span class="stat">للطلاب دون المستوى</span></div>').replace('%BTNS%', NAV('remedial')) + '''
+REMEDIAL = TOP('<div class="stats"><span class="stat">الخطط العلاجية والأنشطة الصفية</span><span class="stat">للطلاب دون المستوى</span></div>').replace('%BTNS%', NAV('remedial')) + '''
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الخطة"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''

@@ -41,6 +41,27 @@ function fallbackSummary(l){ // درس مضاف بلا ملخص جاهز: نبن
   var o=String(l.outcomes||'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
   return {intro:'',outcomes:(o.length?o:['…']).map(function(t){return {code:'',text:t,points:['…']};}),terms:String(l.concepts||'').split(/[،,]/).map(function(x){return x.trim();}).filter(Boolean).slice(0,6).map(function(t){return {t:t,d:'…'};}),remember:[]};
 }
+// ---------- الأنشطة الصفية: أسئلة أعلى مستوى (تطبيق واستدلال) لكل درس ----------
+function classHtml(ls,key){
+  var en=isEnC(),AR='أبجد'.split('');
+  var title=en?(key?'Answer key – ':'')+'Class activities (challenge) – Grade 9':(key?'إجابات ':'')+'الأنشطة الصفية (أسئلة تحدٍّ) في مادة '+course.subject+' للصف '+course.grade;
+  var h=sheetHead(title,en,!key),n=0,any=false,hard=(data&&data.hard)||{};
+  if(!key)h+='<p style="margin:2px 0 8px;font-size:.95em">'+(en?'Work in pairs or groups. Show your reasoning.':'تُنفَّذ داخل الصف فرديًا أو في مجموعات. وضّح خطوات تفكيرك وحلّك.')+'</p>';
+  ls.forEach(function(l){var it=hard[l.id];if(!it||!it.length)return;any=true;
+    h+='<h3 style="font-size:1.08em;margin:14px 0 4px;border-bottom:1.5px solid #000">'+(en?'Lesson: ':'الدرس: ')+esc(l.title)+'</h3>';
+    it.forEach(function(q){n++;
+      var lab=(q.ao==='استدلال'||q.ao==='AO2')?(en?'Reasoning':'استدلال'):(en?'Application':'تطبيق');
+      h+='<div style="margin:8px 0 10px;page-break-inside:avoid"><b>'+(en?'Q':'س')+n+'.</b> <span style="font-size:.8em;border:1px solid #888;border-radius:8px;padding:0 6px">'+lab+' · '+q.marks+(en?' mark(s)':' درجة')+'</span><div style="margin-top:3px">'+esc(q.stem).replace(/\n/g,'<br>')+'</div>';
+      if(q.img)h+='<img src="'+location.origin+'/fin/'+esc(q.img)+'" alt="" style="display:block;max-width:100%;margin:6px auto">';
+      if(q.type==='mcq'&&q.choices&&q.choices.length)h+='<div style="margin:4px 0">'+q.choices.map(function(c,i){return '<span style="display:inline-block;min-width:45%;margin:2px 0">'+(en?String.fromCharCode(65+i):AR[i])+') '+esc(c)+'</span>';}).join('')+'</div>';
+      if(key)h+='<div style="border:1px solid #0e7c66;background:#f1f8f5;border-radius:6px;padding:5px 9px;margin-top:4px"><b>'+(en?'Answer: ':'الإجابة: ')+'</b>'+esc(q.type==='mcq'&&q.choices&&q.choices[q.correct]!=null?q.choices[q.correct]:q.answer).replace(/\n/g,'<br>')+(q.type==='mcq'||!q.answer||q.answer===q.choices[q.correct]?'':'')+'</div>';
+      else if(q.type!=='mcq')h+='<div style="border-bottom:1px dotted #999;height:'+(Math.min(q.marks||1,5)*22+10)+'px"></div>';
+      h+='</div>';
+    });
+  });
+  if(!any)h+='<p>'+(en?'No challenge questions for these lessons yet.':'لا توجد أسئلة تحدٍّ جاهزة لهذه الدروس بعد.')+'</p>';
+  return wrap(h,en);
+}
 // ---------- الخطة العلاجية ----------
 function planHtml(ls){
   var en=isEnC(),weak=en?WEAK_EN:(/تقنية/.test(course.subject||'')?WEAK_IT:WEAK_AR),on={};
@@ -178,7 +199,7 @@ function selectCourse(key){
 }
 function welcome(){
   $('qmain').innerHTML=REM?
-    '<div class="welcome qwel"><h2>🩹 الخطط والأنشطة العلاجية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
+    '<div class="welcome qwel"><h2>🩹 الخطط العلاجية والأنشطة الصفية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة. ومعها تبويب <b>«الأنشطة الصفية»</b>: أسئلة تحدٍّ أعلى مستوى (تطبيق واستدلال، وأسئلة الوزارة بالرسوم) لكل درس مع إجاباتها.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
     '<div class="welcome qwel"><h2>📚 ملخصات الدروس والوحدات</h2><p>ملخص لكل درس مبني على مخرجات التعلم في المنهج العُماني والكتاب المدرسي: الفكرة الأساسية، نقاط كل مخرج، المصطلحات، وأخطاء شائعة. وملخص للوحدة بأفكارها الكبرى وأسئلة مراجعة.</p><div class="welcome-steps"><span>1. اختر درسًا أو وحدة</span><span>2. اعرض الملخص</span><span>3. عدّل ما تريد</span><span>4. اطبع أو حمّل Word للطلاب</span></div></div>';
 }
 function make(){
@@ -187,7 +208,7 @@ function make(){
   if((REM||sumMode==='lesson')&&!ls.length){toast('اختر درسًا واحدًا على الأقل');return;}
   var title,parts;
   if(REM){
-    parts={plan:planHtml(ls),sheet:sheetHtml(ls,false),key:sheetHtml(ls,true)};
+    parts={plan:planHtml(ls),sheet:sheetHtml(ls,false),key:sheetHtml(ls,true),cls:classHtml(ls,false),clskey:classHtml(ls,true)};
     title='خطة علاجية — '+course.subject+' '+course.grade+' — '+ls.map(function(l){return l.title;}).join('، ');part='plan';
     track('remedial_make',ls.length+' دروس',title);
   }else{
@@ -199,8 +220,8 @@ function make(){
   doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:title.slice(0,150),parts:parts,lessons:ls.map(function(l){return l.id;}),id:null,en:isEnC()};
   dirty=true;renderDoc();
 }
-var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',main:'الملخص'};
-function partKeys(){return REM?['plan','sheet','key']:['main'];}
+var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',main:'الملخص'};
+function partKeys(){return REM?['plan','sheet','key','cls','clskey']:['main'];}
 function renderDoc(){
   if(!doc){welcome();return;}
   var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title)+'" aria-label="الاسم في قائمتك"><div class="muted small">'+(doc.id?'محفوظ':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
@@ -231,7 +252,7 @@ function chooseParts(title){
   if(!REM)return Promise.resolve(['main']);
   return new Promise(function(res){
     var ov=$('modal'),box=$('modalBox');
-    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+partKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+(k!=='key'||part==='key'?' checked':'')+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
+    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+partKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+((part==='cls'||part==='clskey')?(k===part||(part==='cls'&&k==='clskey')?' checked':''):(k==='plan'||k==='sheet'||k===part?' checked':''))+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
     ov.hidden=false;var close=function(v){ov.hidden=true;box.innerHTML='';res(v);};
     $('mCancel').onclick=function(){close(null);};
     $('mOk').onclick=function(){var v=Array.prototype.map.call(document.querySelectorAll('input[name="pp"]:checked'),function(x){return x.value;});if(!v.length){toast('اختر جزءًا واحدًا على الأقل');return;}close(v);};
