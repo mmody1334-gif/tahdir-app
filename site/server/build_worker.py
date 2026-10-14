@@ -648,7 +648,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا')]
-              ('searcher', 'https://رابط-الباحث-هنا', '🔎', 'باحث المدرسة')]
+              ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'
