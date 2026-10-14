@@ -656,10 +656,11 @@ def NAV(active, extra=''):
     h += '<button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button>' if active == 'app' else '<a class="btn ghost small" href="/app#settings">القيم الثابتة</a>'
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
-    for k, href, ic, t in MENU_ITEMS:
-        h += f'<a role="menuitem" href="{href}"{cur(k)}><span class="mi">{ic}</span>{t}</a>'
+       for k, href, ic, t in MENU_ITEMS:
+        ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''
+        h += f'<a role="menuitem" href="{href}"{ext}{cur(k)}><span class="mi">{ic}</span>{t}</a>'
     h += f'<a role="menuitem" class="admin-only" id="adminLink" href="/admin"{cur("admin")} hidden><span class="mi">⚙</span>لوحة التحكم</a>'
-    h += extra
+h += extra
     h += '<hr><button type="button" role="menuitem" id="logoutBtn"><span class="mi">⎋</span>تسجيل الخروج</button></div></div>'
     return h
 
