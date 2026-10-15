@@ -727,7 +727,15 @@ src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii
 src = src.replace('__ICONS__', json.dumps({**json.loads(rd('icons.json')), **BRAND_ICONS}))
 # الحزم الكبيرة (الملخصات والألعاب والاختبارات النهائية) تُنشر ملفات ثابتة باسم مشتق من محتواها، ويحمّلها العامل عند الحاجة
 import hashlib as _hl
-_PK = {'study': json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8')), 'games': json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), 'finals': FIN}
+def _study_with_mm():
+    # دمج الخرائط الذهنية (data/mindmaps.json) داخل حزمة الملخصات: study.lessons[id].mm
+    st = json.load(open(os.path.join(DATA, 'study_pack.json'), encoding='utf-8'))
+    mp = os.path.join(DATA, 'mindmaps.json')
+    if os.path.exists(mp):
+        for k, v in json.load(open(mp, encoding='utf-8')).items():
+            st['lessons'].setdefault(str(k), {})['mm'] = v
+    return st
+_PK = {'study': _study_with_mm(), 'games': json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), 'finals': FIN}
 _PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
 _PH = _hl.sha256(b''.join(_PB.values())).hexdigest()[:24]
 import shutil as _sh
