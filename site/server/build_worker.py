@@ -17,6 +17,11 @@ BANNER = f'''<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" 
 base_css = base_css.replace('--bg:#f1f7f4; --paper:#ffffff; --ink:#10261f; --mute:#58726a; --line:#d4e5de;', '--bg:#f6f4ee; --paper:#ffffff; --ink:#10261f; --mute:#5b6d67; --line:#e2e0d6;', 1)
 base_css = base_css.replace('--main:#0c7a63; --main-d:#08503f; --main-l:#e1f3ec; --leaf:#5fae3c; --accent:#c4861a; --accent-l:#fbf0db', '--main:#1f8a70; --main-d:#0b3b33; --main-l:#e3f1eb; --leaf:#e0a93b; --accent:#c98a1e; --accent-l:#fbf0db', 1)
 lessons = json.load(open(os.path.join(DATA, 'lessons.json'), encoding='utf-8'))
+for _ar_f in ('arabic_lessons_g5_to_g12.json', 'lessons_ar.json'):
+    _ar_p = os.path.join(DATA, _ar_f)
+    if os.path.exists(_ar_p):
+        lessons = [l for l in lessons if l.get('subject') != 'اللغة العربية'] + json.load(open(_ar_p, encoding='utf-8'))
+
 qbank = json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8'))
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
 def fin_items():
