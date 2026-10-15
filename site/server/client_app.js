@@ -15,6 +15,8 @@ function subjIcon(s){return SUBJ_ICON[s]||'📘';}
 function subjects(){var s={};lessons.forEach(function(l){s[subjOf(l)]=1;});return Object.keys(s).sort(function(a,b){var x=SUBJ_ORDER.indexOf(a),y=SUBJ_ORDER.indexOf(b);return (x<0?99:x)-(y<0?99:y)||a.localeCompare(b,'ar');});}
 var GRADE_NUM={'الأول':1,'الثاني':2,'الثالث':3,'الرابع':4,'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
 function gradeNum(g){return GRADE_NUM[String(g||'').replace(/^الصف\s+/,'').trim()]||0;}
+// بعض الملفات تكتب الصف «الصف التاسع» وبعضها «التاسع»؛ نعرضه بصيغة واحدة دائمًا
+function gradeLabel(g){return String(g||'').replace(/^الصف\s+/,'').trim();}
 function gradeRange(s){var g=lessons.filter(function(l){return subjOf(l)===s;}).map(function(l){return gradeNum(l.grade);}).filter(function(n){return n>0;});if(!g.length)return '';var a=Math.min.apply(null,g),b=Math.max.apply(null,g);return a===b?'الصف '+String(l_name(a)):'الصفوف '+a+'–'+b;}
 function l_name(n){for(var k in GRADE_NUM){if(GRADE_NUM[k]===n)return k;}return n;}
 function inGroup(l){var ss=subjects();if(ss.length<2)return true;return subjOf(l)===subj;}
@@ -70,7 +72,7 @@ function renderTree(){
     var gDiv=document.createElement('div');gDiv.className='g-block';
     var count=lessons.filter(function(l){return ckey(l)===g;}).length,gp=g.split('|');
     var gBtn=document.createElement('button');gBtn.className='g-btn';gBtn.type='button';
-    gBtn.innerHTML='<span class="g-name">الصف '+esc(gp[1])+'</span><span class="g-meta">'+count+' درس <span class="chev">▾</span></span>';
+    gBtn.innerHTML='<span class="g-name">الصف '+esc(gradeLabel(gp[1]))+'</span><span class="g-meta">'+count+' درس <span class="chev">▾</span></span>';
     var gBody=document.createElement('div');gBody.className='g-body';
     if(openGrades[g]||lessons.some(function(l){return l.id===currentId&&ckey(l)===g;}))gBody.classList.add('open');
     unitsOf(g).forEach(function(u){
@@ -174,11 +176,10 @@ function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
 function lessonNo(l){if(l.lesson_no)return +l.lesson_no;var n=0;for(var i=0;i<lessons.length;i++){var x=lessons[i];if(ckey(x)===ckey(l)&&String(x.unit)===String(l.unit)){n++;if(x.id===l.id)return n;}}return 0;}
 function buildHwJson(l){var t=$('f_title');return JSON.stringify({source:'tahdir-al-aali',kind:'homework',title:(t&&t.value.trim())||l.title||'',base_title:l.title||'',grade:l.grade,subject:l.subject||'',unit:String(l.unit),lesson_no:lessonNo(l),items:hwItems(l)});}
 function sendToNour(kind,json,okMsg,minVer,fallback){
-  var need=IN_APP||hasExt()?minVer:(verCmp(minVer,TOOL_FORCE)>0?minVer:TOOL_FORCE);
-  if(!toolOk(need)){
-    if(!IN_APP&&toolVersion()&&!hasExt()&&!toolOk()){forceToolUpdate();return false;}
-    if(toolVersion()){toolDialog('لإرسال تحضير هذه المادة إلى نور حدّث «أداة نور» إلى الإصدار '+TOOL_LATEST+' (اضغط «تثبيت الأداة» ثم «تحديث» في Tampermonkey).');return false;}
-    toolDialog(toolVersion()?'أداة نور عندك قديمة. حدّثها مرة واحدة وبعدها تتحدث تلقائيًا.':'الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك.');
+  // المسار الوحيد: أداة نور مثبتة على المتصفح (Tampermonkey) أو التطبيق. لا حجب بسبب الإصدار:
+  // نتحقق فقط أن الأداة موجودة، ولو كانت قديمة نُنبّه بلطف ونكمل.
+  if(!IN_APP&&!hasExt()&&!toolVersion()){
+    toolDialog('الإرسال إلى نور يحتاج تثبيت «أداة نور» مرة واحدة على متصفحك (خطوتان فقط).');
     return false;
   }
   var done=false,ev='tahdir-'+kind+'-ack';
@@ -200,7 +201,7 @@ function sendPrep(l){
 function buildHwText(l){var L='أبجدهو';return 'واجب: '+(l.title||'')+'\n\n'+hwItems(l).map(function(x,i){return (i+1)+'- '+x.text+(x.choices?'\n'+x.choices.map(function(c,k){return '   '+L[k]+') '+c;}).join('\n'):'');}).join('\n\n');}
 function renderLesson(l){
   var p=$('panel'),admin=me.role==='admin';
-  var h='<article class="lesson"><div class="crumb">'+(l.subject?esc(l.subject)+' <span>›</span> ':'')+'الصف '+esc(l.grade)+' <span>›</span> الوحدة '+esc(l.unit)+(l.unit_name?' · '+esc(l.unit_name):'')+'</div>'+
+  var h='<article class="lesson"><div class="crumb">'+(l.subject?esc(l.subject)+' <span>›</span> ':'')+'الصف '+esc(gradeLabel(l.grade))+' <span>›</span> الوحدة '+esc(l.unit)+(l.unit_name?' · '+esc(l.unit_name):'')+'</div>'+
     '<div class="lesson-head"><input class="title-in" id="f_title" value="'+esc(l.title)+'" aria-label="عنوان الدرس">'+
     '<div class="head-actions"><button type="button" class="btn small" data-save="title">'+(admin?'حفظ العنوان للجميع':'حفظ العنوان')+'</button></div></div>'+
     ((l.ai_filled||[]).filter(function(k){return k!=='concepts';}).length?'<div class="empty-note">الخانات المعلّمة «مقترح» لم تكن في ملف التحضير الأصلي. راجعها قبل الاستخدام.</div>':'')+

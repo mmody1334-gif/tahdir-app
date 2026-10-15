@@ -7,7 +7,8 @@ function lsGet(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.pars
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function track(type,detail,title,grade){try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,grade:grade||'',detail:detail||'',title:title||''})});}catch(e){}}
 function norm(s){return String(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,'');}
-function toolReady(){return IN_APP||toolOk(NEED);}
+// التصحيح التلقائي يحتاج إصدارًا حديثًا (فيه تبديل الطلاب تلقائيًا)
+function toolReady(){return IN_APP||hasExt()||toolOk(NEED);}
 function ask(type,obj,ackType,ms){
   return new Promise(function(res){
     var done=false;function on(e){done=true;document.removeEventListener('tahdir-'+ackType,on);var d={};try{d=JSON.parse(String(e.detail));}catch(x){}res(d);}
@@ -16,7 +17,7 @@ function ask(type,obj,ackType,ms){
     setTimeout(function(){if(!done){document.removeEventListener('tahdir-'+ackType,on);res(null);}},ms||1500);
   });
 }
-function courseName(c){return (c.subject||'')+' — الصف '+(c.grade||'؟');}
+function courseName(c){return (c.subject||'')+' — الصف '+(gLabel(c.grade)||'؟');}
 // نجمع مهام الأداة (الأحدث) مع النسخة المحفوظة في الموقع، ونحفظ في الموقع لو تغيّر شيء
 function pullFromTool(){
   if(!toolReady())return Promise.resolve(false);
@@ -48,7 +49,7 @@ function render(){
   h+='<section class="gr-card"><h3>2. مهماتك في نور</h3>';
   if(!groups.length)h+='<div class="gr-empty">لا توجد مهمات محفوظة بعد. اختر الصف واضغط «اجلب المهمات من نور».</div>';
   groups.forEach(function(g){
-    h+='<h4 style="margin:12px 0 4px">'+esc((g.subject?g.subject+' — ':'')+(g.grade?'الصف '+g.grade:'صف في نور'))+' <span class="muted small">· آخر تحديث '+esc(fmtDate(g.ts))+'</span></h4>'+
+    h+='<h4 style="margin:12px 0 4px">'+esc((g.subject?g.subject+' — ':'')+(g.grade?'الصف '+gLabel(g.grade):'صف في نور'))+' <span class="muted small">· آخر تحديث '+esc(fmtDate(g.ts))+'</span></h4>'+
       '<div class="t-wrap"><table class="gr-tasks"><thead><tr><th>المهمة</th><th>المفردات</th><th>تاريخ النشر</th><th>آخر موعد للتسليم</th><th></th></tr></thead><tbody>'+
       g.tasks.map(function(t,i){return '<tr><td><b>'+esc(t.title||'—')+'</b></td><td class="num">'+(t.count||'')+'</td><td class="num">'+esc(t.published||'')+'</td><td class="num">'+esc(t.due||'')+'</td>'+
         '<td><button type="button" class="btn small primary" data-g="'+esc(g.cid)+'" data-i="'+i+'"'+(ready?'':' disabled')+'>✓ صحّح تلقائيًا</button></td></tr>';}).join('')+'</tbody></table></div>';

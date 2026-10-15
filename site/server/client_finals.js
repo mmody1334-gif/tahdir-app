@@ -17,19 +17,34 @@ function years(){var s={};Object.keys(data.papers).forEach(function(k){s[data.pa
 function filtered(){
   return data.q.filter(function(q){return q.u===unitSel&&(!lessonSel||String(q.l)===lessonSel||String(q.l2)===lessonSel)&&(!yearSel||paper(q).year===yearSel);});
 }
+// أسئلة المحدد التي تنتمي للوحدة المعروضة حاليًا (الطباعة السريعة لا تخلط الوحدات)
+function unitPicked(){
+  if(!data)return [];
+  return data.q.filter(function(q){return picked[q.id]&&q.u===unitSel;});
+}
+// كل المحدد بترتيب العرض الحالي (وحدة ← درس ← عام/سؤال) بدل ترتيب البيانات الأصلي
+function pickedInOrder(){
+  var byId={};
+  data.q.forEach(function(q){byId[q.id]=q;});
+  var out=[];
+  filtered().forEach(function(q){if(picked[q.id]){out.push(q);delete byId[q.id];}});
+  Object.keys(picked).forEach(function(id){if(byId[id])out.push(byId[id]);});
+  return out;
+}
 function renderSide(){
   var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel')+'</section>';
   if(!data){$('fside').innerHTML=h;bindSide();return;}
   var us=units();if(!us.some(function(x){return x.u===unitSel;}))unitSel=us.length?us[0].u:'';
   h+='<section class="qcard"><h3>2. الوحدة</h3><div class="fin-units">'+us.map(function(x){return '<button type="button" class="fin-u'+(x.u===unitSel?' on':'')+'" data-u="'+esc(x.u)+'"><b>الوحدة '+esc(x.u)+'</b><span>'+esc(x.name)+'</span><em>'+x.n+' سؤالًا</em></button>';}).join('')+'</div></section>';
   var ls={};data.q.forEach(function(q){if(q.u===unitSel){if(q.l)ls[q.l]=(ls[q.l]||0)+1;if(q.l2)ls[q.l2]=(ls[q.l2]||0)+1;}});
-  var lids=Object.keys(ls).sort(function(a,b){return a-b;});
+  var lids=Object.keys(ls).sort(function(a,b){return (+a||0)-(+b||0)||String(a).localeCompare(String(b),'ar');});
   h+='<section class="qcard"><h3>3. التصفية</h3><label class="qrow">الدرس <select id="lessonSel" class="qsel"><option value="">كل دروس الوحدة</option>'+lids.map(function(id){return '<option value="'+id+'"'+(lessonSel===id?' selected':'')+'>'+esc(lessonTitle(id))+' ('+ls[id]+')</option>';}).join('')+'</select></label>'+
     '<label class="qrow">العام <select id="yearSel" class="qsel"><option value="">كل الأعوام</option>'+years().map(function(y){return '<option'+(yearSel===y?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></label>'+
     '<label class="qrow small"><input type="checkbox" id="ansChk"'+(showAns?' checked':'')+'> إظهار الإجابات</label></section>';
-  var np=Object.keys(picked).length;
+  var np=Object.keys(picked).length,npu=unitPicked().length,nOther=np-npu;
   h+='<section class="qcard"><h3>ورقة مراجعة</h3><p class="muted small" style="margin:0 0 8px">اختر أسئلة بعلامة ☐ ثم اطبعها ورقة واحدة (أو احفظها PDF).</p><div class="qrow"><button type="button" class="btn primary" id="printPicked"'+(np?'':' disabled')+'>🖨 اطبع المختار ('+np+')</button><button type="button" class="btn small" id="clearPicked"'+(np?'':' disabled')+'>مسح</button></div>'+
-    '<div class="qrow"><button type="button" class="btn small" id="printUnit">🖨 اطبع كل أسئلة العرض الحالي</button></div></section>';
+    '<div class="qrow"><button type="button" class="btn small" id="printUnit">🖨 اطبع كل أسئلة العرض الحالي</button>'+(npu?'<button type="button" class="btn small" id="printPickedUnit">🖨 المختار في هذه الوحدة ('+npu+')</button>':'')+'</div>'+
+    (nOther?'<p class="muted small" style="margin:6px 0 0">لديك '+nOther+' سؤالًا مختارًا من وحدة أخرى. زر «اطبع المختار» يجمعها كلها.</p>':'')+'</section>';
   $('fside').innerHTML=h;bindSide();
 }
 function card(q){
@@ -58,10 +73,10 @@ function renderMain(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'),function(b){b.onchange=function(){var id=b.getAttribute('data-pick');if(b.checked)picked[id]=1;else delete picked[id];renderSide();};});
 }
 var MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-function finName(title){return (title+' - '+course.subject+' - الصف '+course.grade).replace(/[\\/:*?"<>|]+/g,'-').slice(0,100);}
+function finName(title){return (title+' - '+course.subject+' - الصف '+gLabel(course.grade)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,100);}
 function printHtml(qs,title,abs){
   var O=abs?location.origin:'';
-  return '<div class="ppage pg"><h2 style="text-align:center;margin:0 0 4px">'+esc(title)+'</h2><p style="text-align:center;margin:0 0 10px;font-size:11pt">'+esc(course.subject)+' — الصف '+esc(course.grade)+'</p>'+
+  return '<div class="ppage pg"><h2 style="text-align:center;margin:0 0 4px">'+esc(title)+'</h2><p style="text-align:center;margin:0 0 10px;font-size:11pt">'+esc(course.subject)+' — الصف '+esc(gLabel(course.grade))+'</p>'+
     qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img src="'+O+'/fin/'+esc(q.im)+'" style="max-width:100%"></div>';}).join('')+'</div>'+
     (showAns?'<div class="ppage pg"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+supify(esc(q.a)).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
 }
@@ -90,7 +105,8 @@ function bindSide(){
   if($('lessonSel'))$('lessonSel').onchange=function(){lessonSel=this.value;renderMain();};
   if($('yearSel'))$('yearSel').onchange=function(){yearSel=this.value;renderMain();};
   if($('ansChk'))$('ansChk').onchange=function(){showAns=this.checked;renderMain();};
-  if($('printPicked'))$('printPicked').onclick=function(){printQs(data.q.filter(function(q){return picked[q.id];}),'ورقة مراجعة من امتحانات الوزارة');};
+  if($('printPicked'))$('printPicked').onclick=function(){printQs(pickedInOrder(),'ورقة مراجعة من امتحانات الوزارة');};
+  if($('printPickedUnit'))$('printPickedUnit').onclick=function(){printQs(unitPicked(),'ورقة مراجعة — الوحدة '+unitSel);};
   if($('clearPicked'))$('clearPicked').onclick=function(){picked={};renderSide();renderMain();};
   if($('printUnit'))$('printUnit').onclick=function(){var u=units().filter(function(x){return x.u===unitSel;})[0];printQs(filtered(),'أسئلة الوحدة '+unitSel+(u&&u.name?': '+u.name:'')+' من امتحانات الوزارة');};
 }

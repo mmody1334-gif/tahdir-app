@@ -245,7 +245,7 @@ function groupHtml(members,N,K,names,key){
   var AR='أبجد'.split(''),title=(key?'إجابات ':'')+'نشاط جماعي في مادة '+course.subject+' للصف '+course.grade;
   var ls=lessonsSel(),h=sheetHead(title,false,false),n=0,tot=0,cnt={1:0,2:0,3:0};
   members.forEach(function(m){m.forEach(function(a){tot++;cnt[a.lv]++;});});
-  h+='<table style="'+TB+'"><tr><td style="'+TD+';width:50%"><b>اسم المجموعة:</b> '+(key?'..............................':'..............................')+'</td><td style="'+TD+'"><b>الصف / الشعبة:</b> '+esc(course.grade)+' / ..........</td></tr>'+
+  h+='<table style="'+TB+'"><tr><td style="'+TD+';width:50%"><b>اسم المجموعة:</b> '+(key?'..............................':'..............................')+'</td><td style="'+TD+'"><b>الصف / الشعبة:</b> '+esc(gLabel(course.grade))+' / ..........</td></tr>'+
     '<tr><td style="'+TD+'" colspan="2"><b>الدروس:</b> '+ls.map(function(l){return esc(l.title);}).join('، ')+'</td></tr></table>';
   h+=H('أعضاء المجموعة وأدوارهم');
   h+='<table id="grpTbl" style="'+TB+'"><thead><tr><th style="'+TH+';width:6%">م</th><th style="'+TH+';width:34%">اسم الطالب</th><th style="'+TH+';width:30%">دوره في المجموعة</th><th style="'+TH+'">أسئلته (المستوى)</th></tr></thead><tbody>'+
@@ -330,16 +330,21 @@ function bindSide(){
   if($('grpBtn'))$('grpBtn').onclick=function(){if($('gNames'))gnames=$('gNames').value;makeGroup();};
   ['dir','school','year','term','teacher'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);};});
 }
+var studySeq=0; // رقم طلب حزمة الدراسة: يمنع نتيجة صف قديم من الكتابة فوق الصف الحالي
 function selectCourse(key){
   course=courses.filter(function(c){return c.key===key;})[0]||null;sel={};unitSel='';data=null;
   if(!course){renderSide();return Promise.resolve();}
   lsSet('tahdir_study_course',key);
+  // على الصف الجديد لا معنى لورقة الصف القديم: نمسحها حتى لا تُحفظ على الصف الخطأ
+  if(doc&&doc.course!==course.key){doc=null;dirty=false;}
+  var seq=++studySeq;
   if(!doc)$('qmain').innerHTML='<div class="welcome"><h2>جارٍ التحميل…</h2></div>';
   return api('/api/study?key='+encodeURIComponent(key)).then(function(r){
+    if(seq!==studySeq)return; // وصلت متأخرة بعد تبديل صف آخر
     data=r;byId={};data.lessons.forEach(function(l){byId[l.id]=l;});
     var u=unitsList();unitSel=u.length?u[0].unit:'';
     renderSide();if(!doc)welcome();
-  },function(e){toast(e.message);});
+  },function(e){if(seq===studySeq)toast(e.message);});
 }
 function welcome(){
   $('qmain').innerHTML=REM?
@@ -431,12 +436,12 @@ function clean(html){
 function curPaper(){var pp=$('paper');if(pp)doc.parts[part]=pp.innerHTML;}
 function chooseParts(title){
   if(!REM)return Promise.resolve(['main']);
-  return new Promise(function(res){
-    var ov=$('modal'),box=$('modalBox');
-    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+presentKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+((part==='cls'||part==='clskey')?(k===part||(part==='cls'&&k==='clskey')?' checked':''):(part==='grp'||part==='grpkey')?(k===part||(part==='grp'&&k==='grpkey')?' checked':''):(k==='plan'||k==='sheet'||k===part?' checked':''))+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
-    ov.hidden=false;var close=function(v){ov.hidden=true;box.innerHTML='';res(v);};
-    $('mCancel').onclick=function(){close(null);};
-    $('mOk').onclick=function(){var v=Array.prototype.map.call(document.querySelectorAll('input[name="pp"]:checked'),function(x){return x.value;});if(!v.length){toast('اختر جزءًا واحدًا على الأقل');return;}close(v);};
+  // نستخدم dialog المشتركة: تغلق النافذة وترفع الحدث وعدّاد لوحة المفاتيح معها
+  var html='<div class="parts">'+presentKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+((part==='cls'||part==='clskey')?(k===part||(part==='cls'&&k==='clskey')?' checked':''):(part==='grp'||part==='grpkey')?(k===part||(part==='grp'&&k==='grpkey')?' checked':''):(k==='plan'||k==='sheet'||k===part?' checked':''))+'> '+PART_TXT[k]+'</label>';}).join('')+'</div>';
+  return dialog({title:title,cancelText:'إلغاء',okText:'متابعة',group:'pp',html:html}).then(function(v){
+    if(!v)return null;
+    if(!v.length){toast('اختر جزءًا واحدًا على الأقل');return null;}
+    return v;
   });
 }
 function forOut(html){return clean(html).replace(/ contenteditable="false"/g,'').replace(/<span class="cb"[^>]*>/g,'<span>');}

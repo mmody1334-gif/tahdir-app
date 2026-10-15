@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.0
+// @version      3.4.1
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -15,13 +15,17 @@
 // @grant        GM_openInTab
 // @updateURL    https://tahdir.hudhaifa-bio.workers.dev/tool/tahdir-noor.user.js
 // @downloadURL  https://tahdir.hudhaifa-bio.workers.dev/tool/tahdir-noor.user.js
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
+// سبب @run-at document-start: بعض إعدادات Chrome تحقن الأداة قبل وجود documentElement،
+// فكانت تفشل من أول تحميل ولا تعمل إلا بعد فتح/تحديث صفحة أخرى. الآن ننتظر جاهزية المستند أولًا.
 (function () {
   'use strict';
-  const VERSION = '3.4.0';
+  const VERSION = '3.4.1';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
+
+  function boot() {
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
@@ -83,6 +87,7 @@
   if (location.hostname === 'tahdir.hudhaifa-bio.workers.dev') {
     // لو عند المعلم نسخة قديمة مكررة من الأداة، الإصدار الأحدث هو اللي يظهر للموقع دائمًا
     const de = document.documentElement;
+    if (!de) return; // لم يجهز المستند بعد (بعض إعدادات الحقن المبكر): لا نرمي استثناءً
     const vcmp = (a, b) => { a = String(a || '').split('.'); b = String(b || '').split('.'); for (let i = 0; i < 3; i++) { const d = (parseInt(a[i], 10) || 0) - (parseInt(b[i], 10) || 0); if (d) return d; } return 0; };
     const claim = () => {
       const cur = de.getAttribute('data-tahdir-tool');
@@ -793,4 +798,12 @@
     routeIfNeeded().then(moving => { const p = getPending(); if (!moving && p) showPendingBar(p); });
   }
   else if (pending) showPendingBar(pending);
+  }
+
+  // ننتظر جاهزية المستند: قبلها لا يوجد document.documentElement فيفشل كل شيء.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 })();

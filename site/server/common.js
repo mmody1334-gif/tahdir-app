@@ -18,10 +18,18 @@ function copyText(text){
   }
   try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text||'').then(function(){toast('تم النسخ');},fallback);}else fallback();}catch(e){fallback();}
 }
+var DIALOG=null; // النافذة المفتوحة حاليًا: نستطيع إغلاقها برمجيًا فيصل الوعد ولا يتسرّب مستمع لوحة المفاتيح
+function closeDialog(v){
+  if(!DIALOG)return false;
+  var d=DIALOG;DIALOG=null;
+  d.close(v);
+  return true;
+}
 function dialog(opts){
   return new Promise(function(resolve){
     var ov=$('modal'),box=$('modalBox');
     if(ov.classList.contains('locked')){resolve(null);return;}
+    if(DIALOG)closeDialog(null); // لا نترك نافذة سابقة معلّقة
     var h='<h3 id="mTitle">'+esc(opts.title)+'</h3>';
     if(opts.message)h+='<p class="m-msg">'+esc(opts.message)+'</p>';
     if(opts.html)h+=opts.html;
@@ -32,9 +40,20 @@ function dialog(opts){
     h+='<button type="button" class="btn '+(opts.danger?'danger-solid':'primary')+'" id="mOk">'+esc(opts.okText||'موافق')+'</button></div>';
     box.innerHTML=h;ov.hidden=false;
     var inp=$('mInput')||$('mText');if(inp&&!opts.readonly)setTimeout(function(){inp.focus();},30);
-    function close(v){ov.hidden=true;box.innerHTML='';document.removeEventListener('keydown',onKey);resolve(v);}
-    function val(){if($('mInput'))return $('mInput').value;if($('mText'))return $('mText').value;return true;}
+    var settled=false;
+    function close(v){
+      if(settled)return;settled=true;
+      // opts.extra نُقرأ قبل مسح النافذة، ويستبدل القيمة المرجعة (مفيد لعناصر تُبنى داخل html)
+      if(opts.extra){var ex=opts.extra(box);if(ex!==undefined)v=ex;}
+      ov.hidden=true;box.innerHTML='';document.removeEventListener('keydown',onKey);ov.onclick=null;
+      if(DIALOG&&DIALOG.close===close)DIALOG=null;
+      resolve(v);
+    }
+    // opts.group: نجمع قيم العناصر المختارة بهذا الاسم (اختيار متعدد أو راديو) ونُرجعها مصفوفة
+    // opts.extra: دالة تُقرأ قبل إغلاق النافذة، ويُدمج ناتجها (كائن) مع قيمة الحقل
+    function val(){if($('mInput'))return $('mInput').value;if($('mText'))return $('mText').value;if(opts.group)return Array.prototype.map.call(box.querySelectorAll('[name="'+opts.group+'"]:checked'),function(x){return x.value;});return true;}
     function onKey(e){if(e.key==='Escape')close(null);if(e.key==='Enter'&&$('mInput')&&document.activeElement===$('mInput'))close(val());}
+    DIALOG={close:close,settle:function(){settled=true;}};
     document.addEventListener('keydown',onKey);
     if($('mCancel'))$('mCancel').onclick=function(){close(null);};
     $('mOk').onclick=function(){close(val());};
@@ -56,71 +75,61 @@ function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if
 var TOOL_URL='/tool/tahdir-noor.user.js',TOOL_LATEST='__TOOLVER__',TOOL_FORCE='__TOOLFORCE__',IN_APP=/TahdirApp/.test(navigator.userAgent),APK_URL='/download/tahdir.apk';
 function verCmp(a,b){a=String(a||'').split('.');b=String(b||'').split('.');for(var i=0;i<3;i++){var d=(parseInt(a[i],10)||0)-(parseInt(b[i],10)||0);if(d)return d;}return 0;}
 function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
-// إضافة المتصفح الرسمية (Chrome / Edge): تتحدث من المتجر تلقائيًا ولا تحتاج أي إعداد
+// إضافة المتصفح الرسمية: مسار تجريبي غير مفعّل. عند تعبئة الروابط يعمل تلقائيًا،
+// وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
 var EXT_STORE={chrome:'',edge:''};
 function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
 function browserKind(){var u=navigator.userAgent;return /Edg\//.test(u)?'edge':(/Firefox/.test(u)?'firefox':(/Chrome/.test(u)?'chrome':''));}
 function extUrl(){return EXT_STORE[browserKind()]||'';}
 function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_FORCE)>=0;}
+// مسار واحد بسيط: Tampermonkey فقط. الإضافة الرسمية تُذكر فقط لو فُعّلت روابطها.
+var BROWSER_NAME={chrome:'Chrome',edge:'Edge',firefox:'Firefox'};
+function tmStoreUrl(){var b=browserKind();
+  if(b==='firefox')return 'https://addons.mozilla.org/ar/firefox/addon/tampermonkey/';
+  if(b==='edge')return 'https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd';
+  return 'https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo';}
+function tmStoreName(){return (BROWSER_NAME[browserKind()]||'متصفحك');}
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «الكبسولة»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
-  var v=toolVersion(),ok=toolOk()||hasExt(),eu=extUrl();
+  var v=toolVersion(),ok=!!v,eu=extUrl();
+  // مسار الإضافة الرسمية (لو فُعّلت لاحقًا): خطوة واحدة
   if(eu&&!hasExt()){
-    var bn=browserKind()==='edge'?'Edge':'Chrome';
-    return dialog({title:'أداة نور',html:(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<p class="m-msg"><b>خطوة واحدة فقط:</b> اضغط الزر الأخضر، وفي صفحة المتجر اضغط <b>«إضافة إلى '+bn+'» / Add to '+bn+'</b>. بعدها ارجع لهنا وحدّث الصفحة.</p><p class="m-msg muted small">الإضافة رسمية من متجر '+bn+' وتتحدث تلقائيًا، ولا تحتاج Tampermonkey ولا أي إعدادات.'+(v?' لو عندك Tampermonkey والأداة القديمة فيه، احذفها بعد تثبيت الإضافة.':'')+'</p>',okText:'تثبيت الإضافة من متجر '+bn,cancelText:'إغلاق'}).then(function(r){if(r)window.open(eu,'_blank');});
+    var bn=tmStoreName();
+    return dialog({title:'أداة نور',html:(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<p class="m-msg"><b>خطوة واحدة:</b> اضغط الزر، وفي صفحة المتجر اضغط <b>«إضافة إلى '+bn+'»</b>. بعدها ارجع وحدّث الصفحة.</p>',okText:'تثبيت الإضافة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(eu,'_blank');});
   }
-  var st=v?(ok?'<p class="m-msg" style="color:var(--brand,#0e7c66)"><b>✓ الأداة مثبتة ومحدّثة (الإصدار '+esc(v)+').</b></p>':'<p class="m-msg" style="color:#b45309"><b>عندك إصدار قديم ('+esc(v)+') والأحدث '+esc(TOOL_LATEST)+'.</b> اضغط «تثبيت الأداة» ثم «تحديث» في صفحة Tampermonkey.</p>'):'';
-  var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+st+
+  if(ok)return dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false});
+  // التثبيت لأول مرة: خطوتان فقط
+  var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+
    '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-   '<li><b>مرة واحدة فقط:</b> ثبّت إضافة Tampermonkey من متجر المتصفح:<br><a href="https://addons.mozilla.org/ar/firefox/addon/tampermonkey/" target="_blank" rel="noopener">Firefox</a> · <a href="https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener">Chrome</a> · <a href="https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener">Edge</a></li>'+
-   '<li>اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة اللي تفتح اضغط <b>«تثبيت»</b> (أو «تحديث»).</li>'+
-   '<li>ارجع لهنا وحدّث الصفحة.</li></ol>'+
-
-   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه، بدون Tampermonkey.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
-  return dialog({title:'أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
+   '<li>ثبّت <b>Tampermonkey</b> من متجر '+esc(tmStoreName())+': <a href="'+tmStoreUrl()+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى '+esc(tmStoreName())+'».</li>'+
+   '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b>.</li></ol>'+
+   '<p class="m-msg muted small">هذا كل شيء — مرة واحدة للأبد. بعدها تتحدث الأداة تلقائيًا من الموقع.</p>'+
+   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
+  return dialog({title:'تثبيت أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
-// تحديث إجباري: لو الأداة مثبتة بإصدار أقدم من المنشور على الموقع، لا يكمل المعلم حتى يحدّثها
+// تنبيه غير حاجب: نُخبر المعلم أن هناك إصدارًا أحدث، ولا نمنعه من العمل.
+// (الحجب كان يسبب تعطّلًا كاملًا لو تعذّر قراءة الإصدار لأي سبب.)
 var UPD_KEY='tahdir_tool_upd';
 function updState(){try{var o=JSON.parse(localStorage.getItem(UPD_KEY)||'null');return o&&o.to===TOOL_LATEST?o:{to:TOOL_LATEST,n:0};}catch(e){return {to:TOOL_LATEST,n:0};}}
 function updSave(o){try{localStorage.setItem(UPD_KEY,JSON.stringify(o));}catch(e){}}
-function forceToolUpdate(){
+function toolUpdateNote(){
   if(IN_APP||hasExt())return;
-  var v=toolVersion(),ov=$('modal'),box=$('modalBox');if(!ov||!box)return;
-  if(!v||toolOk()){ // محدّثة: نقفل النافذة لو كانت مفتوحة، وننبّه مرة لو فيه نسخة قديمة مكررة
-    if(ov.classList.contains('locked')){ov.classList.remove('locked');ov.hidden=true;box.innerHTML='';toast('تم تحديث أداة نور ✓');}
-    if(v)updSave({to:TOOL_LATEST,n:0,done:1});
-    return;
-  }
-  var stt=updState(),tried=stt.n>0;
-  if(extUrl()){ // على Chrome/Edge: الحل النهائي هو الإضافة الرسمية بدل Tampermonkey
-    var bn=browserKind()==='edge'?'Edge':'Chrome';
-    box.innerHTML='<h3 id="mTitle">⚠ ثبّت «أداة نور» الجديدة</h3><p class="m-msg">الأداة صارت إضافة رسمية في متجر '+bn+' تتحدث وحدها ولا تحتاج أي إعدادات. اضغط الزر، ثم <b>«إضافة إلى '+bn+'»</b>، وارجع لهنا.</p>'+
-      '<div class="m-actions"><button type="button" class="btn" id="mReload">تم</button><button type="button" class="btn primary" id="mOk">تثبيت من متجر '+bn+'</button></div>';
-    ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
-    $('mOk').onclick=function(){var o=updState();o.n=(o.n||0)+1;updSave(o);window.open(extUrl(),'_blank');$('mReload').classList.add('primary');};
-    $('mReload').onclick=function(){location.reload();};
-    return;
-  }
-  box.innerHTML='<h3 id="mTitle">'+(tried?'⚠ التحديث لم يكتمل بعد':'⚠ حدّث «أداة نور» قبل المتابعة')+'</h3>'+
-    '<p class="m-msg">المتصفح ما زال يشغّل الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_LATEST)+'</b>.</p>'+
-    (tried?
-      '<p class="m-msg">غالبًا عندك نسخة قديمة من الأداة مثبتة مرتين، أو لم يُضغط زر «تحديث» في صفحة Tampermonkey. الحل النهائي (دقيقة واحدة):</p>'+
-      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط أيقونة <b>Tampermonkey</b> بجانب شريط العنوان ← <b>«لوحة التحكم» / Dashboard</b>.</li><li>احذف <b>كل</b> سكربت اسمه «لصق التحضير والواجب - نور» أو فيه «الكبسولة» (أيقونة سلة المهملات).</li><li>ارجع هنا واضغط <b>«تثبيت الأداة من جديد»</b> ثم <b>Install / تثبيت</b>.</li><li>اضغط <b>«تم»</b> هنا.</li></ol>':
-      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط <b>«تحديث الأداة الآن»</b>.</li><li>في صفحة Tampermonkey اللي تفتح اضغط <b>«تحديث» / Update</b> (أو Install).</li><li>ارجع لهنا — النافذة تختفي وحدها بعد التحديث. لو ما اختفت اضغط «تم التحديث».</li></ol>')+
-    '<div class="m-actions"><button type="button" class="btn" id="mReload">'+(tried?'تم':'تم التحديث')+'</button><button type="button" class="btn primary" id="mOk">'+(tried?'تثبيت الأداة من جديد':'تحديث الأداة الآن')+'</button></div>';
-  ov.hidden=false;ov.classList.add('locked');ov.onclick=null;
-  $('mOk').onclick=function(){var o=updState();o.n=(o.n||0)+1;updSave(o);window.open(TOOL_URL,'_blank');$('mReload').classList.add('primary');};
-  $('mReload').onclick=function(){location.reload();};
+  var v=toolVersion(),ov=$('modal');
+  if(!v){ updSave({to:TOOL_LATEST,n:0}); return; }         // غير مثبتة: لا نُزعج في كل صفحة
+  if(verCmp(v,TOOL_LATEST)>=0){ updSave({to:TOOL_LATEST,n:0,done:1}); return; }
+  var st=updState();
+  if(st.n>0)return;                                        // نبّهنا مرة واحدة لهذا الإصدار
+  updSave({to:TOOL_LATEST,n:1});
+  if(ov&&!ov.hidden)return;
+  dialog({title:'تحديث أداة نور',message:'عندك الإصدار '+v+' والأحدث '+TOOL_LATEST+'. التحديث مستحسن لكنه غير إلزامي — تقدر تكمل عادي.',okText:'تحديث الآن',cancelText:'لاحقًا'})
+    .then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
 function watchTool(){
   if(IN_APP)return;
-  // الأداة قد تُحقن متأخرة (Firefox) أو تتحدث والصفحة مفتوحة: نعيد الفحص كلما تغيّر إصدارها أو رجع المعلم للصفحة
-  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(forceToolUpdate,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
-  document.addEventListener('visibilitychange',function(){if(document.hidden)return;var ov=$('modal');
-    // رجع من صفحة Tampermonkey بعد ضغط التحديث: نعيد تحميل الصفحة لتعمل النسخة الجديدة
-    if(ov&&ov.classList.contains('locked')&&updState().n>0){setTimeout(function(){location.reload();},700);return;}
-    setTimeout(forceToolUpdate,600);});
-  setTimeout(forceToolUpdate,2500);
+  // الأداة قد تُحقن متأخرة أو تتحدث والصفحة مفتوحة: نعيد الفحص عند تغيّر إصدارها أو رجوع المعلم
+  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(toolUpdateNote,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
+  document.addEventListener('visibilitychange',function(){if(document.hidden)return;setTimeout(toolUpdateNote,600);});
+  setTimeout(toolUpdateNote,2500);
 }
 // ---------- شريط التنقل: الأساسي ظاهر والباقي في قائمة ----------
 function initNav(me){
@@ -136,7 +145,7 @@ function initNav(me){
   if($('logoutBtn'))$('logoutBtn').onclick=logout;
   if($('toolBtn')){
     if(IN_APP)$('toolBtn').hidden=true;
-    else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolOk()||hasExt()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
+    else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolVersion()||hasExt()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
   }
   if(me&&me.role==='admin')Array.prototype.forEach.call(document.querySelectorAll('.admin-only'),function(x){x.hidden=false;});
   if(me&&$('who'))$('who').textContent=me.name;
@@ -146,11 +155,13 @@ function initNav(me){
 var CP_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};
 var CP_ORDER=['العلوم','الأحياء','الكيمياء','الفيزياء','العلوم البيئية','الرياضيات','اللغة العربية','اللغة الإنجليزية','الدراسات الاجتماعية','التربية الإسلامية','تقنية المعلومات'];
 var CP_GN={'الأول':1,'الثاني':2,'الثالث':3,'الرابع':4,'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
+// بعض الملفات تكتب الصف «الصف التاسع» وبعضها «التاسع»؛ كل العناوين تضيف «الصف » بنفسها
+function gLabel(g){return String(g==null?'':g).replace(/^الصف\s+/,'').trim();}
 function cpLs(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){}return null;}
 function cpSubjects(cs){var s={};cs.forEach(function(c){s[c.subject]=1;});return Object.keys(s).sort(function(a,b){var x=CP_ORDER.indexOf(a),y=CP_ORDER.indexOf(b);return (x<0?99:x)-(y<0?99:y)||a.localeCompare(b,'ar');});}
 function cpGrades(cs,s){return cs.filter(function(c){return c.subject===s;}).sort(function(a,b){return (CP_GN[a.grade]||99)-(CP_GN[b.grade]||99);});}
 function cpDefault(cs){var subs=cpSubjects(cs),s=cpLs('tahdir_subject');if(subs.indexOf(s)<0)s=subs[0];var g=cpGrades(cs,s),last=cpLs('tahdir_cp_'+s);return g.filter(function(c){return c.key===last;})[0]||g[0]||cs[0];}
-function cpGradeOpts(gs,key,extra){return gs.map(function(c){return '<option value="'+esc(c.key)+'"'+(c.key===key?' selected':'')+'>الصف '+esc(c.grade)+(extra?extra(c):'')+'</option>';}).join('');}
+function cpGradeOpts(gs,key,extra){return gs.map(function(c){return '<option value="'+esc(c.key)+'"'+(c.key===key?' selected':'')+'>الصف '+esc(gLabel(c.grade))+(extra?extra(c):'')+'</option>';}).join('');}
 function coursePick(cs,curKey,id,extra){
   var subs=cpSubjects(cs),cur=cs.filter(function(c){return c.key===curKey;})[0],s=cur?cur.subject:cpDefault(cs).subject;
   return '<div class="cpick"><label class="cp-l"'+(subs.length<2?' hidden':'')+'><span>المادة</span><select id="'+id+'Subj" class="qsel">'+subs.map(function(x){return '<option value="'+esc(x)+'"'+(x===s?' selected':'')+'>'+(CP_ICON[x]||'📘')+' '+esc(x)+'</option>';}).join('')+'</select></label>'+

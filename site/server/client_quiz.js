@@ -123,12 +123,17 @@ function headerHtml(d,key,word){
 function sumMarks(items){return items.reduce(function(s,x){return s+(+x.marks||0);},0);}
 function itemHtml(it,n,tno,word,ctrl){
   var stem=it.table?relabel(it.stem,tno):it.stem;
-  var h='<div class="qi" data-i="'+(n-1)+'" style="margin:0 0 '+(word?'10pt':'16px')+';page-break-inside:avoid">';
+  // أساس الأمان للطباعة: الرقم لا ينفصل عن سؤال. يُرفع للطباعة عبر #printArea،
+  // ولأن .qi عنصر واحد فلا يتقسّم على صفحتين (page-break-inside:avoid في CSS).
+  var h='<div class="qi" data-i="'+(n-1)+'" style="margin:0 0 '+(word?'10pt':'16px')+';page-break-inside:avoid;break-inside:avoid">';
   if(ctrl)h+=ctrl;
   if(it.img){ // سؤال من امتحان الوزارة بصورته الأصلية (فيه الرسم والاختيارات وأسطر الإجابة)
     var W=word?Math.min(560,it.iw||560):0;
-    h+='<p style="margin:0 0 4px"><b>'+n+')</b></p>'+
-      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;'+(W?'width:'+W+'px;':'')+'margin:0 auto">';
+    // الصورة نفسها تحمل رقم السؤال الأصلي ونصّه. نعرض الرقم المولَّد في سطر ملاصق
+    // ونمنع انقسام السؤال على صفحتين، فلا يبقى الرقم وحده في أسفل الورقة.
+    h+='<div style="page-break-inside:avoid;break-inside:avoid"><p style="margin:0 0 3px">'+
+      '<b>'+n+')</b></p>'+
+      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;'+(W?'width:'+W+'px;':'')+'margin:0 auto"></div>';
     return h+'</div>';
   }
   h+='<p style="margin:0 0 4px"><b>'+n+')</b> '+rich(stem)+'</p>';
@@ -251,18 +256,23 @@ function bindSide(){
   ['dir','school','year','term'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);if(doc){doc.hdr=clone(hdr);renderDoc();}};});
 }
 function hdrKey(){return 'tahdir_quiz_hdr_'+(me?me.username:'');}
+var bankSeq=0; // رقم طلب بنك الأسئلة: يمنع نتيجة صف قديم من الكتابة فوق الصف الحالي
 function selectCourse(key){
   course=courses.filter(function(c){return c.key===key;})[0]||null;cfg.lessons={};cfg.unit='';
   if(!course){renderSide();return;}
   lsSet('tahdir_quiz_course',key);
   cfg.total=gnum(course.grade)===5?10:15;
+  // على الصف الجديد لا معنى لورقة الصف القديم: نمسحها حتى لا تُحفظ على الصف الخطأ
+  if(doc&&doc.course!==course.key){doc=null;dirty=false;paperView='quiz';}
+  var seq=++bankSeq;
   $('qmain').innerHTML='<div class="welcome"><h2>جارٍ تحميل بنك الأسئلة…</h2></div>';
   return api('/api/quiz/bank?key='+encodeURIComponent(key)).then(function(r){
+    if(seq!==bankSeq)return; // وصلت متأخرة بعد تبديل صف آخر
     bank=r;lessonById={};bank.lessons.forEach(function(l){lessonById[l.id]=l;});
     var u=unitsList();cfg.unit=u.length?u[0].unit:'';
     renderSide();
     if(!doc)welcome();
-  },function(e){toast(e.message);});
+  },function(e){if(seq===bankSeq)toast(e.message);});
 }
 function welcome(){
   var n=bank.items.length;
@@ -393,13 +403,12 @@ function addItem(){
   $('mNew').onclick=function(){close();editItem(null,{type:'short',marks:1,ao:aoList()[0],difficulty:'منخفضة',lesson_id:ids[0]||0,stem:'',answer:'',outcome:'',notes:''});};
 }
 // ---------- الطباعة وملف Word ----------
+// نستخدم dialog المشتركة حتى تُغلق النافذة ويُزال مستمع لوحة المفاتيح معها.
+// القيمة: 'both' أو 'quiz' أو 'key'، و null يعني أن المعلم ألغى.
 function chooseParts(title){
-  return new Promise(function(res){
-    var ov=$('modal'),box=$('modalBox');
-    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
-    ov.hidden=false;var close=function(v){ov.hidden=true;box.innerHTML='';res(v);};
-    $('mCancel').onclick=function(){close(null);};$('mOk').onclick=function(){var r=document.querySelector('input[name="pp"]:checked');close(r?r.value:'both');};
-  });
+  return dialog({title:title,cancelText:'إلغاء',okText:'متابعة',group:'pp',
+    html:'<div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div>'})
+    .then(function(v){return (v&&v.length)?v[0]:null;});
 }
 var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function fileName(){return (doc.title||titleText(doc)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,90);}

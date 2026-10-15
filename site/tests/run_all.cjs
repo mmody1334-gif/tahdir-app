@@ -1,0 +1,81 @@
+// مشغّل كل اختبارات الانحدار: يُقلع سيرفرًا محليًا واحدًا نظيفًا ثم يشغّل كل طقم بالترتيب.
+//   node run_all.cjs            → كل الأطقم
+//   node run_all.cjs fixes play → أطقم محدّدة فقط
+const { spawn } = require('child_process');
+const path = require('path');
+const http = require('http');
+
+const DIR = __dirname;
+const PORT = +(process.env.PORT || 8787);
+const TESTS = [
+  ['fixes', 'regress_fixes.cjs', 'أحداث /api/event، سجل النشاط، ورقة المراجعة، النوافذ، تبديل المقرر'],
+  ['labels', 'regress_labels.cjs', 'تسمية الصفوف (لا «الصف الصف») ونطاق الصلاحيات'],
+  ['play', 'regress_play.cjs', 'تحدٍّ مباشر كامل: دخول طالب، إجابة، كشف، نهاية، عدّاد'],
+  ['quizcard', 'repro_quiz_numbering.cjs', 'ترقيم أسئلة الامتحانات النهائية في الاختبار القصير'],
+  ['tool', 'repro_tool_chrome.cjs', 'أداة نور في كروم: التثبيت والتشغيل من أول ضغطة'],
+];
+
+function ping(port) {
+  return new Promise(res => {
+    const r = http.get({ host: '127.0.0.1', port, path: '/version', timeout: 1500 }, x => { x.resume(); res(x.statusCode === 200); });
+    r.on('error', () => res(false));
+    r.on('timeout', () => { r.destroy(); res(false); });
+  });
+}
+
+function freePort(port) {
+  return new Promise(async res => {
+    if (!(await ping(port))) return res(true);
+    console.error('!! المنفذ ' + port + ' مشغول بسيرفر آخر. أوقفه أولًا ثم أعد التشغيل.');
+    res(false);
+  });
+}
+
+(async () => {
+  const want = process.argv.slice(2);
+  const list = want.length ? TESTS.filter(t => want.includes(t[0])) : TESTS;
+  if (!list.length) { console.error('لا يوجد طقم مطابق. المتاح: ' + TESTS.map(t => t[0]).join(', ')); process.exit(2); }
+  if (!(await freePort(PORT))) process.exit(2);
+
+  let srv = null;
+  async function bootServer() {
+    const s = spawn(process.execPath, ['--experimental-sqlite', 'devserver.mjs', String(PORT)],
+      { cwd: DIR, stdio: ['ignore', 'pipe', 'pipe'] });
+    let l = '', u = false;
+    s.stdout.on('data', d => { l += String(d); if (/listening/.test(l)) u = true; });
+    s.stderr.on('data', d => { l += String(d); });
+    for (let i = 0; i < 50 && !u; i++) await new Promise(r => setTimeout(r, 200));
+    if (!u) { s.kill(); throw new Error('لم يبدأ السيرفر:\n' + l); }
+    return s;
+  }
+
+  console.log('== سيرفر الاختبار على المنفذ ' + PORT + ' (يُعاد لكل طقم: قاعدة بيانات نظيفة)');
+
+  const summary = [];
+  for (let i = 0; i < list.length; i++) {
+    const [key, file, desc] = list[i];
+    // سيرفر نظيف لكل طقم: صفحة /setup تعمل مرة واحدة فقط لكل قاعدة بيانات
+    srv = await bootServer();
+    console.log('\n' + '='.repeat(72));
+    console.log('== [' + key + '] ' + file + ' — ' + desc);
+    console.log('='.repeat(72));
+    const t0 = Date.now();
+    const code = await new Promise(res => {
+      const p = spawn(process.execPath, [file], { cwd: DIR, stdio: 'inherit', env: { ...process.env, B: 'http://localhost:' + PORT } });
+      p.on('exit', c => res(c === null ? 1 : c));
+    });
+    try { srv.kill(); } catch (e) {}
+    await new Promise(r => setTimeout(r, 500));
+    summary.push({ key, code, secs: Math.round((Date.now() - t0) / 1000) });
+  }
+
+  console.log('\n' + '='.repeat(72));
+  console.log('== الملخّص');
+  let bad = 0;
+  summary.forEach(s => {
+    if (s.code !== 0) bad++;
+    console.log('   ' + (s.code === 0 ? 'PASS' : 'FAIL') + '  ' + s.key.padEnd(10) + s.secs + 'ث');
+  });
+  console.log('   الإجمالي: ' + (summary.length - bad) + ' ناجح، ' + bad + ' فاشل');
+  process.exit(bad ? 1 : 0);
+})().catch(e => { console.error('FATAL', e); process.exit(1); });

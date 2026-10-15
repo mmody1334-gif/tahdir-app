@@ -5,11 +5,13 @@ var data=null,act=null,tab='teachers',q='',rep=null,repDays=30,crs=null,lessonsA
 var GRADES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function gn(g){var i=GRADES.indexOf(g);return i<0?99:i;}
 var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جهاز إضافي مرفوض',disabled:'حساب موقوف',locked:'محاولات كثيرة'};
-var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات'};
+// تسميات أنواع الأحداث في سجل النشاط. يجب أن تغطي كل نوع في EVENT_TYPES داخل worker_src.js،
+// وإلا ظهر الحدث في السجل بنصه الإنجليزي الخام.
+var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور'};
 function load(){
   return Promise.all([api('/api/admin/stats'),api('/api/admin/activity'),api('/api/admin/courses'),api('/api/lessons'),api('/api/admin/report?days='+repDays)]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
 }
-function courseName(k){var p=String(k).split('|');return p[0]+' — الصف '+(p[1]||'');}
+function courseName(k){var p=String(k).split('|');return p[0]+' — الصف '+gLabel(p[1]);}
 function sortedCourses(){return (crs.courses||[]).slice().sort(function(a,b){return (gn(a.grade)-gn(b.grade))||a.subject.localeCompare(b.subject,'ar');});}
 // ---------- التقرير ----------
 function reportView(){
@@ -42,7 +44,7 @@ function coursesView(){
   var h='<div class="toolbar"><p class="muted" style="flex:1;margin:0">كل صف ومادة يظهر هنا. الصفوف الأصلية (الأحياء 9–12 والعلوم 5) لها تحضير وبنك أسئلة جاهز. أضف مادة أو صفًا جديدًا ثم أضف دروسه، ويظهر للمعلمين المسموح لهم في صفحة الدروس مع الإرسال لنور.</p><button type="button" class="btn primary" id="addCourse">+ مادة / صف جديد</button></div>';
   h+='<div class="t-wrap"><table class="tbl" style="min-width:640px"><thead><tr><th>المادة والصف</th><th>الدروس</th><th>دروس أضفتها</th><th>بنك الأسئلة</th><th>المعلمون</th><th></th></tr></thead><tbody>'+list.map(function(c){
     var tn=data.users.filter(function(u){var sc=[];try{sc=JSON.parse(u.scope||'[]')||[];}catch(e){}return u.role!=='admin'&&(!sc.length||sc.indexOf(c.key)>=0);}).length;
-    return '<tr><td><b>'+esc(c.subject)+'</b> — الصف '+esc(c.grade)+'</td><td class="num">'+c.lessons+'</td><td class="num">'+c.custom+'</td><td class="num">'+(c.quiz_items||'<span class="muted">—</span>')+'</td><td class="num">'+tn+'</td><td><button type="button" class="btn small" data-course="'+esc(c.key)+'">الدروس</button></td></tr>';}).join('')+'</tbody></table></div>';
+    return '<tr><td><b>'+esc(c.subject)+'</b> — الصف '+esc(gLabel(c.grade))+'</td><td class="num">'+c.lessons+'</td><td class="num">'+c.custom+'</td><td class="num">'+(c.quiz_items||'<span class="muted">—</span>')+'</td><td class="num">'+tn+'</td><td><button type="button" class="btn small" data-course="'+esc(c.key)+'">الدروس</button></td></tr>';}).join('')+'</tbody></table></div>';
   if(openCourse){
     var c=list.filter(function(x){return x.key===openCourse;})[0];
     var ls=lessonsAll.filter(function(l){return (l.subject||'')+'|'+l.grade===openCourse;});
@@ -82,7 +84,7 @@ function addCourse(){
 }
 function scopeDialog(u){
   var sc=[];try{sc=JSON.parse(u.scope||'[]')||[];}catch(e){}
-  var h='<p class="m-msg">اختر الصفوف التي تظهر لـ '+esc(u.name)+' في صفحة الدروس والتقويم. إذا لم تختر شيئًا تظهر كل الصفوف.</p><div class="parts">'+sortedCourses().map(function(c){return '<label><input type="checkbox" data-sc="'+esc(c.key)+'"'+(sc.indexOf(c.key)>=0?' checked':'')+'> '+esc(c.subject)+' — الصف '+esc(c.grade)+'</label>';}).join('')+'</div>';
+  var h='<p class="m-msg">اختر الصفوف التي تظهر لـ '+esc(u.name)+' في صفحة الدروس والتقويم. إذا لم تختر شيئًا تظهر كل الصفوف.</p><div class="parts">'+sortedCourses().map(function(c){return '<label><input type="checkbox" data-sc="'+esc(c.key)+'"'+(sc.indexOf(c.key)>=0?' checked':'')+'> '+esc(c.subject)+' — الصف '+esc(gLabel(c.grade))+'</label>';}).join('')+'</div>';
   var ov=$('modal'),box=$('modalBox');
   box.innerHTML='<h3 id="mTitle">الصفوف المسموحة</h3>'+h+'<div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">حفظ</button></div>';ov.hidden=false;
   var close=function(){ov.hidden=true;box.innerHTML='';};
@@ -110,8 +112,9 @@ function teacherRows(){
         '<td><button type="button" class="btn small" data-open="'+u.id+'">التفاصيل</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
+function typeLabel(t){return TYPES[t]||('نشاط: '+String(t==null?'':t).replace(/_/g,' '));}
 function activityView(){
-  var ev=act.events.map(function(e){return '<li><span class="ev-t">'+esc(fmtDate(e.at))+'</span><b>'+esc(e.name)+'</b> '+esc(TYPES[e.type]||e.type)+(e.lesson_title?' · <span class="muted">'+esc(e.grade)+' — '+esc(e.lesson_title)+'</span>':'')+(e.label?' <span class="dev">'+esc(e.label)+'</span>':'')+'</li>';}).join('');
+  var ev=act.events.map(function(e){return '<li><span class="ev-t">'+esc(fmtDate(e.at))+'</span><b>'+esc(e.name)+'</b> '+esc(typeLabel(e.type))+(e.lesson_title?' · <span class="muted">'+esc(e.grade)+' — '+esc(e.lesson_title)+'</span>':'')+(e.label?' <span class="dev">'+esc(e.label)+'</span>':'')+'</li>';}).join('');
   var fa=act.failed.map(function(a){return '<li class="'+(a.reason==='device_limit'?'bad':'')+'"><span class="ev-t">'+esc(fmtDate(a.at))+'</span><b>'+esc(a.name||a.username)+'</b> '+esc(REASONS[a.reason]||a.reason)+(a.label?' <span class="dev">'+esc(a.label)+'</span>':'')+(a.ip?' <span class="muted ltr">'+esc(a.ip)+'</span>':'')+'</li>';}).join('');
   return '<div class="two"><section class="card"><h3>آخر النشاطات</h3><ul class="feed">'+(ev||'<li class="muted">لا يوجد نشاط بعد.</li>')+'</ul></section>'+
     '<section class="card"><h3>محاولات دخول مرفوضة</h3><p class="muted">الصف الأحمر يعني أن أحدًا حاول الدخول بحساب معلم من جهاز ثالث.</p><ul class="feed">'+(fa||'<li class="muted">لا توجد محاولات مرفوضة.</li>')+'</ul></section></div>';
@@ -138,15 +141,22 @@ function render(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-dell]'),function(b){b.onclick=function(){dialog({title:'حذف هذا الدرس؟',message:'يُحذف من صفحة الدروس لكل المعلمين.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/custom_lessons/'+b.getAttribute('data-dell'),null,'DELETE').then(function(){toast('حُذف الدرس');load();});});};});
 }
 function addTeachers(){
-  var sc='<p class="m-msg">الصفوف التي تظهر لهم (اتركها كلها فارغة ليروا كل الصفوف، ويمكن تعديلها لاحقًا لكل معلم):</p><div class="parts" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'+sortedCourses().map(function(c){return '<label><input type="checkbox" data-isc="'+esc(c.key)+'"> '+esc(c.subject)+' — '+esc(c.grade)+'</label>';}).join('')+'</div>';
-  var chosen=[];
-  setTimeout(function(){Array.prototype.forEach.call(document.querySelectorAll('[data-isc]'),function(c){c.onchange=function(){var k=c.getAttribute('data-isc');if(c.checked)chosen.push(k);else chosen=chosen.filter(function(x){return x!==k;});};});},50);
-  dialog({title:'إضافة معلمين',message:'اكتب كل معلم في سطر: الاسم، اسم المستخدم، كلمة المرور. لو تركت كلمة المرور فاضية تُنشأ تلقائيًا.',html:sc,textarea:true,placeholder:'أحمد البلوشي، ahmed.b، 123456\nسالم الهنائي، salim.h',okText:'إضافة'}).then(function(v){
-    if(!v)return;
-    api('/api/admin/import',{text:v,scope:chosen}).then(function(r){
-      var ok=r.done.map(function(d){return d.name+' | '+d.username+' | '+d.password;}).join('\n');
-      var bad=r.errors.map(function(e){return '• '+e.line+': '+e.error;}).join('\n');
-      dialog({title:'تمت إضافة '+r.done.length+' معلم',message:r.done.length?'احفظ بيانات الدخول التالية وأرسلها للمعلمين. لن تظهر كلمات المرور مرة أخرى.':'',textarea:true,readonly:true,ltr:false,value:ok+(bad?'\n\nلم تتم إضافة:\n'+bad:''),okText:'نسخ البيانات',cancelText:'إغلاق'}).then(function(c){if(c)copyText(ok);});
+  var sc='<p class="m-msg">الصفوف التي تظهر لهم (اتركها كلها فارغة ليروا كل الصفوف، ويمكن تعديلها لاحقًا لكل معلم):</p><div class="parts" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'+sortedCourses().map(function(c){return '<label><input type="checkbox" data-isc="'+esc(c.key)+'"> '+esc(c.subject)+' — '+esc(gLabel(c.grade))+'</label>';}).join('')+'</div>';
+  // نقرأ الصفوف المختارة من النافذة نفسها قبل إغلاقها (المؤقت السابق كان قد لا يلحق ربط المربعات)
+  var chosenOf=function(box){
+    var out=[];
+    Array.prototype.forEach.call(box.querySelectorAll('[data-isc]'),function(c){if(c.checked)out.push(c.getAttribute('data-isc'));});
+    return out;
+  };
+  dialog({title:'إضافة معلمين',message:'اكتب كل معلم في سطر: الاسم، اسم المستخدم، كلمة المرور. لو تركت كلمة المرور فاضية تُنشأ تلقائيًا.',html:sc,textarea:true,placeholder:'أحمد البلوشي، ahmed.b، 123456\nسالم الهنائي، salim.h',okText:'إضافة',
+    // على «موافق» نُرجع النص والصفوف معًا؛ وعلى الإلغاء المصدر لم يُقرأ فلا نضيف أحدًا
+    extra:function(box){var scopes=chosenOf(box);return {text:(box.querySelector('#mText')||{}).value||'',scope:scopes};}}).then(function(r){
+    if(!r||!r.text)return;
+    var chosen=r.scope||[];
+    api('/api/admin/import',{text:r.text,scope:chosen}).then(function(res){
+      var ok=res.done.map(function(d){return d.name+' | '+d.username+' | '+d.password;}).join('\n');
+      var bad=res.errors.map(function(e){return '• '+e.line+': '+e.error;}).join('\n');
+      dialog({title:'تمت إضافة '+res.done.length+' معلم',message:res.done.length?'احفظ بيانات الدخول التالية وأرسلها للمعلمين. لن تظهر كلمات المرور مرة أخرى.':'',textarea:true,readonly:true,ltr:false,value:ok+(bad?'\n\nلم تتم إضافة:\n'+bad:''),okText:'نسخ البيانات',cancelText:'إغلاق'}).then(function(c){if(c)copyText(ok);});
       load();
     },function(e){toast(e.message);});
   });
@@ -170,7 +180,9 @@ function openTeacher(id){
     Array.prototype.forEach.call(document.querySelectorAll('[data-act]'),function(b){b.onclick=function(){doAct(u,b.getAttribute('data-act'));};});
   },0);
 }
-function closeModal(){$('modal').hidden=true;$('modalBox').innerHTML='';}
+// إغلاق أي نافذة مفتوحة. نستخدم closeDialog حتى يُحلّ وعد النافذة السابقة ويُزال مستمع لوحة المفاتيح،
+// وإلا تراكم المستمعون وبقيت النوافذ القديمة تستجيب لزر Escape.
+function closeModal(){closeDialog(null);var ov=$('modal');if(ov){ov.hidden=true;ov.classList.remove('locked');}var b=$('modalBox');if(b)b.innerHTML='';}
 function act1(u,payload,msg){return api('/api/admin/teachers/'+u.id,payload).then(function(r){toast(msg);closeModal();return load().then(function(){return r;});},function(e){toast(e.message);});}
 function doAct(u,a){
   closeModal();

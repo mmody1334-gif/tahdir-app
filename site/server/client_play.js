@@ -6,6 +6,7 @@ function rich(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n
 function post(path,b){return fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'حدث خطأ');return j;});});}
 function view(h){$('pl').innerHTML=h;}
 function joinForm(err){
+  clearTimeout(timer);lastKey=''; // نوقف أي استطلاع قديم، وإلا نادى draw على S وهو null
   var c=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');
   view('<form class="pl-card" id="jf"><h1>🎮 تحدي الكبسولة</h1>'+(err?'<p class="pl-err">'+esc(err)+'</p>':'')+
     '<label>رمز التحدي<input id="jc" class="ltr" inputmode="numeric" maxlength="6" value="'+esc(c)+'" placeholder="123456" required></label>'+
@@ -17,7 +18,13 @@ function joinForm(err){
 function loop(){clearTimeout(timer);poll();}
 function poll(){
   fetch('/api/play/state?code='+S.code+'&pid='+S.pid+'&t='+S.t,{cache:'no-store'}).then(function(r){return r.json();}).then(function(st){
-    draw(st);var next=st.state==='question'&&!st.answered?1200:st.state==='end'||st.state==='gone'?0:1800;if(next)timer=setTimeout(poll,next);
+    draw(st);
+    // نستمر في السؤال والكشف بسرعة، وبعد النهاية ببطء حتى لا تتجمد شاشة الطالب لو غيّر المعلم الحالة
+    var next=st.state==='question'&&!st.answered?1200
+      :st.state==='gone'?0
+      :st.state==='end'?15000
+      :1800;
+    if(next)timer=setTimeout(poll,next);
   },function(){timer=setTimeout(poll,3000);});
 }
 function head(st){return '<div class="pl-head"><span>'+esc(st.you?st.you.name:'')+'</span><b>'+(st.you?st.you.score:0)+' نقطة</b></div>';}
@@ -25,11 +32,17 @@ function draw(st){
   var key=st.state+'|'+st.qi+'|'+(st.answered?1:0);
   if(st.state==='gone'){ss('tahdir_play',null);S=null;joinForm('انتهى التحدي أو تغيّر. ادخل برمز جديد.');return;}
   if(key===lastKey&&st.state!=='question')return;
-  if(key===lastKey&&st.state==='question'){var t=$('plLeft');if(t)t.textContent=Math.ceil(st.left/1000);return;}
+  if(key===lastKey&&st.state==='question'){
+    // تحديث العدّاد فقط. لو الطالب جاوب أو انتهى الوقت، نعيد الرسم بدل ترك الشاشة مجمّدة.
+    var t=$('plLeft');
+    if(t)t.textContent=Math.max(0,Math.ceil(st.left/1000));
+    if(st.left<=0||st.answered){lastKey='';draw(st);}
+    return;
+  }
   lastKey=key;
   if(st.state==='lobby')view(head(st)+'<div class="pl-card c"><div class="pl-big">✅</div><h2>أنت في التحدي!</h2><p>انتظر حتى يبدأ المعلم…</p><p class="muted">'+esc(st.title||'')+'</p></div>');
   else if(st.state==='question'){
-    if(st.answered){view(head(st)+'<div class="pl-card c"><div class="pl-big">⏳</div><h2>تم إرسال إجابتك</h2><p>انتظر النتيجة…</p></div>');return;}
+    if(st.answered){view(head(st)+'<div class="pl-card c"><div class="pl-big">⏳</div><h2>تم إرسال إجابتك</h2><p>انتظر النتيجة… <b id="plLeft">'+Math.max(0,Math.ceil(st.left/1000))+'</b> ث</p></div>');return;}
     var q=st.q;
     view(head(st)+'<div class="pl-q"><div class="pl-meta">السؤال '+(st.qi+1)+' من '+st.total+' · <b id="plLeft">'+Math.ceil(st.left/1000)+'</b> ث</div><div class="pl-stem" dir="auto">'+rich(q.stem)+'</div>'+(q.table&&q.table.rows?'<table class="g-table">'+q.table.rows.map(function(r,i){return '<tr>'+r.map(function(c){return i?'<td>'+rich(c)+'</td>':'<th>'+rich(c)+'</th>';}).join('')+'</tr>';}).join('')+'</table>':'')+
       '<div class="pl-opts">'+q.choices.map(function(c,i){return '<button type="button" class="pl-o o'+i+'" data-c="'+i+'" dir="auto"><span>'+SH[i]+'</span>'+rich(c)+'</button>';}).join('')+'</div></div>');

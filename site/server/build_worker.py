@@ -17,10 +17,24 @@ BANNER = f'''<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" 
 base_css = base_css.replace('--bg:#f1f7f4; --paper:#ffffff; --ink:#10261f; --mute:#58726a; --line:#d4e5de;', '--bg:#f6f4ee; --paper:#ffffff; --ink:#10261f; --mute:#5b6d67; --line:#e2e0d6;', 1)
 base_css = base_css.replace('--main:#0c7a63; --main-d:#08503f; --main-l:#e1f3ec; --leaf:#5fae3c; --accent:#c4861a; --accent-l:#fbf0db', '--main:#1f8a70; --main-d:#0b3b33; --main-l:#e3f1eb; --leaf:#e0a93b; --accent:#c98a1e; --accent-l:#fbf0db', 1)
 lessons = json.load(open(os.path.join(DATA, 'lessons.json'), encoding='utf-8'))
+# دروس اللغة العربية تأتي من ملفها الخاص، وقيمة grade فيه مكتوبة «الصف التاسع» بينما كل الملفات
+# الأخرى تكتبها «التاسع». الواجهة تضيف «الصف » بنفسها، فكانت تظهر «الصف الصف التاسع»،
+# ومفتاح المقرر (المادة|الصف) يختلف عن بقية المواد. نوحّد الصيغة هنا عند البناء.
+_GRADE_NAMES = ('الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر')
+def _norm_grade(g):
+    g = str(g or '').strip()
+    return g[len('الصف '):] if g.startswith('الصف ') else g
 for _ar_f in ('arabic_lessons_g5_to_g12.json', 'lessons_ar.json'):
     _ar_p = os.path.join(DATA, _ar_f)
     if os.path.exists(_ar_p):
-        lessons = [l for l in lessons if l.get('subject') != 'اللغة العربية'] + json.load(open(_ar_p, encoding='utf-8'))
+        _ar = json.load(open(_ar_p, encoding='utf-8'))
+        for _l in _ar:
+            _g = _norm_grade(_l.get('grade'))
+            if _g != _l.get('grade'):
+                _l['grade'] = _g
+            if _l.get('grade') not in _GRADE_NAMES:
+                raise SystemExit('صف غير معروف في %s: %r' % (_ar_f, _l.get('grade')))
+        lessons = [l for l in lessons if l.get('subject') != 'اللغة العربية'] + _ar
 
 qbank = json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8'))
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
@@ -653,6 +667,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
+# ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'

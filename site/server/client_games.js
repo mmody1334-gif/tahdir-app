@@ -147,7 +147,7 @@ function gLive(g){
   $('lvGo').onclick=function(){
     var N=Math.max(3,Math.min(+$('lvN').value||10,mc.length)),D=Math.max(10,Math.min(120,+$('lvD').value||20));
     var items=shuffle(mc).slice(0,N).sort(function(a,b){return diff(a)-diff(b);}).map(mixMcq).map(function(x){return {stem:x.stem,choices:x.choices,correct:x.correct,table:x.table||null};});
-    api('/api/live/create',{title:course.subject+' — الصف '+course.grade,grade:course.grade,dur:D,items:items}).then(function(r){track('game_live',String(N));liveHost(r.code,items);},function(e){toast(e.message);});
+    api('/api/live/create',{title:course.subject+' — الصف '+gLabel(course.grade),grade:course.grade,dur:D,items:items}).then(function(r){track('game_live',String(N));liveHost(r.code,items);},function(e){toast(e.message);});
   };
 }
 function liveHost(code,items){
@@ -324,7 +324,10 @@ function wordList(){
   return out;
 }
 function gWords(g){
-  var words=shuffle(wordList()).slice(0,gnum()<=6?8:10).sort(function(a,b){return b.length-a.length;});
+  // حماية: لو ما فيه كلمات صالحة (درس مفاهيمي بلا مصطلحات، أو مادة إنجليزية بلا Vocabulary) نرجع للرئيسية بدل الانهيار
+  var all=wordList();
+  if(!all.length){toast('هذه الدروس ما فيها مصطلحات تنفع للبحث عن الكلمات. اختر دروسًا أخرى فيها مفاهيم أو مصطلحات.');renderHome();return;}
+  var words=shuffle(all).slice(0,gnum()<=6?8:10).sort(function(a,b){return b.length-a.length;});
   var N=Math.max(10,Math.min(14,words[0].length+3)),grid=[],place=[];
   for(var r=0;r<N;r++){grid.push([]);for(var c=0;c<N;c++)grid[r].push('');}
   var dirs=gnum()<=6?[[0,1],[1,0]]:[[0,1],[1,0],[1,1],[-1,1]];
@@ -333,6 +336,10 @@ function gWords(g){
     for(var t=0;t<200&&!ok;t++){var d=pick(dirs),r0=Math.floor(Math.random()*N),c0=Math.floor(Math.random()*N),fit=true;
       for(var k=0;k<ch.length;k++){var r=r0+d[0]*k,c=c0+d[1]*k;if(r<0||c<0||r>=N||c>=N||(grid[r][c]&&grid[r][c]!==ch[k])){fit=false;break;}}
       if(fit){var cells=[];for(var k2=0;k2<ch.length;k2++){var rr=r0+d[0]*k2,cc=c0+d[1]*k2;grid[rr][cc]=ch[k2];cells.push(rr+'_'+cc);}placed.push({w:w,cells:cells,found:false});ok=true;}}});
+  // كلمة طويلة ما لقيت مكانًا: لا نعرضها في القائمة حتى لا يبحث الطلاب عن كلمة غير موجودة في الشبكة
+  var dropped=words.length-placed.length;
+  if(dropped>0)toast('تعذّر إدراج '+dropped+' كلمة طويلة في الشبكة، فحُذفت من القائمة.');
+  if(!placed.length){toast('تعذّر بناء شبكة الحروف من هذه الدروس. اختر دروسًا أخرى.');renderHome();return;}
   var AL=isEn()?'ABCDEFGHIJKLMNOPRSTUVWY':'ابتثجحخدذرزسشصضطظعغفقكلمنهوي';
   for(var r1=0;r1<N;r1++)for(var c1=0;c1<N;c1++)if(!grid[r1][c1])grid[r1][c1]=AL[Math.floor(Math.random()*AL.length)];
   var first=null,found={};
@@ -376,7 +383,14 @@ function gWheel(g){
     var target=360-(idx*seg+seg/2);rot=rot-(rot%360)+360*5+target;
     var gg=$('whG');gg.style.transition='transform 4s cubic-bezier(.17,.67,.2,1)';gg.style.transform='rotate('+rot+'deg)';$('whSpin').disabled=true;
     setTimeout(function(){beep('ok');$('whSpin').disabled=false;
-      var p=pool().filter(function(x){return !asked[x.qid];});if(!p.length){asked={};p=pool();}var x=pick(p);asked[x.qid]=1;if(x.type==='mcq')x=mixMcq(x);
+      // مفتاح التكرار: qid إن وُجد، وإلا نص السؤال — لأن بعض المفردات (واجبات الدروس) بلا qid
+      // فكان asked[undefined] يجمعها كلها فلا تظهر إلا مرة واحدة.
+      var p=pool();
+      if(!p.length){toast('لا توجد أسئلة في الدروس المختارة.');return;}
+      var keyOf=function(y){return y.qid!=null?('q'+y.qid):('s'+String(y.stem||'').slice(0,80));};
+      var un=p.filter(function(y){return !asked[keyOf(y)];});
+      if(!un.length){asked={};un=p;}
+      var x=pick(un);asked[keyOf(x)]=1;if(x.type==='mcq')x=mixMcq(x);
       $('whQ').innerHTML='<div class="wh-who">'+(mode==='teams'?'الفريق: ':'الطالب رقم ')+'<b>'+esc(L[idx])+'</b></div>'+qHtml(x)+(x.type==='mcq'?'<div class="lv-opts">'+x.choices.map(function(c,i){return '<div class="lv-opt o'+i+'" dir="auto"><span class="sh">'+SHAPES[i]+'</span>'+rich(c)+'</div>';}).join('')+'</div>':'')+
         '<button type="button" class="btn" id="whA">إظهار الإجابة</button><div class="jp-ans" id="whAns" hidden dir="auto">'+rich(answerText(x))+'</div>';
       $('whA').onclick=function(){$('whAns').hidden=false;if(x.type==='mcq')document.querySelectorAll('#whQ .lv-opt')[x.correct].classList.add('right');};
