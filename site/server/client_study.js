@@ -346,6 +346,41 @@ function welcome(){
     '<div class="welcome qwel"><h2>🩹 الخطط العلاجية والأنشطة الصفية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة. ومعها تبويب <b>«الأنشطة الصفية»</b>: أسئلة تحدٍّ أعلى مستوى (تطبيق واستدلال، وأسئلة الوزارة بالرسوم) لكل درس مع إجاباتها. وبطاقة <b>«نشاط جماعي»</b> توزّع أسئلة سهلة ومتوسطة وتحدٍّ خفيف على أفراد المجموعة (2–6) بأدوارهم وأسمائهم، مع نموذج الإجابة.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
     '<div class="welcome qwel"><h2>📚 ملخصات الدروس والوحدات</h2><p>ملخص لكل درس مبني على مخرجات التعلم في المنهج العُماني والكتاب المدرسي: الفكرة الأساسية، نقاط كل مخرج، المصطلحات، وأخطاء شائعة. وملخص للوحدة بأفكارها الكبرى وأسئلة مراجعة.</p><div class="welcome-steps"><span>1. اختر درسًا أو وحدة</span><span>2. اعرض الملخص</span><span>3. عدّل ما تريد</span><span>4. اطبع أو حمّل Word للطلاب</span></div></div>';
 }
+// ==== mind map ====
+// ---------- خريطة ذهنية بالعرض لملخص الدرس (تُقرأ من study.mm) ----------
+var MMCSS='<style>@page{size:A4 landscape;margin:10mm}.mm{font-family:Cairo,Tahoma,Arial,sans-serif;color:#1b1f1d;background:#fff;line-height:1.7;font-size:.95em}.mm *{box-sizing:border-box}'+
+'.mm .mh{display:flex;align-items:center;gap:10px;background:#e3f1eb;border-bottom:3px solid #1f8a70;padding:8px 12px;border-radius:8px 8px 0 0}.mm .mh b{background:#1f8a70;color:#fff;border-radius:8px;padding:0 12px;font-size:1.25em}.mm .mh span{font-weight:700}.mm .mh em{margin-inline-start:auto;font-style:normal;font-weight:900;font-size:1.15em}'+
+'.mm .mg2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;padding:10px}.mm .mc{border:1.5px solid #cfd8d3;border-radius:10px;padding:8px 10px;break-inside:avoid}.mm .wide{grid-column:1/-1}'+
+'.mm .mp{display:inline-block;border-radius:999px;padding:1px 14px;font-weight:800;margin:0 0 4px}.mm .mp i{font-style:normal;font-size:.75em;background:#0002;border-radius:6px;padding:0 6px;margin-inline-start:6px}'+
+'.mm .g{background:#d8ecc0}.mm .pu{background:#e6d3ef}.mm .b{background:#cfe0f5}.mm .r{background:#f7d3d0}.mm .y{background:#fbe7a8}'+
+'.mm .mr{color:#c62828;font-weight:700}.mm .mb{color:#1a4fb4;font-weight:700}'+
+'.mm ul.mk{list-style:none;margin:2px 0;padding:0 10px 0 0;border-right:3px solid #1b1f1d}.mm ul.mk li{position:relative;padding:1px 12px 1px 0}.mm ul.mk li:before{content:"◄";position:absolute;right:-9px;top:.5em;font-size:.7em;background:#fff}'+
+'.mm .ms{display:flex;gap:8px;align-items:flex-start}.mm .ms b{flex:none;width:24px;height:24px;border-radius:50%;background:#1f8a70;color:#fff;display:grid;place-items:center;font-size:.85em;margin-top:2px}.mm .ma{text-align:center;line-height:1;font-size:.9em;color:#1f8a70}'+
+'.mm table.mt{border-collapse:collapse;width:100%;margin:4px 0;font-size:.92em}.mm table.mt td,.mm table.mt th{border:1px solid #9aa8a1;padding:2px 6px;vertical-align:top}.mm table.mt th{background:#eef3f1}'+
+'.mm .mg{text-align:center;margin:6px 0}.mm .mg svg{width:100%;max-width:380px;height:auto}'+
+'.mm .cmp3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm .cmp3>div{border:2px solid #cfd8d3;border-radius:10px;padding:4px 8px}.mm .cmp3 .mp{display:block;text-align:center}.mm .cmp3 ul{margin:2px 0;padding-right:18px}'+
+'.mm .tip{background:#fbe7a8;border-radius:10px;padding:6px 12px}.mm .tip ul{margin:2px 0;padding-right:18px}.mm .mem{margin-top:6px;font-weight:800;text-align:center;border:2px dashed #1f8a70;border-radius:10px;padding:4px 8px}</style>';
+function mmT(s){return esc(s).replace(/\{\{(.+?)\}\}/g,'<bdi dir="ltr">$1</bdi>').replace(/\[\[(.+?)\]\]/g,'<span class="mr">$1</span>').replace(/\(\((.+?)\)\)/g,'<span class="mb">$1</span>');}
+function mmUl(p){return '<ul class="mk">'+p.map(function(x){return '<li>'+mmT(x)+'</li>';}).join('')+'</ul>';}
+function mmSec(s){
+  var h='<div class="mc"><div class="mp '+s.c+'">'+esc(s.h)+(s.o?'<i dir="ltr">'+esc(s.o)+'</i>':'')+'</div>';
+  if(s.pts)h+=mmUl(s.pts);
+  if(s.flow)h+=s.flow.map(function(x,i){return '<div class="ms"><b>'+(i+1)+'</b><span>'+mmT(x)+'</span></div>'+(i<s.flow.length-1?'<div class="ma">▼</div>':'');}).join('');
+  if(s.tbl)h+='<table class="mt"><tr>'+s.tbl.h.map(function(x){return '<th>'+esc(x)+'</th>';}).join('')+'</tr>'+s.tbl.r.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+mmT(c)+'</td>';}).join('')+'</tr>';}).join('')+'</table>';
+  if(s.svg)h+='<div class="mg">'+s.svg+'</div>';
+  return h+'</div>';
+}
+function mmHtml(l){
+  var s=st(l),m=s&&s.mm;if(!m)return '';
+  var S=s.summary||{outcomes:[]},h='<div class="mm"><div class="mh"><b>'+esc(l.unit)+'</b><span>'+esc(l.unit_name||'')+'</span><em>'+esc(l.title)+'</em></div><div class="mg2">';
+  if(S.outcomes&&S.outcomes.length)h+='<div class="mc wide"><div class="mp g">أهداف الدرس</div><ul class="mk">'+S.outcomes.map(function(o){return '<li>'+(o.code?'<span class="mb" dir="ltr">'+esc(o.code)+'</span> ':'')+esc(o.text)+'</li>';}).join('')+'</ul></div>';
+  (m.sec||[]).forEach(function(x){h+=mmSec(x);});
+  if(m.cmp)h+='<div class="mc wide"><div class="mp pu">'+esc(m.cmp.h)+'</div><div class="cmp3">'+m.cmp.cols.map(function(c){return '<div><span class="mp '+c.c+'">'+esc(c.h)+'</span><ul>'+c.pts.map(function(p){return '<li>'+mmT(p)+'</li>';}).join('')+'</ul></div>';}).join('')+'</div></div>';
+  if(m.tips&&m.tips.length)h+='<div class="mc wide tip"><b>تريكات</b><ul>'+m.tips.map(function(p){return '<li>'+mmT(p)+'</li>';}).join('')+'</ul>'+(m.mem?'<div class="mem">'+mmT(m.mem)+'</div>':'')+'</div>';
+  return h+'</div></div>';
+}
+function mmAll(ls){var a=ls.map(mmHtml).filter(Boolean);return a.length?wrap(MMCSS+a.join('<div style="page-break-after:always"></div>'),false):'';}
+// ==== end mind map ====
 function make(){
   if(!course||!data)return;
   var ls=lessonsSel();
@@ -357,6 +392,7 @@ function make(){
     track('remedial_make',ls.length+' دروس',title);
   }else{
     parts={main:summaryHtml()};part='main';
+    if(sumMode==='lesson'){var mmh=mmAll(ls);if(mmh){parts.mm=mmh;part='mm';}}
     var u=unitsList().filter(function(x){return x.unit===unitSel;})[0];
     title=sumMode==='unit'?'ملخص الوحدة '+unitSel+(u&&u.name?': '+u.name:'')+' — '+course.grade:'ملخص: '+ls.map(function(l){return l.title;}).join('، ');
     track('summary_make',sumMode==='unit'?'الوحدة '+unitSel:ls.length+' دروس',title);
@@ -364,8 +400,8 @@ function make(){
   doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:title.slice(0,150),parts:parts,lessons:ls.map(function(l){return l.id;}),id:null,en:isEnC()};
   dirty=true;renderDoc();
 }
-var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',grp:'النشاط الجماعي',grpkey:'إجابات النشاط الجماعي',main:'الملخص'};
-function partKeys(){return REM?['plan','sheet','key','cls','clskey','grp','grpkey']:['main'];}
+var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',mm:'خريطة ذهنية بالعرض',grp:'النشاط الجماعي',grpkey:'إجابات النشاط الجماعي',main:'الملخص'};
+function partKeys(){return REM?['plan','sheet','key','cls','clskey','grp','grpkey']  :['mm','main'];}
 function presentKeys(){var k=partKeys().filter(function(x){return doc&&doc.parts&&doc.parts[x];});return k.length?k:partKeys();}
 function renderDoc(){
   if(!doc){welcome();return;}
@@ -373,7 +409,7 @@ function renderDoc(){
     '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+
     (REM&&part==='plan'?'<button type="button" class="btn" id="rowAdd">+ صف طالب</button><button type="button" class="btn" id="rowDel">− صف</button>':'')+'</div></div>'+
     '<div class="edit-hint no-print">✎ اضغط على أي نص في الورقة لتعديله أو حذفه أو الكتابة فيه'+(REM?'، واضغط على المربع ☐ لتحديده':'')+'.</div>'+
-    (REM?'<div class="ptabs no-print" role="tablist">'+presentKeys().map(function(k){return '<button type="button" class="ltab'+(part===k?' on':'')+'" data-part="'+k+'">'+PART_TXT[k]+'</button>';}).join('')+'</div>':'')+
+    ((REM||(doc.parts&&doc.parts.mm))?'<div class="ptabs no-print" role="tablist">'+presentKeys().map(function(k){return '<button type="button" class="ltab'+(part===k?' on':'')+'" data-part="'+k+'">'+PART_TXT[k]+'</button>';}).join('')+'</div>':'')+
     '<div class="paper study-paper" id="paper" contenteditable="true" spellcheck="false">'+clean(doc.parts[part]||'')+'</div>';
   $('qmain').innerHTML=h;
   var pp=$('paper');
