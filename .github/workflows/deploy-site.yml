@@ -37,6 +37,8 @@ jobs:
             exit 0
           fi
           mkdir -p site/dist/assets/fin && cp -r site/finals/img/. site/dist/assets/fin/
+          # تنظيف صور الوزارة (خطوط الحواف، صناديق الدرجات، شظايا الورقة) — الأصول في site/finals تبقى كما هي
+          pip install -q numpy pillow opencv-python-headless && python3 site/tools/clean_fin.py site/dist/assets/fin || echo "::warning::fin image cleaning skipped"
           cd site && npx --yes wrangler@3.114.0 deploy && cd ..
           want=$(git rev-parse --short HEAD)
           for i in 1 2 3 4 5 6; do
