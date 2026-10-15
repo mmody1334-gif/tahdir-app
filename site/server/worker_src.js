@@ -60,13 +60,21 @@ function hardItems(key, ls) {
   });
   return out;
 }
+// مستوى هدف التقويم لسؤال الوزارة: بعضها مكتوب مركّبًا («معرفة / تطبيق»، «AO1/AO2»، «أ: AO1 ؛ ب: AO2») أو فارغًا
+// نأخذ الأعلى مستوى فيها، والفارغ يُستنتج من الدرجة، حتى لا تسقط أسئلة كثيرة من الفيزياء والعلوم والعلوم البيئية
+const AO_RANK = { AO1: 1, 'معرفة': 1, 'تذكر': 1, AO2: 2, 'تطبيق': 2, AO3: 3, 'استدلال': 3 };
+function normAO(raw, hi, m) {
+  const found = String(raw || '').match(/AO[123]|معرفة|تذكر|تطبيق|استدلال/g) || [];
+  const top = found.length ? found.reduce((a, b) => (AO_RANK[b] > AO_RANK[a] ? b : a)) : ((+m || 1) >= 2 ? 'تطبيق' : 'معرفة');
+  return (hi ? AO_HI : AO_LO)[top];
+}
 function finQuizItems(key) {
   const G = FINALS[key]; if (!G) return [];
   const [subj, grade] = key.split('|'); if (subj === 'تقنية المعلومات' || subj === 'اللغة الإنجليزية') return [];
   const g = FG[grade] || 0, hi = g >= 11, smax = hi ? 3 : 2, lr = hi ? [4, 5] : (g >= 9 ? [3, 4] : []);
   const out = [];
   for (const q of G.q) {
-    const ao = (hi ? AO_HI : AO_LO)[String(q.ao || '').trim()], m = q.m;
+    const m = q.m, ao = normAO(q.ao, hi, m);
     if (!ao || !q.l || typeof m !== 'number' || m !== Math.floor(m)) continue;
     let type;
     if (q.t === 'mcq') { if (m !== 1) continue; type = 'mcq'; }
