@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 guard();
-var GRADE_ORDER=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
+var GRADE_ORDER=['الصف الخامس','الصف السادس','الصف السابع','الصف الثامن','الصف التاسع','الصف العاشر','الصف الحادي عشر','الصف الثاني عشر','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر','الأول الثانوي','الثاني الثانوي','الثالث الثانوي','المسار العام'];
 function ckey(l){return (l.subject||'')+'|'+l.grade;}
 var LEGACY_SUBJ={'':1,'الأحياء':1,'العلوم':1,'اللغة الإنجليزية':1};
 function toolMin(l,v){return LEGACY_SUBJ[l.subject||'']?v:'3.4.0';}
@@ -108,7 +108,7 @@ function fieldBlock(l,f,ess){
     '<button type="button" class="btn small" data-save="'+f.key+'">'+(admin?'حفظ للجميع':'حفظ على جهازي')+'</button></div></section>';
 }
 function buildCopyAll(l){
-  if(isEn(l)){ // تحضير الإنجليزي بالإنجليزية بالكامل
+  if(isEn(l)||l.subject==='اللغة العربية'){ // تحضير الإنجليزي بالإنجليزية بالكامل
     var e='Title:\n'+(l.title||'')+'\n\nStrategies: '+(l.strategies||'')+'\nResources: '+(l.resources||'')+'\n\n';
     [['concepts','Concepts'],['pre_learning','Warm-up'],['activities_teach','Lesson Procedures'],['formative','Formative Assessment'],['closing','Closing Assessment'],['homework','Homework'],['outcomes','Objectives']].forEach(function(f){e+='— '+f[1]+' —\n'+(l[f[0]]||'')+'\n\n';});
     return e.trim();
