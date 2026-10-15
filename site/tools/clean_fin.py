@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""ينظّف صور أسئلة الوزارة (webp) من بقايا الورقة الأصلية:
+  - الخطوط/الأشرطة الرمادية أو السوداء على حافتي الصورة (يمين/يسار) وإطار الصفحة العلوي/السفلي
+  - عمود «لا تكتب في هذا الجزء»
+  - صناديق الدرجات المقطوعة في أعلى يسار الصورة
+  - شظايا نصوص مقطوعة على الحافة العلوية/السفلية
+الاستخدام: python3 clean_fin.py <مجلد الصور> [--dry] — يعدّل الملفات في مكانها ولا يفشل أبدًا (يتخطى أي صورة بها مشكلة).
+"""
+import os, sys
+import numpy as np
+from PIL import Image
+import cv2
+
+DARK = 190      # أقل من هذا = حبر
+NONWHITE = 246  # أقل من هذا = غير أبيض (لتمييز الشريط الرمادي)
+
+
+def _side_cluster(a, side, maxw=72):
+    """يعيد عدد الأعمدة (من الحافة) التي يجب تبييضها، أو 0."""
+    H, W = a.shape
+    cols = range(0, min(maxw, W // 3)) if side == 'L' else range(W - 1, W - 1 - min(maxw, W // 3), -1)
+    first = last = -1
+    for i, x in enumerate(cols):
+        col = a[:, x]
+        dfrac = (col < DARK).mean()
+        gfrac = (col < NONWHITE).mean()
+        art = dfrac >= 0.80 or gfrac >= 0.88 or (gfrac >= 0.60 and i <= 3 and (a[:, x + (1 if side == 'L' else -1) * 12] < NONWHITE).mean() >= 0.60)
+        if art:
+            if first < 0:
+                first = i
+            last = i
+        elif first >= 0 and i - last > 6:
+            break
+        elif first < 0 and i > 12:
+            break
+    if first < 0 or first > 12:
+        return 0
+    return last + 3  # هامش بسيط
+
+
+def _band_rows(a0, edge, sides):
+    """صفوف الحافة العلوية/السفلية التي تمثل إطارًا ممتدًا من حافة إلى حافة (لا سطر إجابة)."""
+    H, W = a0.shape
+    n = 0
+    rng = range(0, min(14, H // 4)) if edge == 'T' else range(H - 1, H - 1 - min(14, H // 4), -1)
+    for i, y in enumerate(rng):
+        row = a0[y, :]
+        dk = np.where(row < DARK)[0]
+        full = len(dk) > 0 and (row < DARK).mean() >= 0.85
+        left_ok = full and (dk[0] <= 6 or 'L' in sides or dk[0] <= 70 and 'L' not in sides and False)
+        right_ok = full and (dk[-1] >= W - 7 or 'R' in sides)
+        if full and not (left_ok and right_ok):
+            # يلامس حافة واحدة، والطرف الآخر قريب (≤ 70px) → إطار؛ أما سطر الإجابة فيبدأ بعد رقم الدرجة
+            left_ok = left_ok or (right_ok and dk[0] <= 70) or (dk[0] <= 40 and dk[-1] >= W - 45)
+            right_ok = right_ok or (left_ok and dk[-1] >= W - 71) or (dk[0] <= 40 and dk[-1] >= W - 45)
+        if full and left_ok and right_ok:
+            n = i + 1
+        elif i - n > 3:
+            break
+    return n + 2 if n else 0
+
+
+def _header_rows(a):
+    """ترويسة الورقة (المادة / الصف / الفصل / الدور / العام) المسطّرة أعلى الصورة."""
+    ink = a < DARK
+    H, W = a.shape
+    rows = ink.any(1)
+    bands, y = [], 0
+    while y < H:
+        if rows[y]:
+            st = y
+            while y < H and rows[y]:
+                y += 1
+            bands.append([st, y])
+        else:
+            y += 1
+    m = []
+    for st, e in bands:
+        if m and st - m[-1][1] <= 2:
+            m[-1][1] = e
+        else:
+            m.append([st, e])
+    if len(m) < 2:
+        return 0
+    st, e = m[0]
+    if st > 20 or not (14 <= e - st <= 32):
+        return 0
+    dens = ink[st:e].mean(1)
+    line = dens >= 0.5
+    if not line[-10:].any():
+        return 0
+    txt = ink[st:e][~line]
+    if not len(txt):
+        return 0
+    cols = txt.any(0)
+    xs = np.where(cols)[0]
+    if xs[-1] - xs[0] < 0.65 * W or 1 + int((np.diff(xs) > 12).sum()) < 4:
+        return 0
+    if m[1][0] - e < 6:
+        return 0
+    return e + 2
+
+
+def clean_array(a):
+    """a: مصفوفة رمادية uint8. تعيد (المصفوفة، قائمة ما تمّت إزالته)."""
+    a0 = a
+    a = a.copy()
+    H, W = a.shape
+    done = []
+    sides = ''
+
+    # 1) الأشرطة الجانبية
+    for side in ('L', 'R'):
+        k = _side_cluster(a, side)
+        if k:
+            if side == 'L':
+                a[:, :k] = 255
+            else:
+                a[:, W - k:] = 255
+            sides += side
+            done.append('side' + side)
+    # 2) إطار علوي/سفلي
+    for edge in ('T', 'B'):
+        k = _band_rows(a0, edge, sides)
+        if k:
+            if edge == 'T':
+                a[:k, :] = 255
+            else:
+                a[H - k:, :] = 255
+            done.append('frame' + edge)
+    k = _header_rows(a)
+    if k:
+        a[:k, :] = 255
+        done.append('header')
+    # 3) صناديق الدرجات في أعلى اليسار
+    ink = (a < DARK).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    for i in range(1, n):
+        x, y, w, h, ar = st[i]
+        if x > 30 or not (45 <= w <= 150):
+            continue
+        cut = y == 0 and h <= 45                                   # بقية صندوق سابق مقطوع من الأعلى
+        scored = False
+        if y <= 200 and 25 <= h <= 140 and ar < 0.2 * w * h:        # صندوق الدرجة وفيه رقم
+            for j in range(1, n):
+                if j == i:
+                    continue
+                xj, yj, wj, hj, _ = st[j]
+                if xj > x + 3 and yj > y + 3 and xj + wj < x + w - 3 and yj + hj < y + h - 3 and 8 <= hj <= 45:
+                    scored = True
+                    break
+        if cut or scored:
+            a[max(0, y - 3):y + h + 4, max(0, x - 3):x + w + 4] = 255
+            done.append('box')
+    # 4) شظايا على الحافتين العلوية والسفلية
+    ink = (a < DARK)
+    for edge in ('T', 'B'):
+        rows = ink[:12, :] if edge == 'T' else ink[H - 12:, :]
+        rows = rows if edge == 'T' else rows[::-1]
+        if not rows.any():
+            continue
+        has = rows.any(1)
+        if not has[0]:
+            continue
+        hb = 0
+        while hb < len(has) and has[hb]:
+            hb += 1
+        if hb >= len(has):
+            continue  # طويلة: ليست شظية
+        sub = rows[:hb]
+        if sub.mean(1).max() >= 0.5:
+            continue  # خط أفقي (سطر إجابة) — يبقى
+        if sub.mean() > 0.2:
+            continue
+        if edge == 'T':
+            a[:hb + 1, :] = 255
+        else:
+            a[H - hb - 1:, :] = 255
+        done.append('frag' + edge)
+    return a, done
+
+
+def process(path, dry=False):
+    im = Image.open(path)
+    g = np.array(im.convert('L'))
+    out, done = clean_array(g)
+    if done and not dry:
+        # نُطبّق التبييض على الصورة الأصلية (RGB) حتى لا نفقد الألوان
+        rgb = np.array(im.convert('RGB'))
+        mask = (out == 255) & (g != 255)
+        rgb[mask] = 255
+        Image.fromarray(rgb).save(path, 'WEBP', quality=88, method=4)
+    return done
+
+
+def main():
+    root = sys.argv[1] if len(sys.argv) > 1 else 'site/finals/img'
+    dry = '--dry' in sys.argv
+    tot = ch = err = 0
+    kinds = {}
+    for dp, _, fs in os.walk(root):
+        for f in fs:
+            if not f.lower().endswith('.webp'):
+                continue
+            tot += 1
+            try:
+                d = process(os.path.join(dp, f), dry)
+            except Exception as e:  # لا نفشل البناء بسبب صورة واحدة
+                err += 1
+                print('skip', f, e)
+                continue
+            if d:
+                ch += 1
+                for k in set(d):
+                    kinds[k] = kinds.get(k, 0) + 1
+    print('images', tot, 'cleaned', ch, 'errors', err, kinds)
+
+
+if __name__ == '__main__':
+    main()
