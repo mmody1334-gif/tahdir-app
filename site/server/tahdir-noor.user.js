@@ -61,9 +61,9 @@
   }
   function clearPending(key) { if (typeof GM_deleteValue !== 'undefined') GM_deleteValue(key || PENDING_KEY); }
   // رابط الصفحة المطلوبة لهذا الصف في نور
-  function subjKey(subject, grade) { return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '') + '|' + grade; }
+  function subjKey(subject, grade) { subject = String(subject || '').replace(/لغتي الجميلة|المؤنس و المفيد|المؤنس والمفيد|المؤنس|المفيد/g, 'اللغة العربية'); grade = String(grade || '').replace(/^الصف\s+/, ''); return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '') + '|' + grade; }
   // مفتاح المادة بدون «ال» (نور قد يكتب «كيمياء» أو «الكيمياء»)
-  function subjKey2(subject, grade) { return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/(^|\s)ال/g, '$1').replace(/\s+/g, '') + '|' + grade; }
+  function subjKey2(subject, grade) { subject = String(subject || '').replace(/لغتي الجميلة|المؤنس و المفيد|المؤنس والمفيد|المؤنس|المفيد/g, 'اللغة العربية'); grade = String(grade || '').replace(/^الصف\s+/, ''); return String(subject || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/(^|\s)ال/g, '$1').replace(/\s+/g, '') + '|' + grade; }
   function cidFor(map, grade, subject) {
     if (!subject) return map[grade];
     const hit = map[subjKey(subject, grade)] || map[subjKey2(subject, grade)];
