@@ -9,7 +9,7 @@ var WEAK_IT=['المفاهيم والمصطلحات التقنية','المها�
 var WEAK_EN=['Reading comprehension','Vocabulary','Grammar','Writing','Listening','Speaking','Spelling & punctuation'];
 var T_ACTS=[['إعادة شرح المفاهيم الأساسية بأسلوب مبسط وأمثلة من الحياة',1],['أوراق عمل علاجية متدرجة من السهل إلى الأصعب',1],['التعلم بالأقران (طالب متمكن مع طالب متعثر)',1],['تعليم فردي قصير داخل الحصة',0],['استخدام الوسائل والنماذج والصور والمخططات',1],['تقسيم المهمة إلى خطوات قصيرة ومتابعة كل خطوة',0],['تكليفات منزلية قصيرة ومتابعتها وتصحيحها',0],['اختبارات تشخيصية قصيرة لقياس التقدم',0],['التعزيز والتحفيز المستمر',1],['حصص تقوية / مراجعة',0]];
 var S_ACTS=[['التواصل مع ولي الأمر وإطلاعه على الخطة',1],['متابعة الأخصائي الاجتماعي / النفسي',0],['متابعة المعلم الأول للمادة',1],['توفير حصص تقوية ضمن جدول المدرسة',0],['تكريم الطلاب المتحسنين',0]];
-var me=null,courses=[],course=null,data=null,byId={},sel={},sumMode='lesson',unitSel='',doc=null,dirty=false,part='',hdr=null,rows=5;
+var me=null,courses=[],course=null,data=null,byId={},sel={},sumMode='lesson',unitSel='',doc=null,dirty=false,part='',hdr=null,rows=5,gsize=5,gper=1,gnames='';
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function track(type,detail,title){try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,grade:course&&course.grade,detail:detail||'',title:title||''})});}catch(e){}}
@@ -151,6 +151,145 @@ function summaryHtml(){
   ls.forEach(function(l){h+=lessonSum(l,en,false);});
   return wrap(h,en);
 }
+// ==== group activity ====
+// ---------- النشاط الجماعي: أسئلة (سهل / متوسط / تحدٍّ خفيف) موزّعة على أعضاء المجموعة ----------
+var GROLES=['قائد المجموعة','مقرِّر المجموعة (يكتب الإجابة)','المتحدّث الرسمي','ضابط الوقت','مراجع الإجابات','منسّق الأدوات والمواد'];
+var GLVL={1:['سهل','#e3f4e8','#2e7d4f'],2:['متوسط','#fff3d6','#9a6b00'],3:['تحدٍّ','#fde3e3','#b3261e']};
+var STARTW=('ما ماذا لماذا كيف أين متى كم هل أي أيهما أيها اذكر سم عرف فسر اكتب قارن صف اشرح احسب اقترح حدد استخدم علل توقع صنف قيم صمم لاحظ عد بين وضح استنتج ارسم أكمل أعط اختر رتب ميز عين حلل أوجد تنبأ قدر أجب سجل حول ضع طبق لخص ناقش استخلص أشر برهن مثل').split(' ');
+function nAr(s){return String(s||'').replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه');}
+var STARTSET={};STARTW.forEach(function(w){STARTSET[nAr(w)]=1;});
+function isQ(line){ // يبدأ بأداة استفهام أو فعل أمر؟
+  var s=String(line||'').replace(/^\s*(?:[\(\[]?[0-9\u0660-\u0669]+[\)\]\.\-:]|[\(\[]?[ابجدهوزحطي][\)\]\.\-:])\s*/,'').trim();
+  var w=nAr(s.split(/\s+/)[0]||'').replace(/[:،,\.؟?]+$/,'');
+  return !!STARTSET[w];
+}
+function qClean(t){ // يزيل ترقيم الامتحان الأصلي، ويرفض سؤالًا ناقصًا ينتهي بنقطتين وحده
+  if(!t)return '';
+  t=t.replace(/^\s*[\(\[]?[0-9\u0660-\u0669]+[\)\]\.\-:]\s*/,'');
+  if(t.indexOf('\n')<0&&/[:：]\s*$/.test(t))return '';
+  if(t.replace(/[_\s.…]+/g,' ').trim().length<14||(/_{3,}/.test(t)&&t.length<45))return ''; // سؤال ناقص أو مجرد فراغ
+  return t;
+}
+function hasVis(q){return !!(q.img||(q.table&&q.table.rows&&q.table.rows.length));}
+function qText(q){return qClean(qText0(q));}
+function qText0(q){ // نص السؤال يبدأ بأداة استفهام/أمر؛ مع الشكل أو الجدول نقتطع من أول جملة سؤال
+  var lines=String(q.stem||'').replace(/\*\*/g,'').split('\n').map(function(x){return x.trim();}).filter(function(x){return x&&x.charAt(0)!=='[';});
+  if(!lines.length)return '';
+  if(isQ(lines[0]))return lines.join('\n');
+  if(!hasVis(q))return '';
+  for(var i=0;i<lines.length;i++){if(isQ(lines[i]))return lines.slice(i).join('\n');}
+  for(var a=0;a<lines.length;a++){var ss=lines[a].match(/[^.؟?!]+[.؟?!]?/g)||[];for(var j=1;j<ss.length;j++){if(isQ(ss[j]))return [ss.slice(j).join(' ').trim()].concat(lines.slice(a+1)).join('\n');}}
+  return '';
+}
+function lvlOf(q){ // 1 سهل · 2 متوسط · 3 تحدٍّ خفيف · 0 مستبعد
+  var m=q.marks||1,d=q.difficulty||'',ao=q.ao||'',know=(ao==='معرفة'||ao==='AO1'||ao==='تذكر وفهم');
+  if(d==='منخفضة')return m<=2?1:2;
+  if(d==='متوسطة')return m<=3?2:0;
+  if(d==='مرتفعة')return m<=3?3:0;
+  if(m===1)return know?1:2;
+  if(m===2)return 2;
+  if(m===3)return know?2:3;
+  return 0;
+}
+function levelPlan(T){ // نسبة تقريبية 40% سهل · 40% متوسط · 20% تحدٍّ خفيف
+  if(T<=1)return [1];if(T===2)return [1,3];if(T===3)return [1,2,3];
+  var h=Math.max(1,Math.round(T*0.2)),e=Math.round(T*0.4),m=T-e-h,out=[],i;
+  for(i=0;i<e;i++)out.push(1);for(i=0;i<m;i++)out.push(2);for(i=0;i<h;i++)out.push(3);return out;
+}
+function interleave(items){ // توزيع عادل على الدروس المختارة
+  var by={},ids=[];items.forEach(function(q){if(!by[q.lesson_id]){by[q.lesson_id]=[];ids.push(q.lesson_id);}by[q.lesson_id].push(q);});
+  var out=[],more=true;while(more){more=false;ids.forEach(function(id){if(by[id].length){out.push(by[id].shift());more=true;}});}
+  return out;
+}
+function buildPools(items){
+  var pools={1:[],2:[],3:[]},seen={};
+  shuffle(items).forEach(function(q){
+    if(q.type==='mcq'&&(!q.choices||!q.choices.length)&&!q.answer)return;
+    var t=qText(q);if(!t||t.length>380)return;
+    var lv=lvlOf(q);if(!lv)return;
+    var k=nAr(t).replace(/\s+/g,'').slice(0,60);if(seen[k])return;seen[k]=1;
+    var pri=Math.random()-(hasVis(q)?0.55:0)-(lv===3&&(q.marks||1)===2?0.15:0);
+    pools[lv].push({q:q,t:t,lv:lv,pri:pri,lesson_id:q.lesson_id});
+  });
+  [1,2,3].forEach(function(l){pools[l]=interleave(pools[l].sort(function(a,b){return a.pri-b.pri;}));});
+  return pools;
+}
+function takeQ(pools,lv,used){ // يأخذ سؤالًا بالمستوى المطلوب، وإن نقص يستعير من أقرب مستوى
+  var order={1:[1,2],2:[2,1,3],3:[3,2]}[lv];
+  for(var o=0;o<order.length;o++){var p=pools[order[o]];for(var i=0;i<p.length;i++){if(!used[p[i].q.qid||p[i].t]){var it=p.splice(i,1)[0];used[it.q.qid||it.t]=1;return {q:it.q,t:it.t,lv:lv};}}}
+  return null;
+}
+function buildAssign(items,N,K){ // يعيد قائمة بأسئلة كل عضو
+  var pools=buildPools(items),lvls=levelPlan(N*K),used={},members=[],j,i;
+  for(j=0;j<N;j++)members.push([]);
+  for(j=0;j<N;j++){
+    if(K===1){var a=takeQ(pools,lvls[j],used);if(a)members[j].push(a);}
+    else{ // متوازن: الأسهل مع الأصعب حتى يتقارب جهد الأعضاء
+      for(i=0;i<K;i++){var idx=(i%2===0)?j+Math.floor(i/2)*N:lvls.length-1-j-Math.floor(i/2)*N;idx=Math.max(0,Math.min(lvls.length-1,idx));var b=takeQ(pools,lvls[idx],used);if(b)members[j].push(b);}
+    }
+  }
+  members.forEach(function(m){m.sort(function(x,y){return x.lv-y.lv;});});
+  return members;
+}
+function lvlBadge(lv){var g=GLVL[lv];return '<span style="font-size:.8em;border:1px solid '+g[2]+';color:'+g[2]+';background:'+g[1]+';border-radius:8px;padding:0 7px;font-weight:bold">'+g[0]+'</span>';}
+function visHtml(q){
+  var h='';
+  if(q.table&&q.table.rows&&q.table.rows.length){
+    h+='<table style="'+TB+';width:78%;margin:6px auto">'+(q.table.caption?'<caption style="font-size:.9em;font-weight:bold;padding:2px">'+esc(q.table.caption)+'</caption>':'')+
+      q.table.rows.map(function(r,ri){return '<tr>'+r.map(function(c){return '<td style="'+(ri===0?TH:TD+';text-align:center')+'">'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</table>';
+  }
+  if(q.img)h+='<img src="'+location.origin+'/fin/'+esc(q.img)+'" alt="" style="display:block;max-width:100%;margin:6px auto">';
+  return h;
+}
+function groupHtml(members,N,K,names,key){
+  var AR='أبجد'.split(''),title=(key?'إجابات ':'')+'نشاط جماعي في مادة '+course.subject+' للصف '+course.grade;
+  var ls=lessonsSel(),h=sheetHead(title,false,false),n=0,tot=0,cnt={1:0,2:0,3:0};
+  members.forEach(function(m){m.forEach(function(a){tot++;cnt[a.lv]++;});});
+  h+='<table style="'+TB+'"><tr><td style="'+TD+';width:50%"><b>اسم المجموعة:</b> '+(key?'..............................':'..............................')+'</td><td style="'+TD+'"><b>الصف / الشعبة:</b> '+esc(course.grade)+' / ..........</td></tr>'+
+    '<tr><td style="'+TD+'" colspan="2"><b>الدروس:</b> '+ls.map(function(l){return esc(l.title);}).join('، ')+'</td></tr></table>';
+  h+=H('أعضاء المجموعة وأدوارهم');
+  h+='<table id="grpTbl" style="'+TB+'"><thead><tr><th style="'+TH+';width:6%">م</th><th style="'+TH+';width:34%">اسم الطالب</th><th style="'+TH+';width:30%">دوره في المجموعة</th><th style="'+TH+'">أسئلته (المستوى)</th></tr></thead><tbody>'+
+    members.map(function(m,i){return '<tr><td style="'+TD+';text-align:center">'+(i+1)+'</td><td style="'+TD+'">'+esc(names[i]||'')+'</td><td style="'+TD+'">'+esc(GROLES[i]||'عضو')+'</td><td style="'+TD+';font-size:.9em">'+(m.length?m.map(function(a,k){return 'سؤال '+(i*K+k+1)+' ('+GLVL[a.lv][0]+')';}).join(' · '):'—')+'</td></tr>';}).join('')+'</tbody></table>';
+  if(!key)h+='<div style="border:1px solid #0e7c66;background:#f1f8f5;border-radius:6px;padding:6px 10px;margin:6px 0 8px"><b>خطوات العمل:</b> ١) يجيب كل عضو عن سؤاله بمفرده (3 دقائق). ٢) يعرض إجابته على المجموعة ويناقشها. ٣) تتفق المجموعة على الإجابة النهائية ويكتبها المقرِّر. ٤) يعرض المتحدّث الرسمي إجابات المجموعة أمام الصف. &nbsp; <span style="font-size:.9em">المستويات: '+lvlBadge(1)+' '+lvlBadge(2)+' '+lvlBadge(3)+'</span></div>';
+  else h+='<p style="margin:4px 0 8px;font-size:.92em">عدد الأسئلة: <b>'+tot+'</b> (سهلة '+cnt[1]+'، متوسطة '+cnt[2]+'، تحدٍّ '+cnt[3]+'). تُقبل أي إجابة تؤدي المعنى نفسه.</p>';
+  members.forEach(function(m,i){
+    h+='<h3 style="font-size:1.05em;margin:14px 0 4px;border-bottom:1.5px solid #000">'+(i+1)+'. '+esc(names[i]||('الطالب '+(i+1)))+' <span style="font-size:.85em;font-weight:normal">— '+esc(GROLES[i]||'عضو')+'</span></h3>';
+    if(!m.length)h+='<p>لا توجد أسئلة متاحة لهذا العضو.</p>';
+    m.forEach(function(a){
+      n++;var q=a.q,mk=q.marks||1;
+      h+='<div style="margin:8px 0 10px;page-break-inside:avoid"><b>س'+n+'.</b> '+lvlBadge(a.lv)+' <span style="font-size:.8em;border:1px solid #888;border-radius:8px;padding:0 6px">'+mk+' درجة</span><div style="margin-top:3px">'+esc(a.t).replace(/\n/g,'<br>')+'</div>'+visHtml(q);
+      if(q.type==='mcq'&&q.choices&&q.choices.length)h+='<div style="margin:4px 0">'+q.choices.map(function(c,ci){return '<span style="display:inline-block;min-width:45%;margin:2px 0">'+AR[ci]+') '+esc(c)+'</span>';}).join('')+'</div>';
+      if(key){var ans=(q.type==='mcq'&&q.choices&&q.choices[q.correct]!=null)?AR[q.correct]+') '+q.choices[q.correct]:q.answer;
+        h+='<div style="border:1px solid #0e7c66;background:#f1f8f5;border-radius:6px;padding:5px 9px;margin-top:4px"><b>الإجابة: </b>'+esc(ans||'').replace(/\n/g,'<br>')+(q.notes?'<div style="font-size:.85em;color:#555;margin-top:2px">'+esc(q.notes)+'</div>':'')+'</div>';}
+      else if(q.type!=='mcq')h+='<div style="border-bottom:1px dotted #999;height:'+(Math.min(mk,5)*22+10)+'px"></div>';
+      h+='</div>';
+    });
+  });
+  if(!key)h+='<table style="'+TB+';margin-top:14px"><tr><td style="'+TD+';width:50%"><b>درجة المجموعة:</b> ........ / '+members.reduce(function(s,m){return s+m.reduce(function(t,a){return t+(a.q.marks||1);},0);},0)+'</td><td style="'+TD+'"><b>توقيع المعلم:</b> ..............</td></tr></table>';
+  return wrap(h,false);
+}
+var bankCache={};
+function loadBank(key){
+  if(bankCache[key])return Promise.resolve(bankCache[key]);
+  return api('/api/quiz/bank?key='+encodeURIComponent(key)).then(function(r){bankCache[key]=r.items||[];return bankCache[key];});
+}
+function makeGroup(){
+  if(!course||!data)return;
+  var ls=lessonsSel();if(!ls.length){toast('اختر درسًا واحدًا على الأقل');return;}
+  var ids={};ls.forEach(function(l){ids[l.id]=1;});
+  var N=gsize,K=gper,names=String(gnames||'').split('\n').map(function(x){return x.trim();}).filter(Boolean).slice(0,N);
+  toast('جارٍ تجهيز الأسئلة…');
+  loadBank(course.key).then(function(items){
+    var mine=items.filter(function(q){return ids[q.lesson_id];}),m=buildAssign(mine,N,K),tot=m.reduce(function(s,x){return s+x.length;},0);
+    if(!tot){toast('لا توجد أسئلة مناسبة لهذه الدروس');return;}
+    var sheet=groupHtml(m,N,K,names,false),key=groupHtml(m,N,K,names,true);
+    if(doc&&doc.kind===KIND&&doc.course===course.key){curPaper();doc.parts.grp=sheet;doc.parts.grpkey=key;}
+    else doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:('نشاط جماعي — '+course.subject+' '+course.grade+' — '+ls.map(function(l){return l.title;}).join('، ')).slice(0,150),parts:{grp:sheet,grpkey:key},lessons:ls.map(function(l){return l.id;}),id:null,en:false};
+    dirty=true;part='grp';track('remedial_make','نشاط جماعي '+N+'×'+K,doc.title);renderDoc();
+    if(tot<N*K)toast('الأسئلة المتاحة أقل من المطلوب ('+tot+' من '+(N*K)+')');
+  },function(e){toast(e.message);});
+}
+// ==== end group ====
 // ---------- الواجهة ----------
 function renderSide(){
   var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel');
@@ -170,6 +309,7 @@ function renderSide(){
     h+='</div>';
     if(REM)h+='<label class="qrow">عدد صفوف الطلاب <input id="rowsIn" type="number" min="1" max="30" value="'+rows+'" class="qsel sm" style="width:80px"></label>';
     h+='<button type="button" class="btn primary go-btn" id="makeBtn">'+(REM?'كوّن الخطة والأنشطة':'اعرض الملخص')+'</button></section>';
+    if(REM)h+='<section class="qcard"><h3>👥 نشاط جماعي</h3><label class="qrow">عدد أفراد المجموعة <select id="gSize" class="qsel sm">'+[2,3,4,5,6].map(function(n){return '<option'+(n===gsize?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label><label class="qrow">أسئلة كل طالب <select id="gPer" class="qsel sm"><option value="1"'+(gper===1?' selected':'')+'>سؤال واحد</option><option value="2"'+(gper===2?' selected':'')+'>سؤالان</option></select></label><label class="qrow" style="flex-direction:column;align-items:stretch">أسماء الأعضاء (اختياري، اسم في كل سطر — الأول يأخذ الأسهل)<textarea id="gNames" class="qsel" rows="4" placeholder="الطالب الأول&#10;الطالب الثاني">'+esc(gnames)+'</textarea></label><button type="button" class="btn primary go-btn" id="grpBtn">كوّن النشاط الجماعي</button><div class="muted small" style="margin-top:6px">أسئلة سهلة ومتوسطة وتحدٍّ خفيف، بالأشكال والجداول ونموذج إجابة.</div></section>';
   }
   h+='<section class="qcard"><h3>بيانات الورقة</h3><div class="hdr-f">'+(REM?'<label>اسم معلم المادة<input id="h_teacher" value="'+esc(hdr.teacher)+'"></label>':'')+
     '<label>المديرية<input id="h_dir" value="'+esc(hdr.dir)+'"></label><label>المدرسة<input id="h_school" value="'+esc(hdr.school)+'"></label>'+
@@ -184,6 +324,10 @@ function bindSide(){
   if($('unitSel'))$('unitSel').onchange=function(){unitSel=this.value;};
   if($('rowsIn'))$('rowsIn').onchange=function(){rows=Math.max(1,Math.min(30,parseInt(this.value,10)||5));};
   if($('makeBtn'))$('makeBtn').onclick=make;
+  if($('gSize'))$('gSize').onchange=function(){gsize=Math.max(2,Math.min(6,parseInt(this.value,10)||5));};
+  if($('gPer'))$('gPer').onchange=function(){gper=this.value==='2'?2:1;};
+  if($('gNames'))$('gNames').onchange=function(){gnames=this.value;};
+  if($('grpBtn'))$('grpBtn').onclick=function(){if($('gNames'))gnames=$('gNames').value;makeGroup();};
   ['dir','school','year','term','teacher'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);};});
 }
 function selectCourse(key){
@@ -199,7 +343,7 @@ function selectCourse(key){
 }
 function welcome(){
   $('qmain').innerHTML=REM?
-    '<div class="welcome qwel"><h2>🩹 الخطط العلاجية والأنشطة الصفية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة. ومعها تبويب <b>«الأنشطة الصفية»</b>: أسئلة تحدٍّ أعلى مستوى (تطبيق واستدلال، وأسئلة الوزارة بالرسوم) لكل درس مع إجاباتها.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
+    '<div class="welcome qwel"><h2>🩹 الخطط العلاجية والأنشطة الصفية</h2><p>لكل درس: المهارة التي يتعثر فيها الطلاب، شرح مبسط، و3 أنشطة علاجية متدرجة مع نموذج الإجابة — مكتوبة من مخرجات التعلم في المنهج العُماني. ومعها نموذج «خطة علاجية للطالب دون المستوى» جاهز للتعبئة. ومعها تبويب <b>«الأنشطة الصفية»</b>: أسئلة تحدٍّ أعلى مستوى (تطبيق واستدلال، وأسئلة الوزارة بالرسوم) لكل درس مع إجاباتها. وبطاقة <b>«نشاط جماعي»</b> توزّع أسئلة سهلة ومتوسطة وتحدٍّ خفيف على أفراد المجموعة (2–6) بأدوارهم وأسمائهم، مع نموذج الإجابة.</p><div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الخطة</span><span>3. عدّل أي نص بالضغط عليه</span><span>4. اطبع أو حمّل Word</span></div></div>':
     '<div class="welcome qwel"><h2>📚 ملخصات الدروس والوحدات</h2><p>ملخص لكل درس مبني على مخرجات التعلم في المنهج العُماني والكتاب المدرسي: الفكرة الأساسية، نقاط كل مخرج، المصطلحات، وأخطاء شائعة. وملخص للوحدة بأفكارها الكبرى وأسئلة مراجعة.</p><div class="welcome-steps"><span>1. اختر درسًا أو وحدة</span><span>2. اعرض الملخص</span><span>3. عدّل ما تريد</span><span>4. اطبع أو حمّل Word للطلاب</span></div></div>';
 }
 function make(){
@@ -220,15 +364,16 @@ function make(){
   doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:title.slice(0,150),parts:parts,lessons:ls.map(function(l){return l.id;}),id:null,en:isEnC()};
   dirty=true;renderDoc();
 }
-var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',main:'الملخص'};
-function partKeys(){return REM?['plan','sheet','key','cls','clskey']:['main'];}
+var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',grp:'النشاط الجماعي',grpkey:'إجابات النشاط الجماعي',main:'الملخص'};
+function partKeys(){return REM?['plan','sheet','key','cls','clskey','grp','grpkey']:['main'];}
+function presentKeys(){var k=partKeys().filter(function(x){return doc&&doc.parts&&doc.parts[x];});return k.length?k:partKeys();}
 function renderDoc(){
   if(!doc){welcome();return;}
   var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title)+'" aria-label="الاسم في قائمتك"><div class="muted small">'+(doc.id?'محفوظ':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
     '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+
     (REM&&part==='plan'?'<button type="button" class="btn" id="rowAdd">+ صف طالب</button><button type="button" class="btn" id="rowDel">− صف</button>':'')+'</div></div>'+
     '<div class="edit-hint no-print">✎ اضغط على أي نص في الورقة لتعديله أو حذفه أو الكتابة فيه'+(REM?'، واضغط على المربع ☐ لتحديده':'')+'.</div>'+
-    (REM?'<div class="ptabs no-print" role="tablist">'+partKeys().map(function(k){return '<button type="button" class="ltab'+(part===k?' on':'')+'" data-part="'+k+'">'+PART_TXT[k]+'</button>';}).join('')+'</div>':'')+
+    (REM?'<div class="ptabs no-print" role="tablist">'+presentKeys().map(function(k){return '<button type="button" class="ltab'+(part===k?' on':'')+'" data-part="'+k+'">'+PART_TXT[k]+'</button>';}).join('')+'</div>':'')+
     '<div class="paper study-paper" id="paper" contenteditable="true" spellcheck="false">'+clean(doc.parts[part]||'')+'</div>';
   $('qmain').innerHTML=h;
   var pp=$('paper');
@@ -252,7 +397,7 @@ function chooseParts(title){
   if(!REM)return Promise.resolve(['main']);
   return new Promise(function(res){
     var ov=$('modal'),box=$('modalBox');
-    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+partKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+((part==='cls'||part==='clskey')?(k===part||(part==='cls'&&k==='clskey')?' checked':''):(k==='plan'||k==='sheet'||k===part?' checked':''))+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
+    box.innerHTML='<h3 id="mTitle">'+esc(title)+'</h3><div class="parts">'+presentKeys().map(function(k){return '<label><input type="checkbox" name="pp" value="'+k+'"'+((part==='cls'||part==='clskey')?(k===part||(part==='cls'&&k==='clskey')?' checked':''):(part==='grp'||part==='grpkey')?(k===part||(part==='grp'&&k==='grpkey')?' checked':''):(k==='plan'||k==='sheet'||k===part?' checked':''))+'> '+PART_TXT[k]+'</label>';}).join('')+'</div><div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">متابعة</button></div>';
     ov.hidden=false;var close=function(v){ov.hidden=true;box.innerHTML='';res(v);};
     $('mCancel').onclick=function(){close(null);};
     $('mOk').onclick=function(){var v=Array.prototype.map.call(document.querySelectorAll('input[name="pp"]:checked'),function(x){return x.value;});if(!v.length){toast('اختر جزءًا واحدًا على الأقل');return;}close(v);};
@@ -310,7 +455,7 @@ function loadSaved(){
 function openSaved(id){
   api('/api/quizzes/'+id).then(function(r){
     var d=r.quiz.data;d.id=r.quiz.id;d.title=r.quiz.title;
-    var go=function(){doc=d;dirty=false;part=partKeys()[0];renderDoc();};
+    var go=function(){doc=d;dirty=false;part=presentKeys()[0];renderDoc();};
     if(!course||course.key!==d.course){var c=courses.filter(function(x){return x.key===d.course;})[0];if(c){doc=null;selectCourse(c.key).then(go);return;}}
     go();
   },function(e){toast(e.message);});
