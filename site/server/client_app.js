@@ -13,7 +13,10 @@ var subj=null;try{subj=localStorage.getItem('tahdir_subject');}catch(e){}
 function subjOf(l){return l.subject||'';}
 function subjIcon(s){return SUBJ_ICON[s]||'📘';}
 function subjects(){var s={};lessons.forEach(function(l){s[subjOf(l)]=1;});return Object.keys(s).sort(function(a,b){var x=SUBJ_ORDER.indexOf(a),y=SUBJ_ORDER.indexOf(b);return (x<0?99:x)-(y<0?99:y)||a.localeCompare(b,'ar');});}
-function gradeRange(s){var g=lessons.filter(function(l){return subjOf(l)===s;}).map(function(l){return GRADE_ORDER.indexOf(l.grade);}).filter(function(i){return i>=0;});if(!g.length)return '';var a=Math.min.apply(null,g)+1,b=Math.max.apply(null,g)+1;return a===b?'الصف '+GRADE_ORDER[a-1]:'الصفوف '+a+'–'+b;}
+var GRADE_NUM={'الأول':1,'الثاني':2,'الثالث':3,'الرابع':4,'الخامس':5,'السادس':6,'السابع':7,'الثامن':8,'التاسع':9,'العاشر':10,'الحادي عشر':11,'الثاني عشر':12};
+function gradeNum(g){return GRADE_NUM[String(g||'').replace(/^الصف\s+/,'').trim()]||0;}
+function gradeRange(s){var g=lessons.filter(function(l){return subjOf(l)===s;}).map(function(l){return gradeNum(l.grade);}).filter(function(n){return n>0;});if(!g.length)return '';var a=Math.min.apply(null,g),b=Math.max.apply(null,g);return a===b?'الصف '+String(l_name(a)):'الصفوف '+a+'–'+b;}
+function l_name(n){for(var k in GRADE_NUM){if(GRADE_NUM[k]===n)return k;}return n;}
 function inGroup(l){var ss=subjects();if(ss.length<2)return true;return subjOf(l)===subj;}
 var me=null,lessons=[],currentId=null,openGrades={},openUnits={},viewed={};
 var DEF_SETTINGS={level:['التذكُّر','الإبداع'],strategies:['التعلم التعاوني','التعلم التشاركي','التعلم الذاتي'],resources:['الكتاب','السبورة التقليدية','جهاز عرض البيانات','الوسائط المتعددة (سمعية - بصرية)']};
