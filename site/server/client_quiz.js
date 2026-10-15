@@ -22,6 +22,8 @@ var IT_AO=['تذكر وفهم','تطبيق','استدلال'];
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
+// خلط يفضّل أسئلة الوزارة (التي لها صورة) حتى تظهر في كل المواد مثل الأحياء، وإن كان عددها أقل في بنك المادة
+function shuffleP(a){return a.map(function(x){return [Math.random()*(x&&x.img?0.3:1),x];}).sort(function(p,q){return p[0]-q[0];}).map(function(p){return p[1];});}
 
 // ---------- مواصفات الاختبار حسب الصف (وثيقة تقويم تعلم الطلبة) ----------
 // جدول مواصفات الاختبار القصير الرسمي (الصفوف 5–12)
@@ -45,7 +47,7 @@ function prepPool(pool,sp){
 
 // ---------- تكوين الاختبار تلقائيًا (بحث دقيق يطابق جدول المواصفات) ----------
 function subsets(items,target,maxSol){ // مجموعات عشوائية من المفردات مجموع درجاتها = target
-  var out=[],arr=shuffle(items),seen={};
+  var out=[],arr=shuffleP(items),seen={};
   (function dfs(k,sum,cur){
     if(out.length>=maxSol)return;
     if(sum===target){var key=cur.map(function(x){return x.qid;}).sort().join(',');if(!seen[key]){seen[key]=1;out.push(cur.slice());}return;}
@@ -61,10 +63,10 @@ function assemble(pool,sp,lessonIds){
   for(var att=0;att<60;att++){
     // اختيار الاختيار من متعدد
     var mc=[],usedQ={};
-    if(sp.mcq){Object.keys(sp.mcq).forEach(function(ao){var c=shuffle(mcqs.filter(function(x){return x.ao===ao;}));for(var n=0;n<sp.mcq[ao]&&c.length;n++)mc.push(c.shift());});}
-    else{var c0=shuffle(mcqs);for(var n=0;n<c0.length&&mc.length<sp.mcqCount;n++){var x=c0[n];var dist={};mc.concat([x]).forEach(function(y){dist[y.ao]=1;});if(mc.length===sp.mcqCount-1&&Object.keys(dist).length<2)continue;mc.push(x);}}
+    if(sp.mcq){Object.keys(sp.mcq).forEach(function(ao){var c=shuffleP(mcqs.filter(function(x){return x.ao===ao;}));for(var n=0;n<sp.mcq[ao]&&c.length;n++)mc.push(c.shift());});}
+    else{var c0=shuffleP(mcqs);for(var n=0;n<c0.length&&mc.length<sp.mcqCount;n++){var x=c0[n];var dist={};mc.concat([x]).forEach(function(y){dist[y.ao]=1;});if(mc.length===sp.mcqCount-1&&Object.keys(dist).length<2)continue;mc.push(x);}}
     if(mc.length!==sp.mcqCount)continue;
-    var lg=[];if(sp.long.count){if(!longs.length)continue;lg=[pick(longs)];}
+    var lg=[];if(sp.long.count){if(!longs.length)continue;lg=[shuffleP(longs)[0]];}
     var need={};aos.forEach(function(a){need[a]=sp.targets[a];});
     mc.concat(lg).forEach(function(x){need[x.ao]-=x.marks;usedQ[x.qid]=1;});
     if(aos.some(function(a){return need[a]<0;}))continue;
@@ -87,7 +89,7 @@ function assemble(pool,sp,lessonIds){
 }
 function fallbackAssemble(pool,sp){ // إن لم يوجد حل مطابق تمامًا (مثل درس واحد فقط) نأخذ أقرب اختبار
   var rem=clone(sp.targets),out=[],used={};
-  shuffle(pool).forEach(function(x){if(used[x.qid])return;var mcN=out.filter(function(y){return y.type==='mcq';}).length,lgN=out.filter(function(y){return y.type==='long';}).length;
+  shuffleP(pool).forEach(function(x){if(used[x.qid])return;var mcN=out.filter(function(y){return y.type==='mcq';}).length,lgN=out.filter(function(y){return y.type==='long';}).length;
     if(x.type==='mcq'&&mcN>=sp.mcqCount)return;if(x.type==='long'&&lgN>=sp.long.count)return;
     if((rem[x.ao]||0)>=x.marks){out.push(x);used[x.qid]=1;rem[x.ao]-=x.marks;}});
   return out;
