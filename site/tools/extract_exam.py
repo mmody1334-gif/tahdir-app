@@ -190,6 +190,138 @@ def marks_in(marks, y0, y1, default=1):
     return max(inside) if inside else default
 
 
+def last_content_y(rows, y_from, y_to):
+    """آخر صف فيه نص حقيقي بين حدّين.
+
+    مهم: علامة الدرجة [n] تُطبع على مستوى بداية السؤال الذي *يليها*، فالحدّ الفاصل
+    يجب أن يكون بعد آخر محتوى فعلي للسؤال السابق، وإلا دخل ذيله في صورة السؤال التالي.
+    نستبعد سطر الأقواس [n] نفسه وسطور أرقام الصفحات.
+    """
+    last = y_from
+    for r in rows:
+        y = r['y']
+        if y < y_from or y > y_to:
+            continue
+        t = (r['text'] or '').strip()
+        # نتجاهل الصفوف الفارغة أو التي كلها شرطات/نقاط أو رقم صفحة أو قوس درجة
+        if not t or MARK_RE.match(r['items'][0]['text']):
+            continue
+        if not re.search(r'[\u0621-\u064A]{2,}|[A-Za-z]{2,}', t):
+            continue
+        last = max(last, y)
+    return last
+
+
+def widest_gap(ink, y_center, win_before=120, win_after=40, min_len=6):
+    """أوسع فجوة بيضاء (صف بلا حبر) حول y_center. تعيد (مركز الفجوة، طولها).
+
+    هذه هي طريقة القصّ المضمونة: علامة الدرجة تُطبع على مستوى بداية السؤال،
+    فالحدّ الفاصل بين سؤالين هو الفراغ الأوسع حول العلامة. القصّ من فجوة إلى
+    الفجوة التالية لا يبدأ داخل سؤال ولا يقطع سؤالًا آخر.
+    """
+    H = ink.shape[0]
+    lo = max(0, int(y_center - win_before))
+    hi = min(H, int(y_center + win_after))
+    best_len, best_mid, cur = 0, None, None
+    for y in range(lo, hi):
+        if not ink[y].any():
+            if cur is None:
+                cur = y
+        else:
+            if cur is not None:
+                ln = y - cur
+                if ln >= min_len and ln > best_len:
+                    best_len, best_mid = ln, (cur + y) // 2
+                cur = None
+    if cur is not None:
+        ln = hi - cur
+        if ln >= min_len and ln > best_len:
+            best_len, best_mid = ln, (cur + hi) // 2
+    return best_mid, best_len
+
+
+def first_gap_after(ink, y_from, y_to, min_len=8):
+    """أول فجوة بيضاء لا تقل عن min_len، تبدأ بعد y_from وقبل y_to. تعيد (مركزها، طولها).
+
+    للفصل بين سؤالين: نبحث بين علامة السؤال الحالي وعلامة السؤال التالي، ونأخذ
+    *أول* فراغ حقيقي — أي نهاية محتوى السؤال الفعلية. هذا يمنع امتداد القصّ إلى
+    السؤال التالي، وهو ما يحدث لو أخذنا أوسع فجوة في نافذة واسعة.
+    """
+    H = ink.shape[0]
+    lo = max(0, int(y_from))
+    hi = min(H, int(y_to))
+    cur = None
+    for y in range(lo, hi):
+        if not ink[y].any():
+            if cur is None:
+                cur = y
+        else:
+            if cur is not None and (y - cur) >= min_len:
+                return (cur + y) // 2, y - cur
+            cur = None
+    return None, 0
+
+
+def q_number_rows(rows, page_w, page_h):
+    """صفوف أرقام الأسئلة في هامش اليمين (بدايات أسئلة موثوقة).
+
+    أرقام الأسئلة تُطبع في أقصى يمين الصفحة فقط، فنستنبط منها حدود الأسئلة:
+    كل رقم بداية سؤال، والسؤال يمتد إلى الرقم التالي. هذا أدقّ من علامات الدرجة
+    (التي قد تنقص أو تتكرر) ومن الفجوات البصرية (التي تقطع داخل السؤال).
+    """
+    out = []
+    for r in rows:
+        if r['y'] < page_h * 0.055 or r['y'] > page_h * 0.945:
+            continue
+        for it in r['items']:
+            if it['x0'] < page_w * 0.80:
+                continue
+            m = QNUM_RE.match(it['text']) or BARE_NUM_RE.match(it['text'])
+            if not m:
+                continue
+            v = int(m.group(1))
+            if 1 <= v <= 60:
+                out.append({'y': r['y'], 'n': v})
+                break
+    # إزالة التكرار مع الحفاظ على الترتيب العمودي
+    seen, res = set(), []
+    for o in out:
+        if o['n'] in seen:
+            continue
+        seen.add(o['n'])
+        res.append(o)
+    res.sort(key=lambda z: z['y'])
+    # نقطع عند أول انخفاض كبير في الترقيم: ما بعده جدول الدرجات في آخر صفحة، لا أسئلة
+    cut = len(res)
+    for i in range(1, len(res)):
+        if res[i]['n'] < res[i - 1]['n'] - 1:
+            cut = i
+            break
+    return res[:cut]
+
+
+def start_gap_after(ink, y_anchor, win=(2, 50), min_len=12):
+    """أول فراغ بيضاء بعد المرساة مباشرة = حدّ بداية السؤال.
+
+    قياس فعلي على هذه الأوراق: يبدأ الفراغ الفاصل على بُعد 5–12 بكسل أسفل رقم
+    السؤال، وطوله 35–110 بكسل. نستخدم أول فراغ لا يقل عن min_len داخل نافذة
+    ضيقة (50 بكسل) فلا نخطئ فنأخذ فراغًا داخل السؤال.
+    """
+    H = ink.shape[0]
+    lo = min(H - 1, int(y_anchor + win[0]))
+    hi = min(H, int(y_anchor + win[1]))
+    cur = None
+    for y in range(lo, hi):
+        if not ink[y].any():
+            if cur is None:
+                cur = y
+        else:
+            if cur is not None and (y - cur) >= min_len:
+                return cur
+            cur = None
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pdf')
@@ -201,7 +333,9 @@ def main():
     ap.add_argument('--session', default='')
     ap.add_argument('--region', default='')
     ap.add_argument('--num-from', type=int, default=0, help='أول رقم سؤال للترقيم المتسلسل (0 = رقم الورقة)')
-    ap.add_argument('--anchor', default='marks', choices=['marks', 'numbers'],
+    ap.add_argument('--cut', default='gap', choices=['gap', 'marks'],
+                    help='gap: الحدّ من أوسع فراغ أبيض حول علامة الدرجة (مضمون) | marks: من العلامة مباشرة')
+    ap.add_argument('--anchor', default='qnum', choices=['qnum', 'marks', 'numbers'],
                     help='marks: حدود الأسئلة من علامات الدرجة [n] (أكمل) | numbers: من أرقام الأسئلة')
     a = ap.parse_args()
 
@@ -220,7 +354,11 @@ def main():
         H = page.rect.height * scale
         W = page.rect.width * scale
         rows = rows_of(spans_of(page, scale))
-        if a.anchor == 'marks':
+        if a.anchor == 'qnum':
+            starts = q_number_rows(rows, W, H)
+            for s in starts:
+                s['marks'] = None
+        elif a.anchor == 'marks':
             starts = mark_anchors(rows, H)
             for s in starts:
                 n = number_for_y(rows, W, s['y'])
@@ -237,9 +375,28 @@ def main():
         if pix.n == 4:
             arr = arr[:, :, :3]
         footer = H * 0.955
+        # مصفوفة الحبر لعمود المحتوى: تُستخدم في طريقة الفجوة
+        gray_full = arr.mean(2)
+        ink = gray_full[:, int(0.03 * W):int(0.97 * W)] < 190
         for i, s in enumerate(starts):
-            y0 = max(0.0, s['y'] - 7)
-            y1 = (starts[i + 1]['y'] - 7) if i + 1 < len(starts) else footer
+            if a.cut == 'gap':
+                # بداية السؤال: الفجوة التي تسبق علامة الدرجة (أو العلامة نفسها)
+                cut_here, _ = widest_gap(ink, s['y'], win_before=60, win_after=14)
+                y0 = float(cut_here if cut_here is not None else max(0.0, s['y'] - 20))
+                # نهاية السؤال: أول فراغ حقيقي بعد بدايته، ولا يتجاوز علامة السؤال التالي
+                nxt = starts[i + 1]['y'] if i + 1 < len(starts) else footer
+                g, _ = first_gap_after(ink, y0 + 60, min(nxt, footer), min_len=8)
+                y1 = float(g if g is not None else min(nxt, footer))
+            else:
+                # من فراغ البداية بعد رقم السؤال إلى فراغ البداية بعد رقم السؤال التالي.
+                # قياس فعلي: الفراغ الفاصل يبدأ 5–12 بكسل أسفل الرقم.
+                g0 = start_gap_after(ink, s['y'])
+                y0 = float(g0 if g0 is not None else max(0.0, s['y'] - 6))
+                if i + 1 < len(starts):
+                    g1 = start_gap_after(ink, starts[i + 1]['y'])
+                    y1 = float(g1 if g1 is not None else starts[i + 1]['y'] - 6)
+                else:
+                    y1 = footer
             # سقف الارتفاع: يمنع امتداد السؤال إلى تذييل الصفحة (رقم الصفحة/الترويسة)
             y1 = min(y1, y0 + 0.80 * H, footer)
             y1 = min(max(y1, y0 + 26), H)
