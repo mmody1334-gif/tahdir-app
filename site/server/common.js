@@ -124,12 +124,37 @@ function toolUpdateNote(){
   dialog({title:'تحديث أداة نور',message:'عندك الإصدار '+v+' والأحدث '+TOOL_LATEST+'. التحديث مستحسن لكنه غير إلزامي — تقدر تكمل عادي.',okText:'تحديث الآن',cancelText:'لاحقًا'})
     .then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
+// نُبقي مراقبة الإصدار لتحديث زر «أداة نور» في الشريط، والإعلان يتولّى التنبيه للمعلم.
 function watchTool(){
   if(IN_APP)return;
-  // الأداة قد تُحقن متأخرة أو تتحدث والصفحة مفتوحة: نعيد الفحص عند تغيّر إصدارها أو رجوع المعلم
-  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(toolUpdateNote,400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
-  document.addEventListener('visibilitychange',function(){if(document.hidden)return;setTimeout(toolUpdateNote,600);});
-  setTimeout(toolUpdateNote,2500);
+  var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
+  setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},2500);
+}
+// ---------- إعلان من السيرفر ----------
+// يظهر مرة واحدة لكل معلم (لكل معرّف إعلان)، ويعمل حتى لو كانت الأداة معطّلة تمامًا
+// فلا تضبط سمة الإصدار. يُدار من site/data/announcements.json.
+var ANNOUNCE=__ANNOUNCE__||{};
+var ANN_KEY='tahdir_ann_seen';
+function annSeen(){try{return JSON.parse(localStorage.getItem(ANN_KEY)||'[]')||[];}catch(e){return [];}}
+function annMark(id){try{var a=annSeen();if(a.indexOf(id)<0){a.push(id);localStorage.setItem(ANN_KEY,JSON.stringify(a.slice(-20)));}}catch(e){}}
+function showAnnouncement(){
+  var a=ANNOUNCE.toolUpdate;
+  if(!a||!a.id||!a.body)return;
+  if(navigator.webdriver)return;
+  var ov=$('modal');if(!ov)return;                       // صفحات الدخول بلا نافذة: لا إعلان
+  if(ov.classList.contains('locked')||!ov.hidden)return;  // لا نقاطع نافذة مفتوحة
+  if(annSeen().indexOf(a.id)>=0)return;
+  // لو الأداة محدّثة فعلًا فلا داعي للإعلان
+  var v=toolVersion();
+  if(v&&verCmp(v,TOOL_LATEST)>=0){annMark(a.id);return;}
+  // لا نُسجّله كمقروء الآن: لو كانت هناك نافذة مفتوحة نؤجّل ونعرضه في زيارة تالية،
+  // وإلا ضاع الإعلان بلا أن يراه المعلم.
+  setTimeout(function(){
+    if(ov.classList.contains('locked')||!ov.hidden)return;
+    annMark(a.id);
+    dialog({title:a.title||'إعلان',message:a.body,okText:a.okText||'حسنًا',cancelText:a.cancelText||'لاحقًا'})
+      .then(function(r){if(r)window.open(a.url||TOOL_URL,'_blank');});
+  },900);
 }
 // ---------- شريط التنقل: الأساسي ظاهر والباقي في قائمة ----------
 function initNav(me){
@@ -150,6 +175,7 @@ function initNav(me){
   if(me&&me.role==='admin')Array.prototype.forEach.call(document.querySelectorAll('.admin-only'),function(x){x.hidden=false;});
   if(me&&$('who'))$('who').textContent=me.name;
   watchTool();
+  showAnnouncement();
 }
 // اختيار الصف: المادة أولًا (قائمة منبثقة) ثم صفوفها مرتّبة
 var CP_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};

@@ -79,6 +79,11 @@ common = rd('common.js')
 TOOL_VER = re.search(r'@version\s+(\S+)', rd('tahdir-noor.user.js')).group(1)
 TOOL_FORCE = re.search(r"MIN_REQUIRED = '([^']+)'", rd('tahdir-noor.user.js')).group(1)
 common = common.replace('__TOOLVER__', TOOL_VER).replace('__TOOLFORCE__', TOOL_FORCE)
+# إعلان المعلمين (site/data/announcements.json) يُدمج داخل common.js لأنه كود صفحة،
+# لا داخل worker_src.js — والاستبدال يجب أن يقع قبل تجميع الصفحات (pack).
+_ann_p = os.path.join(DATA, 'announcements.json')
+_ann = json.load(open(_ann_p, encoding='utf-8')) if os.path.exists(_ann_p) else {}
+common = common.replace('__ANNOUNCE__', json.dumps(_ann, ensure_ascii=False, separators=(',', ':')))
 
 extra_css = '''
 /* ---------- هوية الكبسولة: بانر فاتح وألوان متناسقة ---------- */

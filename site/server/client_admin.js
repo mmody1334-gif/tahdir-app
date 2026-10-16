@@ -7,7 +7,7 @@ function gn(g){var i=GRADES.indexOf(g);return i<0?99:i;}
 var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جهاز إضافي مرفوض',disabled:'حساب موقوف',locked:'محاولات كثيرة'};
 // تسميات أنواع الأحداث في سجل النشاط. يجب أن تغطي كل نوع في EVENT_TYPES داخل worker_src.js،
 // وإلا ظهر الحدث في السجل بنصه الإنجليزي الخام.
-var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور'};
+var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور',device_stale_removed:'إزالة جهاز مهمل تلقائيًا'};
 function load(){
   return Promise.all([api('/api/admin/stats'),api('/api/admin/activity'),api('/api/admin/courses'),api('/api/lessons'),api('/api/admin/report?days='+repDays)]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
 }
@@ -172,7 +172,7 @@ function openTeacher(id){
     '<h4>إجراءات</h4><div class="acts">'+
       '<button type="button" class="btn small" data-act="password">كلمة مرور جديدة</button>'+
       '<button type="button" class="btn small" data-act="rename">تعديل الاسم</button>'+
-      (u.role!=='admin'?'<button type="button" class="btn small primary" data-act="scope">الصفوف المسموحة</button><button type="button" class="btn small" data-act="reset_devices">مسح كل الأجهزة</button><button type="button" class="btn small" data-act="max_devices">عدد الأجهزة المسموح</button><button type="button" class="btn small" data-act="toggle">'+(u.active?'إيقاف الحساب':'تفعيل الحساب')+'</button><button type="button" class="btn small danger" data-act="delete">حذف المعلم</button>':'')+
+      (u.role!=='admin'?'<button type="button" class="btn small primary" data-act="scope">الصفوف المسموحة</button><button type="button" class="btn small" data-act="clean_stale">مسح الأجهزة المهملة</button><button type="button" class="btn small" data-act="reset_devices">مسح كل الأجهزة</button><button type="button" class="btn small" data-act="max_devices">عدد الأجهزة المسموح</button><button type="button" class="btn small" data-act="toggle">'+(u.active?'إيقاف الحساب':'تفعيل الحساب')+'</button><button type="button" class="btn small danger" data-act="delete">حذف المعلم</button>':'')+
     '</div>';
   dialog({title:u.name,message:u.username,html:html,okText:'إغلاق',cancelText:false});
   setTimeout(function(){
@@ -189,6 +189,7 @@ function doAct(u,a){
   if(a==='password')return dialog({title:'كلمة مرور جديدة لـ '+u.name,input:true,placeholder:'اتركها فارغة لإنشاء كلمة مرور تلقائية',okText:'حفظ'}).then(function(v){if(v===null)return;api('/api/admin/teachers/'+u.id,{action:'password',password:v}).then(function(r){load();dialog({title:'كلمة المرور الجديدة',textarea:true,readonly:true,value:u.username+' | '+r.password,okText:'نسخ',cancelText:'إغلاق'}).then(function(c){if(c)copyText(u.username+' | '+r.password);});},function(e){toast(e.message);});});
   if(a==='rename')return dialog({title:'تعديل اسم المعلم',input:true,value:u.name,okText:'حفظ'}).then(function(v){if(v)act1(u,{action:'rename',name:v},'حُفظ الاسم');});
   if(a==='max_devices')return dialog({title:'عدد الأجهزة المسموح لـ '+u.name,input:true,value:String(u.max_devices),placeholder:'من 1 إلى 5',okText:'حفظ'}).then(function(v){if(v)act1(u,{action:'max_devices',value:+v},'تم التعديل');});
+  if(a==='clean_stale')return api('/api/admin/teachers/'+u.id,{action:'clean_stale'}).then(function(r){toast(r.removed?('أُزيل '+r.removed+' جهازًا مهملًا'):'لا توجد أجهزة مهملة');load();},function(e){toast(e.message);});
   if(a==='reset_devices')return dialog({title:'مسح أجهزة '+u.name,message:'سيُسجَّل خروجه من كل الأجهزة، ويستطيع الدخول من جهازين جديدين.',okText:'مسح الأجهزة',danger:true}).then(function(ok){if(ok)act1(u,{action:'reset_devices'},'مُسحت الأجهزة');});
   if(a==='scope')return scopeDialog(u);
   if(a==='toggle')return act1(u,{action:'toggle'},u.active?'أُوقف الحساب':'فُعّل الحساب');

@@ -104,6 +104,14 @@ const SESSION_DAYS = 30;
 const MAX_FAILS = 5;
 const LOCK_MIN = 15;
 const PBKDF2_ITER = 100000;
+// جهاز لم يُستخدم هذه المدة يُعدّ مهجورًا، فيُستبدل تلقائيًا عند اكتمال الحد
+// (تغيّر جهاز أو متصفح، أو مُسحت بيانات المتصفح) فلا يبقى المعلم محجوبًا.
+// قابلة للضبط من بيئة الـWorker (STALE_SECONDS) لتسهيل الاختبار المحلي.
+const STALE_DAYS = 30;
+function staleSeconds(env) {
+  const v = env && env.STALE_SECONDS ? parseInt(env.STALE_SECONDS, 10) : NaN;
+  return Number.isFinite(v) && v >= 0 ? v : STALE_DAYS * 86400;
+}
 const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
 // أنواع الأحداث المقبولة في /api/event. أي نوع غير مذكور هنا يُرفض، فيضيع الحدث بصمت.
 // عند إضافة track() جديد في client_*.js أضف نوعه هنا وأضف تسميته العربية في TYPES داخل client_admin.js.
@@ -176,6 +184,18 @@ function setCookie(name, val, maxAgeSec) {
   return `${name}=${encodeURIComponent(val)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAgeSec}`;
 }
 function ipOf(req) { return req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''; }
+// مدة مختصرة بالعربية لعرضها في رسائل الأجهزة
+function ago(t) {
+  if (!t) return 'غير معروف';
+  const s = (now() - t) / 1000;
+  if (s < 120) return 'قبل لحظات';
+  if (s < 3600) return 'قبل ' + Math.floor(s / 60) + ' دقيقة';
+  if (s < 86400) return 'قبل ' + Math.floor(s / 3600) + ' ساعة';
+  const d = Math.floor(s / 86400);
+  if (d === 1) return 'أمس';
+  if (d < 30) return 'قبل ' + d + ' يومًا';
+  return 'قبل ' + Math.floor(d / 30) + ' شهر';
+}
 function deviceLabel(ua) {
   ua = ua || '';
   const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'جهاز';
@@ -259,11 +279,28 @@ async function login(req, env) {
   let dev = did ? devs.find(d => d.device_id === did) : null;
   if (!dev && fp) { dev = devs.find(d => d.fp === fp); if (dev) did = dev.device_id; }
   if (!did) did = rand(24);
-  if (!dev) {
-    if (u.role !== 'admin' && devs.length >= u.max_devices) {
+  if (!dev && u.role !== 'admin' && devs.length >= u.max_devices) {
+    // الحد مكتمل. لكن الجهاز القديم الذي لم يُستخدم منذ STALE_DAYS يومًا يكون مهجورًا
+    // (تغيّر جهاز/متصفح، أو بيانات متصفح مُمحاة)، فلا نُعطّل المعلم بسببه:
+    // نُزيل الأقدم المهمل وندخله. أما لو كان الجهازان مستعملين فعلًا فنمنع (حماية من مشاركة الحساب).
+    const oldest = devs.slice().sort((a, b) => (a.last_seen || 0) - (b.last_seen || 0))[0];
+    const stale = oldest && (t - (oldest.last_seen || 0)) > staleSeconds(env) * 1000;
+    if (stale) {
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND device_id = ?').bind(u.id, oldest.device_id),
+        env.DB.prepare('DELETE FROM devices WHERE id = ?').bind(oldest.id),
+        env.DB.prepare('INSERT INTO events(user_id,type,detail,device_id,ip,at) VALUES(?,?,?,?,?,?)').bind(u.id, 'device_stale_removed', String(oldest.label || '').slice(0, 40), did, ip, t)
+      ]);
+    } else {
       await logA(false, 'device_limit', u.id);
-      return json({ error: `هذا الحساب مسجّل بالفعل على ${u.max_devices} أجهزة. لا يمكن الدخول من جهاز جديد. تواصل مع أ. محمد مجدي لإعادة ضبط الأجهزة.` }, 403, { 'Set-Cookie': setCookie('did', did, 63072000) });
+      const list = devs.slice().sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0))
+        .map(d => '• ' + (d.label || 'جهاز') + ' — آخر دخول ' + ago(d.last_seen)).join('\n');
+      return json({
+        error: `هذا الحساب مسجّل بالفعل على ${u.max_devices} أجهزة، وكلها مستعملة حديثًا. لا يمكن الدخول من جهاز جديد.\n\nأجهزتك المسجّلة:\n${list}\n\nإن كنت غيّرت جهازك، اطلب من أ. محمد مجدي «مسح الأجهزة» ثم ادخل مرة أخرى.`
+      }, 403, { 'Set-Cookie': setCookie('did', did, 63072000) });
     }
+  }
+  if (!dev) {
     await env.DB.prepare('INSERT INTO devices(user_id,device_id,fp,label,ip,first_seen,last_seen) VALUES(?,?,?,?,?,?,?)').bind(u.id, did, fp, label, ip, t, t).run();
   } else {
     await env.DB.prepare('UPDATE devices SET last_seen = ?, ip = ?, label = ?, fp = COALESCE(NULLIF(?,\'\'), fp) WHERE id = ?').bind(t, ip, label, fp, dev.id).run();
@@ -709,6 +746,17 @@ export default {
         if (m === 'POST') {
           const b = await body(req); const out = { ok: true };
           if (b.action === 'reset_devices') await env.DB.batch([env.DB.prepare('DELETE FROM devices WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND user_id <> ?').bind(id, me.id)]);
+          else if (b.action === 'clean_stale') {
+            // إزالة أجهزة هذا المعلم التي لم تُستخدم منذ مدة الإهمال (لا يخسر جهازه الحالي)
+            const cut = now() - staleSeconds(env) * 1000;
+            const dead = (await env.DB.prepare('SELECT id, device_id FROM devices WHERE user_id = ? AND last_seen < ?').bind(id, cut).all()).results || [];
+            if (!dead.length) return json({ ok: true, removed: 0 });
+            await env.DB.batch(dead.flatMap(d => [
+              env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND device_id = ?').bind(id, d.device_id),
+              env.DB.prepare('DELETE FROM devices WHERE id = ?').bind(d.id)
+            ]));
+            return json({ ok: true, removed: dead.length });
+          }
           else if (b.action === 'remove_device') await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND device_id = (SELECT device_id FROM devices WHERE id = ? AND user_id = ?)').bind(id, +b.device, id), env.DB.prepare('DELETE FROM devices WHERE id = ? AND user_id = ?').bind(+b.device, id)]);
           else if (b.action === 'toggle') {
             if (u.role === 'admin') return json({ error: 'لا يمكن إيقاف حساب المدير.' }, 400);
