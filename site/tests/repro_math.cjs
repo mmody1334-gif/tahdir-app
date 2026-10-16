@@ -1,8 +1,9 @@
-// يتحقق من ظهور مادة الرياضيات (الصف الخامس) بتحضيرها الكامل.
+// يتحقق من ظهور مادة الرياضيات وكل صف مبنيّ فيها، بتحضيره الكامل.
 const PW = require('./_pw.cjs');
 const USER = 'mohamed', PASS = 'Bio@2026x';
 let pass = 0, fail = 0;
 const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  ' : '  FAIL  ') + n + (extra ? '  → ' + extra : '')); };
+const GRADES = ['الخامس', 'السادس', 'السابع', 'الثامن'];
 const F = ['concepts', 'pre_learning', 'outcomes', 'strategies', 'activities_teach', 'resources', 'formative', 'closing', 'homework'];
 
 (async () => {
@@ -27,44 +28,52 @@ const F = ['concepts', 'pre_learning', 'outcomes', 'strategies', 'activities_tea
   await p.goto(B + '/app', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(3500);
 
-  // 1) هل الرياضيات ظاهرة في قائمة المواد؟
   const subs = await p.evaluate(() => { const s = document.getElementById('subjSel'); return s ? [...s.options].map(o => o.value) : []; });
-  console.log('المواد المتاحة: ' + JSON.stringify(subs));
+  console.log('المواد: ' + JSON.stringify(subs));
   ok('مادة الرياضيات ظاهرة', subs.some(x => /رياض/.test(x)), subs.filter(x => /رياض/.test(x)).join(','));
 
-  // 2) نفتح درس رياضيات ونتحقق من الحقول
-  const r = await p.evaluate(async () => {
-    const sel = document.getElementById('subjSel');
-    const o = [...sel.options].find(x => /رياض/.test(x.value));
-    if (!o) return { err: 'لا مادة رياضيات' };
-    sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise(x => setTimeout(x, 900));
-    const g = [...document.querySelectorAll('.g-btn')].find(x => /الخامس/.test(x.textContent));
-    if (!g) return { err: 'لا صف خامس' };
-    if (!g.parentElement.querySelector('.g-body.open')) { g.click(); await new Promise(x => setTimeout(x, 800)); }
-    const units = [...document.querySelectorAll('.u-name')].map(x => x.textContent.trim());
-    const u = [...document.querySelectorAll('.u-btn')].find(x => x.offsetParent !== null);
-    if (u) { u.click(); await new Promise(x => setTimeout(x, 800)); }
-    const ls = [...document.querySelectorAll('.l-list button')].filter(x => x.offsetParent !== null);
-    if (!ls.length) return { err: 'لا دروس', units };
-    const title = ls[0].textContent.trim().slice(0, 40);
-    ls[0].click(); await new Promise(x => setTimeout(x, 1400));
-    const shown = [], empty = [];
-    for (const k of ['concepts', 'pre_learning', 'outcomes', 'strategies', 'activities_teach', 'resources', 'formative', 'closing', 'homework']) {
-      const el = document.getElementById('f_' + k);
-      if (el) shown.push(k);
-      if (!el || !String(el.value).trim()) empty.push(k);
-    }
-    return { title, units, shown, empty, count: ls.length };
+  // نختار الرياضيات مرة واحدة
+  await p.evaluate(async () => {
+    const s = document.getElementById('subjSel');
+    const o = [...s.options].find(x => /رياض/.test(x.value));
+    if (o) { s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); }
+    await new Promise(x => setTimeout(x, 1200));
   });
-  console.log('\nالوحدات: ' + JSON.stringify(r.units));
-  console.log('الدرس المفتوح: ' + r.title + ' | دروس الوحدة: ' + r.count);
-  console.log('الحقول الظاهرة: ' + JSON.stringify(r.shown));
-  console.log('الفارغة: ' + JSON.stringify(r.empty));
-  ok('الوحدات الأربع ظاهرة', (r.units || []).length >= 4, JSON.stringify(r.units));
-  ok('الحقول التسعة ظاهرة', (r.shown || []).length >= 9, (r.shown || []).length + ' حقلًا');
-  ok('التحضير مملوء (لا فراغ)', (r.empty || []).length === 0, JSON.stringify(r.empty));
-  await p.screenshot({ path: require('path').join(__dirname, 'math_g5.png'), fullPage: false });
+  await p.waitForTimeout(1500);
+
+  const grades = await p.evaluate(() => [...document.querySelectorAll('.g-btn')].map(x => x.textContent.trim().replace(/\d+\s*درس.*/, '').trim()));
+  console.log('صفوف الرياضيات: ' + JSON.stringify(grades));
+
+  for (const g of GRADES) {
+    const r = await p.evaluate(async (grade) => {
+      // نفتح الصف
+      const gb = [...document.querySelectorAll('.g-btn')].find(x => x.textContent.includes(grade));
+      if (!gb) return { err: 'لا صف ' + grade };
+      const body = gb.parentElement.querySelector('.g-body');
+      if (!body || !body.classList.contains('open')) { gb.click(); await new Promise(x => setTimeout(x, 900)); }
+      const units = [...gb.parentElement.querySelectorAll('.u-btn, .u-name')].map(x => x.textContent.trim());
+      // نفتح أول وحدة
+      const ub = [...gb.parentElement.querySelectorAll('.u-btn')].filter(x => x.offsetParent !== null);
+      if (!ub.length) return { err: 'لا وحدات', units };
+      ub[0].click(); await new Promise(x => setTimeout(x, 900));
+      const ls = [...document.querySelectorAll('.l-list button')].filter(x => x.offsetParent !== null);
+      if (!ls.length) return { err: 'لا دروس', units };
+      const title = ls[0].textContent.trim().slice(0, 40);
+      ls[0].click(); await new Promise(x => setTimeout(x, 1500));
+      const shown = [], empty = [];
+      for (const k of ['concepts', 'pre_learning', 'outcomes', 'strategies', 'activities_teach', 'resources', 'formative', 'closing', 'homework']) {
+        const el = document.getElementById('f_' + k);
+        if (el) shown.push(k);
+        if (!el || !String(el.value).trim()) empty.push(k);
+      }
+      return { title, units: units.length, shown: shown.length, empty, count: ls.length };
+    }, g);
+    if (r.err) { ok('صف ' + g + ' يعمل', false, r.err + ' ' + JSON.stringify(r.units || [])); continue; }
+    console.log('  ' + g + ': ' + r.units + ' وحدة · ' + r.count + ' درسًا في الأولى · "' + r.title + '" · فارغة=' + JSON.stringify(r.empty));
+    ok('صف ' + g + ': الدروس والحقول', r.shown >= 9 && r.empty.length === 0, r.shown + ' حقلًا · فارغة ' + r.empty.length);
+  }
+
+  await p.screenshot({ path: require('path').join(__dirname, 'math_grades.png'), fullPage: false });
   await b.close(); srv.stop();
   const real = [...new Set(errs)];
   console.log('\nأخطاء JavaScript:', real.length ? real.join('\n') : '(لا شيء)');
