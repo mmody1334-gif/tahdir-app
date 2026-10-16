@@ -23,7 +23,10 @@ function clone(o){return JSON.parse(JSON.stringify(o));}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
 // خلط يفضّل أسئلة الوزارة (التي لها صورة) حتى تظهر في كل المواد مثل الأحياء، وإن كان عددها أقل في بنك المادة
-function shuffleP(a){return a.map(function(x){return [Math.random()*(x&&x.img?0.3:1),x];}).sort(function(p,q){return p[0]-q[0];}).map(function(p){return p[1];});}
+// ترتيب مرجّح للمرشّحين: أسئلة الوزارة بصورها تتقدَّم بوزن أصغر بكثير من غيرها،
+// لأنها الأفضل تقويميًا (سؤال أصلي برسمه) وعددها في البنك قليل مقابل الأسئلة الكتابية،
+// فبلا هذا الترجيح القوي لا تكاد تدخل ورقة الاختبار.
+function shuffleP(a){return a.map(function(x){return [Math.random()*(x&&x.img?0.04:1),x];}).sort(function(p,q){return p[0]-q[0];}).map(function(p){return p[1];});}
 
 // ---------- مواصفات الاختبار حسب الصف (وثيقة تقويم تعلم الطلبة) ----------
 // جدول مواصفات الاختبار القصير الرسمي (الصفوف 5–12)
