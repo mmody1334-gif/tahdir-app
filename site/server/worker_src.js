@@ -76,7 +76,12 @@ function stripQNo(t) {
 function finQuizItems(key) {
   const G = FINALS[key]; if (!G) return [];
   const [subj, grade] = key.split('|'); if (subj === 'تقنية المعلومات' || subj === 'اللغة الإنجليزية') return [];
-  const g = FG[grade] || 0, hi = g >= 11, smax = hi ? 3 : 2, lr = hi ? [4, 5] : (g >= 9 ? [3, 4] : []);
+  // اللغة العربية والتربية الإسلامية تستخدمان **أسماء أهداف التقويم العربية** في جداول
+  // مواصفاتهما (معرفة · تطبيق · استدلال)، بينما العلوم والكيمياء… تستخدم رموز AO1/AO2.
+  // فلو حوّلنا مفرداتهما إلى رموز AO للصفوف 11-12 لما طابقت مواصفتهما فلم يُولَّد اختبار.
+  const ARAO = (subj === 'اللغة العربية' || subj === 'التربية الإسلامية');
+  const g = FG[grade] || 0, hi = g >= 11 && !ARAO, smax = hi ? 3 : 2,
+        lr = hi ? [4, 5] : (g >= 9 ? [3, 4] : []);
   const out = [];
   for (const q of G.q) {
     const m = q.m, ao = normAO(q.ao, hi, m);

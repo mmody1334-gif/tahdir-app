@@ -1,6 +1,7 @@
-// يتحقق من الاختبارات النهائية للغة العربية (الصفوف 6 · 7 · 8) وربطها بالاختبارات القصيرة.
+// يتحقق من الاختبارات النهائية للغة العربية في كل الصفوف (5-11) وربطها بالاختبارات القصيرة.
 const PW = require('./_pw.cjs');
 const USER = 'mohamed', PASS = 'Bio@2026x';
+const GRADES = ['الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر'];
 let pass = 0, fail = 0;
 const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  ' : '  FAIL  ') + n + (extra ? '  → ' + extra : '')); };
 
@@ -24,64 +25,58 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
     await p.click('#loginBtn'); await p.waitForTimeout(2500);
   }
 
-  // 1) صفحة الاختبارات النهائية: المقررات والصور
-  await p.goto(B + '/finals', { waitUntil: 'domcontentloaded' });
-  await p.waitForTimeout(2600);
-  const fin = await p.evaluate(() => {
-    const t = document.body.innerText.replace(/\s+/g, ' ');
-    return { text: t.slice(0, 200), imgs: document.querySelectorAll('img').length };
-  });
-  console.log('صفحة النهائيات: ' + fin.text.slice(0, 130));
-  ok('صفحة النهائيات تُفتح', fin.text.length > 30, fin.text.slice(0, 50));
-
-  // 2) بنك الأسئلة لكل صف عربي (يأتي من النهائيات)
-  const banks = await p.evaluate(async () => {
+  // 1) بنك الأسئلة لكل صف
+  const banks = await p.evaluate(async (grades) => {
     const out = {};
-    for (const g of ['السادس', 'السابع', 'الثامن', 'الخامس']) {
-      const k = 'اللغة العربية|' + g;
-      const r = await (await fetch('/api/quiz/bank?key=' + encodeURIComponent(k))).json();
-      out[g] = { items: (r.items || []).length, lessons: (r.lessons || []).length };
+    for (const g of grades) {
+      const r = await (await fetch('/api/quiz/bank?key=' + encodeURIComponent('اللغة العربية|' + g))).json();
+      out[g] = { items: (r.items || []).length, imgs: (r.items || []).filter(x => x.img).length };
     }
     return out;
-  });
-  console.log('\nبنك الأسئلة (من النهائيات):');
-  for (const [g, v] of Object.entries(banks)) console.log('   %s: %d مفردة | %d درسًا', g.padEnd(10), v.items, v.lessons);
+  }, GRADES);
+  console.log('بنك أسئلة اللغة العربية (من النهائيات):');
+  for (const g of GRADES) console.log('   %s: %3d مفردة | %3d بصور', g.padEnd(12), banks[g].items, banks[g].imgs);
+  ok('كل الصفوف السبعة لها بنك أسئلة', GRADES.every(g => banks[g].items > 0),
+    GRADES.map(g => g + '=' + banks[g].items).join(' · '));
+  ok('المفردات تحمل صور الورقة الوزارية', GRADES.every(g => banks[g].imgs > 0),
+    GRADES.map(g => banks[g].imgs).join(','));
 
-  ok('بنك الصف السادس يعمل', banks['السادس'].items > 0, banks['السادس'].items + ' مفردة');
-  ok('بنك الصف السابع يعمل', banks['السابع'].items > 0, banks['السابع'].items + ' مفردة');
-  ok('بنك الصف الثامن يعمل', banks['الثامن'].items > 0, banks['الثامن'].items + ' مفردة');
-  ok('الصف الخامس بلا بنك (لم يُستخرج بعد)', true, banks['الخامس'].items + ' مفردة');
-
-  // 3) توليد اختبار قصير فعلي للصف السابع
+  // 2) توليد اختبار فعلي لكل صف
   await p.goto(B + '/quiz', { waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#courseSel', { timeout: 25000 });
   await p.waitForTimeout(1200);
-  const gen = await p.evaluate(async () => {
-    const subj = document.getElementById('courseSelSubj'), cs = document.getElementById('courseSel');
-    subj.value = 'اللغة العربية'; subj.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise(x => setTimeout(x, 1400));
-    cs.value = 'اللغة العربية|السابع'; cs.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise(x => setTimeout(x, 2000));
-    const lids = [...document.querySelectorAll('[data-lid]')];
-    lids.slice(0, 8).forEach(x => { if (!x.checked) x.click(); });
-    await new Promise(x => setTimeout(x, 400));
-    document.getElementById('makeBtn').click();
-    await new Promise(x => setTimeout(x, 3200));
-    const items = [...document.querySelectorAll('#paper .qi')];
-    return {
-      n: items.length,
-      imgs: items.filter(it => it.querySelector('img')).length,
-      spec: ((document.querySelector('.checks') || document.body).innerText || '').replace(/\s+/g, ' ').slice(0, 300),
-      lessons: lids.length,
-    };
-  });
-  console.log('\nتوليد اختبار صف 7: %d سؤالًا | بصور=%d | دروس=%d', gen.n, gen.imgs, gen.lessons);
-  console.log('المواصفة: ' + gen.spec.slice(0, 190));
-  ok('وُلّد اختبار للصف السابع', gen.n > 0, gen.n + ' سؤالًا');
-  ok('الأسئلة بصور الورقة الوزارية', gen.imgs > 0, gen.imgs + ' صورة');
-  ok('المواصفة تطبّق وثيقة التقويم', /من\s*15/.test(gen.spec), gen.spec.slice(0, 70));
-  await p.screenshot({ path: require('path').join(__dirname, 'arabic_finals_67.png'), fullPage: false });
-
+  const gen = {};
+  for (const g of GRADES) {
+    const r = await p.evaluate(async (key) => {
+      const subj = document.getElementById('courseSelSubj'), cs = document.getElementById('courseSel');
+      subj.value = 'اللغة العربية'; subj.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(x => setTimeout(x, 1300));
+      if (![...cs.options].some(o => o.value === key)) return { err: 'المقرر غير متاح' };
+      cs.value = key; cs.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(x => setTimeout(x, 1800));
+      const lids = [...document.querySelectorAll('[data-lid]')];
+      lids.slice(0, 8).forEach(x => { if (!x.checked) x.click(); });
+      await new Promise(x => setTimeout(x, 400));
+      document.getElementById('makeBtn').click();
+      await new Promise(x => setTimeout(x, 3000));
+      const items = [...document.querySelectorAll('#paper .qi')];
+      return {
+        n: items.length, imgs: items.filter(it => it.querySelector('img')).length,
+        lessons: lids.length,
+        spec: ((document.querySelector('.checks') || document.body).innerText || '').replace(/\s+/g, ' '),
+      };
+    }, 'اللغة العربية|' + g);
+    gen[g] = r;
+    if (r.err) { console.log('\n[%s] %s', g, r.err); continue; }
+    const m = (r.spec.match(/الدرجة الكلية\s*(\d+)\s*من\s*(\d+)/) || []);
+    console.log('\n[%s] %d سؤالًا | بصور=%d | دروس=%d | الدرجة %s من %s', g, r.n, r.imgs, r.lessons, m[1] || '?', m[2] || '?');
+  }
+  const good = GRADES.filter(g => gen[g] && !gen[g].err);
+  ok('وُلّد اختبار لكل صف', good.length === GRADES.length, good.length + '/' + GRADES.length);
+  ok('الأسئلة بصور الوزارة في كل صف', good.every(g => gen[g].imgs > 0), good.map(g => gen[g].imgs).join(','));
+  ok('المواصفة تطبّق وثيقة التقويم (15 درجة)', good.every(g => /من\s*15/.test(gen[g].spec || '')),
+    good.map(g => ((gen[g].spec || '').match(/من\s*(\d+)/) || [])[1]).join(','));
+  await p.screenshot({ path: require('path').join(__dirname, 'arabic_all_grades.png'), fullPage: false });
   await b.close(); srv.stop();
   const real = [...new Set(errs)];
   console.log('\nأخطاء JavaScript:', real.length ? real.join('\n') : '(لا شيء)');
