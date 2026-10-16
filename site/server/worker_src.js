@@ -545,7 +545,11 @@ async function gamesData(env, me, key) {
   const sc = scopeOf(me); if (sc && !sc.has(key)) return { error: 'غير مسموح.' };
   const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
   const ids = new Set(ls.map(l => l.id));
-  const items = QBANK.filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'bank' }));
+  // مفردات الألعاب من البنك المثبّت **ومن مفردات امتحانات الوزارة** معًا — وإلا
+  // خلت موادّ بلا بنك مثبّت (الرياضيات) من أي لعبة، مع أن نهائياتها مستخرجة
+  // ومربوطة بالدروس والأهداف وبنكها يعمل في صفحة التقويم.
+  const items = QBANK.filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'bank' }))
+    .concat(finQuizItems(key).filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'fin' })));
   let k = 0;
   ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
     const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;

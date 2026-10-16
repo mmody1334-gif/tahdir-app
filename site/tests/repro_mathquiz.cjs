@@ -17,7 +17,7 @@ const EXPECT = {
   'الخامس': [10, 6, 7, false], 'السادس': [10, 6, 7, false],
   'السابع': [10, 6, 7, true], 'الثامن': [10, 6, 7, true],
   'التاسع': [10, 6, 7, true], 'العاشر': [10, 6, 7, true],
-  'الحادي عشر': [10, 5, 7, true], 'الثاني عشر': [10, 5, 7, true],
+  'الحادي عشر': [10, 5, 9, true], 'الثاني عشر': [10, 5, 9, true],
 };
 const COURSES = [
   ['الرياضيات', 'الخامس'], ['الرياضيات', 'السادس'], ['الرياضيات', 'السابع'],
@@ -85,11 +85,12 @@ const COURSES = [
       });
       const types = items.map(it => (it.innerText.match(/^(اختيار من متعدد|إجابة قصيرة|إجابة طويلة)/) || [])[1] || '');
       const imgs = document.querySelectorAll('#paper .qi img').length;
+      const nMcq = types.filter(x => x === 'اختيار من متعدد').length;
       const tm = document.body.textContent.match(/الدرجة الكلية\s*(\d+)/);
       return {
         n: items.length, sum: marks.reduce((a, x) => a + x, 0), marks, imgs,
         panel: tm ? +tm[1] : null,
-        hasLong: marks.some(m => m >= 3), types,
+        hasLong: marks.some(m => m >= 3), types, nMcq,
         lessons: lids.length,
       };
     }, { subject, grade, key });
@@ -101,6 +102,7 @@ const COURSES = [
     ok('  عدد المفردات في نطاق الوثيقة (' + exp[1] + '-' + exp[2] + ')', r.n >= exp[1] && r.n <= exp[2], r.n + ' مفردة');
     ok('  الإجابة الطويلة كما الوثيقة', r.hasLong === exp[3], r.hasLong ? 'فيها' : 'بلا');
     ok('  الأسئلة تحمل صورة الوزارة', r.imgs > 0, r.imgs + ' صورة');
+    ok('  مفردتا اختيار من متعدد (الوثيقة)', r.nMcq === 2, r.nMcq + ' مفردة');
   }
 
   await p.screenshot({ path: require('path').join(__dirname, 'math_quiz.png'), fullPage: false });
