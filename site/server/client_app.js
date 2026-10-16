@@ -21,8 +21,39 @@ function gradeRange(s){var g=lessons.filter(function(l){return subjOf(l)===s;}).
 function l_name(n){for(var k in GRADE_NUM){if(GRADE_NUM[k]===n)return k;}return n;}
 function inGroup(l){var ss=subjects();if(ss.length<2)return true;return subjOf(l)===subj;}
 var me=null,lessons=[],currentId=null,openGrades={},openUnits={},viewed={};
-var DEF_SETTINGS={level:['التذكُّر','الإبداع'],strategies:['التعلم التعاوني','التعلم التشاركي','التعلم الذاتي'],resources:['الكتاب','السبورة التقليدية','جهاز عرض البيانات','الوسائط المتعددة (سمعية - بصرية)']};
-var settings=JSON.parse(JSON.stringify(DEF_SETTINGS));
+// ---------- القيم الثابتة: لكل مادة قيمها الخاصة ----------
+// السبب: التربية الإسلامية تحتاج «المصحف» و«القصة النبوية» في المصادر، بينما الأحياء
+// تحتاج «المجهر» و«الشرائح»، فالقيم الثابتة الواحدة لا تصلح للجميع.
+// DEF_SETTINGS = الافتراضي لأي مادة · SUBJ_SETTINGS = قيم مادة بعينها (تُدمج فوق الافتراضي).
+var DEF_SETTINGS={level:['التذكُّر','الإبداع'],strategies:['الحوار والمناقشة','التعلم التعاوني','التعلم التشاركي','التعلم الذاتي'],resources:['الكتاب','السبورة التقليدية','جهاز عرض البيانات','الوسائط المتعددة (سمعية - بصرية)']};
+var SUBJ_SETTINGS={
+  'التربية الإسلامية':{
+    strategies:['الحوار والمناقشة','التعلم التعاوني','القصة','الخرائط الذهنية'],
+    resources:['كتاب الطالب','المصحف','القصة النبوية والسيرة','بطاقات الأنشطة والرسومات','جهاز عرض البيانات','لوحة الكلمات القرآنية']
+  }
+};
+function subjKeyOf(s){s=String(s||'الافتراضي');return 'tahdir_settings_v2:'+s;}
+function baseSettingsFor(s){return Object.assign(JSON.parse(JSON.stringify(DEF_SETTINGS)),SUBJ_SETTINGS[s]||{});}
+// المادة النشطة: المختارة في الشريط، أو مادة الدرس المفتوح، أو أول مادة متاحة
+function activeSubject(){
+  try{ if(typeof subj!=='undefined'&&subj)return subj; }catch(e){}
+  if(typeof currentId!=='undefined'&&currentId!=null){
+    var l=(lessons||[]).filter(function(x){return String(x.id)===String(currentId);})[0];
+    if(l&&typeof subjOf==='function')return subjOf(l);
+  }
+  return (typeof subjects==='function'&&subjects()[0])||'الافتراضي';
+}
+var settings=null,_setSubj=null; var GLOBAL_SET={hwMark:null};
+function useSettingsFor(s){
+  var k=String(s||'الافتراضي');
+  if(_setSubj===k&&settings)return settings;
+  var st=lsGet(subjKeyOf(k));
+  settings=Object.assign(baseSettingsFor(k),st||{});
+  _setSubj=k;
+  return settings;
+}
+function saveSettings(){ if(settings)lsSet(subjKeyOf(_setSubj),settings); }
+function settingsForSubject(s){useSettingsFor(s);}
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function editsKey(){return 'tahdir_edits_'+me.username;}
@@ -30,6 +61,8 @@ var ESSENTIAL=[
   {key:'concepts',label:'المفاهيم',icon:'mol'},
   {key:'pre_learning',label:'التهيئة / التمهيد / التعلم القبلي',icon:'seed'},
   {key:'activities_teach',label:'إجراءات سير الدرس / الأنشطة التدريسية',icon:'scope'},
+  {key:'strategies',label:'الاستراتيجيات كما وردت في ملف التحضير',icon:'seed',note:'خاصة بهذا الدرس — تظهر في قائمة الاستراتيجيات عند النسخ إلى نور'},
+  {key:'resources',label:'الوسائل ومصادر التعلم',icon:'scope',note:'خاصة بهذا الدرس — تُختار تلقائيًا في نور'},
   {key:'formative',label:'التقويم التكويني',icon:'cell'},
   {key:'closing',label:'التقويم الختامي',icon:'leaf'},
   {key:'homework',label:'الأنشطة والمهام المنزلية',icon:'flask'},
@@ -38,8 +71,6 @@ var ESSENTIAL=[
 ];
 var EN_LABEL={strategies:'Strategies',resources:'Teaching aids & resources'};
 var EXTRA=[
-  {key:'strategies',label:'الاستراتيجيات كما وردت في ملف التحضير'},
-  {key:'resources',label:'الوسائل ومصادر التعلم'},
   {key:'enrich',label:'نشاط إثرائي / علاجي (تفريد التعليم)'},
   {key:'misconceptions',label:'المفاهيم الخاطئة وسوء الفهم'}
 ];
@@ -125,6 +156,7 @@ function buildCopyAll(l){
   return out.trim();
 }
 function buildCopyJson(l){
+  useSettingsFor(subjOf(l));   // القيم الثابتة لمادة هذا الدرس: لكل مادة قيمها الخاصة
   var c=function(k){return hwVal(l,k);};
   var pre=c('pre_learning'),preOnly=(pre.match(/(^|\n)\s*التعلم القبلي\s*[:：][^\n]*/)||[''])[0].trim();
   var objective='';
@@ -169,7 +201,7 @@ function hwBlock(l){
 function hwVal(l,k){var el=$('f_'+k);return el?el.value:(l[k]||'');}
 function shuffled(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function mcqChoices(raw){return String(raw||'').split('\n').map(function(x){return x.trim();}).filter(Boolean).slice(0,6);}
-function hwItems(l){var m=settings.hwMark==null?1:settings.hwMark;
+function hwItems(l){var m=GLOBAL_SET.hwMark==null?1:GLOBAL_SET.hwMark;
   if(isMcq(l))return [1,2].map(function(n){var c=mcqChoices(hwVal(l,'hw_a'+n));if(c.length<2)return {text:''};var right=c[0],mix=shuffled(c);
     return {type:'mcq',text:hwVal(l,'hw_q'+n),choices:mix,correct:mix.indexOf(right)+1,answer:right,mark:m};}).filter(function(x){return x.text.trim();});
   return [1,2].map(function(n){return {text:hwVal(l,'hw_q'+n),answer:hwVal(l,'hw_a'+n),mark:m};}).filter(function(x){return x.text.trim();});}
@@ -219,7 +251,7 @@ function renderLesson(l){
   $('sendHwBtn').onclick=function(){sendHw(l);};
   $('copyHwBtn').onclick=function(){copyText(buildHwJson(l));track('copy_hw',l);};
   $('copyHwTxt').onclick=function(){copyText(buildHwText(l));track('copy_hw',l,'text');};
-  $('hwMark').onchange=function(){var v=parseFloat(this.value);if(!(v>=0))v=1;settings.hwMark=v;lsSet('tahdir_settings_v1',settings);toast('تم حفظ الدرجة');};
+  $('hwMark').onchange=function(){var v=parseFloat(this.value);if(!(v>=0))v=1;GLOBAL_SET.hwMark=v;lsSet('tahdir_settings_v1',Object.assign(lsGet('tahdir_settings_v1')||{},GLOBAL_SET));toast('تم حفظ الدرجة');};
   $('extraToggle').onclick=function(){var b=$('extraBody');b.hidden=!b.hidden;this.setAttribute('aria-expanded',String(!b.hidden));};
   $('copyAllBtn').onclick=function(){copyText(buildCopyAll(l));track('copy_all',l);};
   $('sendPrepBtn').onclick=function(){sendPrep(l);};
@@ -235,27 +267,20 @@ function selectLesson(id){
 }
 function showWelcome(t,m){$('panel').innerHTML='<div class="welcome">'+$('cellArt').innerHTML+'<h2>'+esc(t)+'</h2><p>'+esc(m)+'</p></div>';}
 function openSettings(){
-  var groups=[['level','المستوى'],['strategies','الاستراتيجيات'],['resources','المصادر التعليمية']];
-  var h='<div class="settings"><h2>القيم الثابتة في كل تحضير</h2><p class="muted">تُضاف هذه القيم مع كل نسخ، وتختارها أداة نور من القوائم. تُحفظ على جهازك.</p>';
-  groups.forEach(function(g){h+='<section class="sec"><div class="sec-head"><h3><span>'+g[1]+'</span></h3></div><div class="chips" id="chips_'+g[0]+'"></div><div class="chip-add"><input id="add_'+g[0]+'" placeholder="أضف قيمة كما تظهر في نور"><button type="button" class="btn small" data-add="'+g[0]+'">إضافة</button></div></section>';});
-  h+='<button type="button" class="btn primary" id="closeSettings">تم</button></div>';
-  $('panel').innerHTML=h;groups.forEach(function(g){renderChips(g[0]);});
-  Array.prototype.forEach.call(document.querySelectorAll('[data-add]'),function(b){b.onclick=function(){var k=b.getAttribute('data-add'),i=$('add_'+k),v=i.value.trim();if(!v)return;settings[k].push(v);i.value='';lsSet('tahdir_settings_v1',settings);renderChips(k);};});
-  $('closeSettings').onclick=function(){showWelcome('حُفظت الإعدادات','اختر درسًا من القائمة.');};
-}
-function renderChips(k){
-  var row=$('chips_'+k);row.innerHTML='';
-  settings[k].forEach(function(v,i){var c=document.createElement('span');c.className='chip';c.innerHTML='<span>'+esc(v)+'</span>';var b=document.createElement('button');b.type='button';b.textContent='×';b.setAttribute('aria-label','حذف '+v);b.onclick=function(){settings[k].splice(i,1);lsSet('tahdir_settings_v1',settings);renderChips(k);};c.appendChild(b);row.appendChild(c);});
+  // «القيم الثابتة» انتقلت إلى داخل تحضير كل درس (الاستراتيجيات + الوسائل ومصادر التعلم)
+  showWelcome('القيم الثابتة صارت داخل الدرس','افتح أي درس من القائمة، وستجد حقلَي «الاستراتيجيات» و«الوسائل ومصادر التعلم» جاهزين بقيم المادة، وتقدر تعدّلها لكل درس على حدة.');
 }
 function init(){
-  $('settingsBtn').onclick=openSettings;
+  // لا يوجد زر «قيم ثابتة» في الشريط: الاستراتيجيات والوسائل صارت حقولًا في كل درس.
   if(IN_APP){if($('appBar'))$('appBar').hidden=true;}
   else{
     if($('pcBtn'))$('pcBtn').onclick=function(){toolDialog('');};
     if($('iosBtn'))$('iosBtn').onclick=function(){dialog({title:'التطبيق على الآيفون',html:'<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>افتح الموقع من متصفح <b>Safari</b>.</li><li>اضغط زر <b>«مشاركة»</b> ⬆ أسفل الشاشة.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة».</li></ol><p class="m-msg">يظهر «التحضير الآلي» بأيقونة على شاشتك مثل أي تطبيق.</p>',okText:'تم',cancelText:false});};}
-  var st=lsGet('tahdir_settings_v1');if(st)settings=Object.assign(settings,st);
   Promise.all([api('/api/me'),api('/api/lessons')]).then(function(r){
     me=r[0];lessons=r[1].lessons;
+    // نحمّل القيم الثابتة للمادة الأولى، وتُبدَّل تلقائيًا عند فتح درس مادة أخرى
+    useSettingsFor(activeSubject());
+    try{var g=lsGet('tahdir_settings_v1');if(g&&g.hwMark!=null)GLOBAL_SET.hwMark=g.hwMark;}catch(e){}
     initNav(me);
     if(location.hash==='#settings'){history.replaceState(null,'','/app');setTimeout(openSettings,50);}
     if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}

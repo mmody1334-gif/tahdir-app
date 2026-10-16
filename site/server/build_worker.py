@@ -678,7 +678,8 @@ def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'
     h += f'<a class="btn ghost small" href="/app"{cur("app")}>التحضير</a>'
-    h += '<button type="button" class="btn ghost small" id="settingsBtn">القيم الثابتة</button>' if active == 'app' else '<a class="btn ghost small" href="/app#settings">القيم الثابتة</a>'
+    # «القيم الثابتة» لم تعد قسمًا مستقلًا: صارت حقولًا داخل تحضير كل درس (الاستراتيجيات
+    # والوسائل ومصادر التعلم)، لأن كل مادة — بل كل درس — يحتاج قيمه الخاصة.
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
