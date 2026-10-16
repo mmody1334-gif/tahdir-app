@@ -300,12 +300,15 @@ def q_number_rows(rows, page_w, page_h):
     return res[:cut]
 
 
-def start_gap_after(ink, y_anchor, win=(2, 50), min_len=12):
-    """أول فراغ بيضاء بعد المرساة مباشرة = حدّ بداية السؤال.
+def start_gap_after(ink, y_anchor, win=(2, 60), min_len=12, at='end'):
+    """حدود أول فراغ بيضاء بعد رقم السؤال.
 
     قياس فعلي على هذه الأوراق: يبدأ الفراغ الفاصل على بُعد 5–12 بكسل أسفل رقم
-    السؤال، وطوله 35–110 بكسل. نستخدم أول فراغ لا يقل عن min_len داخل نافذة
-    ضيقة (50 بكسل) فلا نخطئ فنأخذ فراغًا داخل السؤال.
+    السؤال وطوله 35–110 بكسل، ورقم السؤال المطبوع يقع قبل الفراغ مباشرة.
+
+    at='end'   ⇒ نهاية الفراغ: يُستبعد الرقم المطبوع (المطلوب عادة).
+    at='start' ⇒ بداية الفراغ: يُبقي الرقم، ونستخدمه فقط حين يقطع 'end' نص السؤال
+                 (يحدث حين يكون الرقم على سطر النص نفسه لا في سطر مستقل).
     """
     H = ink.shape[0]
     lo = min(H - 1, int(y_anchor + win[0]))
@@ -317,9 +320,26 @@ def start_gap_after(ink, y_anchor, win=(2, 50), min_len=12):
                 cur = y
         else:
             if cur is not None and (y - cur) >= min_len:
-                return cur
+                return (y if at == 'end' else cur)
             cur = None
     return None
+
+
+def top_looks_clipped(crop, thresh=140, frac=0.01):
+    """هل يلمس محتوى الصورة حدّها العلوي؟ (يعني القصّ قطع نص السؤال)"""
+    if crop.shape[0] < 4:
+        return False
+    band = crop[:3, :]
+    return float((band < thresh).mean()) > frac
+
+
+def num_cols_of_row(crop, y_lo=0, y_hi=14, dark=150):
+    """أعمدة فيها حبر في نطاق علوي (لتحديد موضع رقم السؤال المطبوع)."""
+    if crop.shape[0] <= y_lo:
+        return None
+    sub = crop[y_lo:min(crop.shape[0], y_hi), :]
+    cols = (sub < dark).any(0)
+    return cols
 
 
 def main():
@@ -388,15 +408,24 @@ def main():
                 g, _ = first_gap_after(ink, y0 + 60, min(nxt, footer), min_len=8)
                 y1 = float(g if g is not None else min(nxt, footer))
             else:
-                # من فراغ البداية بعد رقم السؤال إلى فراغ البداية بعد رقم السؤال التالي.
-                # قياس فعلي: الفراغ الفاصل يبدأ 5–12 بكسل أسفل الرقم.
-                g0 = start_gap_after(ink, s['y'])
-                y0 = float(g0 if g0 is not None else max(0.0, s['y'] - 6))
+                # الرقم المطبوع يقع قبل الفراغ الفاصل مباشرة، فالقصّ من نهاية الفراغ
+                # يُستبعده. لكن إن كان الرقم على سطر النص نفسه، فالقصّ من النهاية
+                # يقطع أول سطر؛ نكتشف ذلك ونرجع لبداية الفراغ ونُبيّض الرقم فقط.
+                g0_end = start_gap_after(ink, s['y'], at='end')
+                g0_start = start_gap_after(ink, s['y'], at='start')
+                y0 = float(g0_end if g0_end is not None else max(0.0, s['y'] - 6))
                 if i + 1 < len(starts):
-                    g1 = start_gap_after(ink, starts[i + 1]['y'])
+                    g1 = start_gap_after(ink, starts[i + 1]['y'], at='end')
                     y1 = float(g1 if g1 is not None else starts[i + 1]['y'] - 6)
                 else:
                     y1 = footer
+                # فحص القطع: نجرّب من نهاية الفراغ، فإن لمست الحافة العلوية حبرًا
+                # (أي قُطع نص) نرجع لبداية الفراغ ونبيّض شريط الرقم أعلى القصّ.
+                trial = arr[int(y0):int(min(y1, y0 + 40)), int(0.012 * W):int(0.988 * W)]
+                mask_num_top = 0.0
+                if g0_start is not None and g0_start < y0 and top_looks_clipped(np.array(Image.fromarray(trial).convert('L'))):
+                    mask_num_top = y0 - g0_start + 4
+                    y0 = float(g0_start)
             # سقف الارتفاع: يمنع امتداد السؤال إلى تذييل الصفحة (رقم الصفحة/الترويسة)
             y1 = min(y1, y0 + 0.80 * H, footer)
             y1 = min(max(y1, y0 + 26), H)
@@ -411,6 +440,12 @@ def main():
             rgb = crop.copy()
             mask = (cleaned == 255) & (gray != 255)
             rgb[mask] = 255
+            # تبييض شريط رقم السؤال المطبوع حين اضطررنا للقصّ من بداية الفراغ
+            if mask_num_top:
+                k = int(min(rgb.shape[0], mask_num_top))
+                strip = rgb[:k]
+                dark = (strip.mean(2) < 150)
+                rgb[:k][dark] = 255
             im = Image.fromarray(rgb)
             if im.width > 1000:
                 im = im.resize((1000, int(im.height * 1000 / im.width)), Image.LANCZOS)
