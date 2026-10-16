@@ -18,7 +18,9 @@ function gnum(g){return GRADE_NUM[g]||99;}
 function isIT(){return !!course&&/تقنية/.test(course.subject||'');}
 // التربية الإسلامية: لها جدول مواصفات خاص في وثيقة تقويم تعلم الطلبة (5-12) 2026
 function isIslam(){return !!course&&/إسلام/.test(course.subject||'');}
-function isHi(){return course&&gnum(course.grade)>=11&&!isIT()&&!isIslam();}
+// اللغة العربية: لها مواصفة خاصة في وثيقة تقويم تعلم الطلبة في اللغة العربية (5-12) 2026/2027
+function isArabic(){return !!course&&/العربية/.test(course.subject||'');}
+function isHi(){return course&&gnum(course.grade)>=11&&!isIT()&&!isIslam()&&!isArabic();}
 function aoList(){return isIT()?IT_AO:(isIslam()?LO_AO:(isHi()?HI_AO:LO_AO));}
 var IT_AO=['تذكر وفهم','تطبيق','استدلال'];
 function clone(o){return JSON.parse(JSON.stringify(o));}
@@ -44,6 +46,16 @@ function spec(){
       return {total:10,targets:{'معرفة':4,'تطبيق':4,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[5,7],label:'التربية الإسلامية (10-12)'};
     }
     return {total:15,targets:{'معرفة':6,'تطبيق':6,'استدلال':3},mcqCount:3,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[9,12],label:'التربية الإسلامية (5-9)'};
+  }
+  // اللغة العربية — وثيقة تقويم تعلم الطلبة في اللغة العربية (5-12) 2026/2027:
+  //   المجموع 15 درجة · عدد المفردات بين 3 و10 · يُنوّع بين الموضوعي والمقالي.
+  //   توزيع الدرجات على مجالات الاختبار:
+  //     الصفوف 5-10: الفهم 4 · النص 3-4 · القراءة 3-4 · النص الأدبي 2 · التصحيح اللغوي 2
+  //     الصفوف 11-12: الفهم 4 · النص 4 · القراءة 4 · النص الأدبي/البلاغة 3 (بلا تصحيح لغوي)
+  //   (نُسقط المجالات على أهداف التقويم الثلاثة لتوافق محرّك الاختبار)
+  if(isArabic()){
+    var tgAr = g>=11 ? {'معرفة':4,'تطبيق':8,'استدلال':3} : {'معرفة':4,'تطبيق':9,'استدلال':2};
+    return {total:15,targets:tgAr,mcqCount:2,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[3,10],label:'اللغة العربية'};
   }
   if(isIT()){ // وثيقة تقويم تقنية المعلومات (الاختبار القصير): تذكر وفهم 50% · تطبيق 30% · استدلال 20%
     if(g>=11)return {total:10,targets:{'تذكر وفهم':5,'تطبيق':3,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:1,marks:[3]},shortMax:2,items:[6,8],label:'11–12 (تقنية المعلومات)'};
