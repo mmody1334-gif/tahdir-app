@@ -3,7 +3,7 @@ const PW = require('./_pw.cjs');
 const USER = 'mohamed', PASS = 'Bio@2026x';
 let pass = 0, fail = 0;
 const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  ' : '  FAIL  ') + n + (extra ? '  → ' + extra : '')); };
-const GRADES = ['الخامس', 'السادس', 'السابع', 'الثامن'];
+const GRADES = ['الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
 const F = ['concepts', 'pre_learning', 'outcomes', 'strategies', 'activities_teach', 'resources', 'formative', 'closing', 'homework'];
 
 (async () => {
