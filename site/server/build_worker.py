@@ -533,6 +533,7 @@ button.lv-opt{cursor:pointer}
 .fin-q{border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 12px;background:var(--card,#fff)}.fin-q header{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:8px}
 .fin-q .chip{font-size:.74rem;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}.fin-q .chip.strong{color:var(--ink);font-weight:700}.fin-q .chip.lesson{color:var(--brand,#0e7c66)}
 .fin-q img{display:block;width:100%;max-width:780px;margin:0 auto;height:auto;background:#fff;border-radius:6px}.fin-pick{margin-inline-end:4px}
+.fin-txt{margin:8px 0;padding:10px 12px;background:var(--bg);border-radius:8px;line-height:1.9;font-size:1rem;white-space:pre-wrap}
 .fin-ans{margin-top:8px;font-size:.9rem}.fin-ans summary{cursor:pointer;font-weight:700;color:var(--brand,#0e7c66)}.fin-a{padding:6px 10px;border-inline-start:3px solid var(--line);margin-top:6px;line-height:1.7}
 #printArea .fin-pq{page-break-inside:avoid;margin:0 0 10px}#printArea .fin-pq img{max-width:100%}#printArea .fin-pn{font-weight:bold;font-size:12pt}#printArea .fin-pn small{font-weight:normal;font-size:9pt;color:#555}
 @media print{

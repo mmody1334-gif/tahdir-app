@@ -53,7 +53,8 @@ function card(q){
     '<span class="chip">'+esc(p.year||'')+'</span><span class="chip">'+esc(p.session||'')+'</span>'+(p.region?'<span class="chip">'+esc(p.region)+'</span>':'')+
     '<span class="chip">السؤال '+esc(q.n)+'</span><span class="chip strong">'+esc(q.m)+' '+(q.m==1?'درجة':'درجات')+'</span>'+(q.ao?'<span class="chip">'+esc(q.ao)+'</span>':'')+
     (lt?'<span class="chip lesson">'+esc(lt)+'</span>':'')+'</header>'+
-    '<img loading="lazy" src="/fin/'+esc(q.im)+'" width="'+q.w+'" height="'+q.h+'" alt="'+esc(q.x.slice(0,120))+'">'+
+    (q.im?'<img loading="lazy" src="/fin/'+esc(q.im)+'" width="'+q.w+'" height="'+q.h+'" alt="'+esc((q.x||'').slice(0,120))+'">'
+         :'<div class="fin-txt">'+esc(q.x||'')+'</div>')+
     '<details class="fin-ans"'+(showAns?' open':'')+'><summary>الإجابة'+(q.as==='ai'?' <span class="muted small">(مقترحة — لا يوجد نموذج)</span>':' <span class="muted small">(من نموذج الإجابة)</span>')+'</summary><div class="fin-a">'+esc(q.a).replace(/\n/g,'<br>')+'</div></details></article>';
 }
 function renderMain(){

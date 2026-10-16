@@ -23,7 +23,7 @@ const DB = {
   async batch(list) { const out = []; sq.exec('BEGIN'); try { for (const s of list) out.push(await s.run()); sq.exec('COMMIT'); } catch (e) { sq.exec('ROLLBACK'); throw e; } return out; }
 };
 const port = +(process.argv[2] || 8787);
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 const ASSETS = { fetch: async rq => { const f = join(dir, '../dist/assets', decodeURIComponent(new URL(rq.url).pathname)); return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': 'application/json' } }) : new Response('nf', { status: 404 }); } };
 // بيئة العامل: نمرّر أيضًا إعدادات قابلة للضبط من متغيّرات البيئة حتى نستطيع اختبارها محليًا
 // (مثل STALE_SECONDS: مدة إهمال الجهاز). في الإنتاج تُضبط من إعدادات الـWorker.
@@ -32,7 +32,16 @@ if (process.env.STALE_SECONDS) ENV.STALE_SECONDS = process.env.STALE_SECONDS;
 
 http.createServer(async (req, res) => {
   // صور أسئلة الوزارة: في الإنتاج تُنشر تحت dist/assets/fin/ وتُخدم على /fin/ (انظر worker_src.js)
-  if (req.url.startsWith('/fin/')) { const f = join(dir, '../dist/assets/fin', decodeURIComponent(req.url.slice(5))); if (existsSync(f)) { const ext = f.split('.').pop().toLowerCase(); res.writeHead(200, { 'content-type': ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'application/octet-stream' }); res.end(readFileSync(f)); return; } res.writeHead(404); res.end('nf'); return; }
+  if (req.url.startsWith('/fin/')) {
+    const rel = decodeURIComponent(req.url.slice(5).split('?')[0]);
+    const f = join(dir, '../dist/assets/fin', rel);
+    // حماية: لا نقرأ مجلدًا. مسار فارغ أو منتهٍ بـ/ يُرفض بـ404 بدل أن يُسقط السيرفر
+    // (يحدث إن كانت مفردة بلا صورة فيطلب المتصفح /fin/ نفسه = مجلد).
+    if (!rel || rel.endsWith('/') || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
+    const ext = f.split('.').pop().toLowerCase();
+    res.writeHead(200, { 'content-type': ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'application/octet-stream' });
+    res.end(readFileSync(f)); return;
+  }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   headers.set('CF-Connecting-IP', req.headers['x-test-ip'] || '127.0.0.1');
