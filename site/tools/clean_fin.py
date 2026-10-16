@@ -6,7 +6,8 @@
   - شظايا نصوص مقطوعة على الحافة العلوية/السفلية
 الاستخدام: python3 clean_fin.py <مجلد الصور> [--dry] — يعدّل الملفات في مكانها ولا يفشل أبدًا (يتخطى أي صورة بها مشكلة).
 """
-import os, sys
+import os, re, sys
+import re
 import numpy as np
 from PIL import Image
 import cv2
@@ -213,6 +214,61 @@ def clean_array(a):
             a[H - hb - 1:, :] = 255
         done.append('frag' + edge)
     return a, done
+
+
+def mask_printed_number(a, num=None, y_hi=60, dark=165, pad=3):
+    """يبيّض **رقم السؤال المطبوع** في أقصى يمين السطر الأول.
+
+    العربية تُكتب من اليمين، فرقم السؤال المطبوع («2)» · «17 )» · «10)») هو آخر ما
+    في السطر، ثم مسافة، ثم نص السؤال. **المرساة الموثوقة** التي قِسناها في كل
+    مفردات العلوم صف 7 (65/65): **القوس** — كتلة رقيقة عرضها 2–14 وارتفاعها 10–26
+    في آخر 12% من العرض وعند x=892–944.
+
+    القاعدة: نجد القوس (الأقصى يمينًا)، ثم نُبيّضه مع كل ما يقع **يمينه** (خانات
+    الرقم) داخل نطاق رمزين كحد أقصى، وفي نطاق صفوفه وحده. ونقف عند مسافة ≥ 8 بكسل
+    إن وُجدت، فلا يُمَسّ أول حرف من النص (جرّبنا التقدير بالعرض فأفسد النص).
+
+    يعيد 1 إن بيّض شيئًا.
+    """
+    H, W = a.shape
+    band = (a[:y_hi, :] < dark).astype(np.uint8)
+    n, _lab, st, _ = cv2.connectedComponentsWithStats(band, connectivity=8)
+    paren = None
+    for i in range(1, n):
+        x, y, w, h, ar = st[i]
+        if ar < 8 or x < W * 0.88:
+            continue
+        if 10 <= h <= 26 and 2 <= w <= 14:
+            if paren is None or x > paren[0]:
+                paren = (int(x), int(y), int(w), int(h))
+    if paren is None:
+        return 0
+    px, py, pw, ph = paren
+    # ما يمين القوس = خانات الرقم (نطاق محدود)، ثم نتوقف عند مسافة ≥ 8 بكسل
+    right_limit = min(W, px + pw + 22)
+    x0 = px
+    prof = (a[:y_hi, :] < dark).any(0)
+    # نمشي يسارًا من بداية القوس ونتوقف عند أول فراغ >= 8 بكسل
+    gap = 0
+    xx = px - 1
+    stop = None
+    while xx >= 0 and (px - xx) <= 56:
+        if not prof[xx]:
+            gap += 1
+            if gap >= 6:
+                stop = xx + gap
+                break
+        else:
+            gap = 0
+        xx -= 1
+    if stop is not None:
+        x0 = stop
+    seg = a[:y_hi, x0:right_limit] < dark
+    ys = np.where(seg.any(1))[0]
+    if not len(ys):
+        return 0
+    a[max(0, int(ys[0]) - 3):min(H, int(ys[-1]) + 4), x0:right_limit] = 255
+    return 1
 
 
 def clean_all(a):
