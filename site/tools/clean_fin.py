@@ -101,6 +101,41 @@ def _header_rows(a):
     return e + 2
 
 
+def strip_score_box(a, max_h_frac=0.45):
+    """يبيّض صندوق درجة الصفحة في أعلى اليسار (مربّع بخط أفقي وداخله رقم).
+
+    يُطبع في رأس كل صفحة امتحان، وكثيرًا ما يدخل في قصّ السؤال الأول فيظهر
+    «مربّع فيه رقم» لا علاقة له بالسؤال. نكتشفه بالبنية لا بالحجم: مكوّن متصل
+    في أقصى اليسار أعلى الصورة، شكله إطار مستطيل مستدير، وداخله خط أفقي ممتد.
+    يعيد عدد ما أُزيل (قد يكون أكثر من صندوق).
+    """
+    H, W = a.shape
+    ink = (a < DARK).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    removed = 0
+    for i in range(1, n):
+        x, y, w, h, ar = st[i]
+        # أقصى اليسار وأعلى الصورة (قد يكون مقطوعًا من أعلى القصّ فـ y=0)
+        if x > W * 0.15 or y > max(8, H * 0.08):
+            continue
+        if not (26 <= w <= W * 0.28 and 26 <= h <= max(40, H * max_h_frac)):
+            continue
+        if not (0.60 <= h / max(1, w) <= 2.4):            # مربّع تقريبًا
+            continue
+        if ar / float(max(1, w * h)) > 0.20:              # ممتلئ/جدول: ليس صندوق درجة
+            continue
+        sub = ink[y:y + h, x:x + w]
+        rows = sub.mean(1)
+        if not (rows > 0.55).any():                       # لا خط أفقي ممتد
+            continue
+        body = sub[rows <= 0.55]
+        if body.size == 0 or body.mean() < 0.012:         # ولا رقم داخل الإطار
+            continue
+        a[max(0, y - 3):min(H, y + h + 4), max(0, x - 3):min(W, x + w + 4)] = 255
+        removed += 1
+    return removed
+
+
 def clean_array(a):
     """a: مصفوفة رمادية uint8. تعيد (المصفوفة، قائمة ما تمّت إزالته)."""
     a0 = a
@@ -177,6 +212,15 @@ def clean_array(a):
         else:
             a[H - hb - 1:, :] = 255
         done.append('frag' + edge)
+    return a, done
+
+
+def clean_all(a):
+    """clean_array + إزالة صندوق درجة الصفحة (يُستدعى من مستخرج الامتحانات)."""
+    a, done = clean_array(a)
+    k = strip_score_box(a)
+    if k:
+        done = list(done) + ['scorebox%d' % k]
     return a, done
 
 

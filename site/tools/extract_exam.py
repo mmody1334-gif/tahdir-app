@@ -15,7 +15,7 @@ import pymupdf
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from clean_fin import clean_array  # إعادة استخدام أداة التنظيف نفسها
+from clean_fin import clean_array, clean_all as clean_fin_all  # إعادة استخدام أداة التنظيف نفسها
 
 MARK_RE = re.compile(r'^[\[\(]\s*(\d{1,2})\s*[\]\)]$')
 QNUM_RE = re.compile(r'^(\d{1,2})\s*[\)\u002e]\s*(.*)$', re.S)
@@ -407,7 +407,7 @@ def main():
             if crop.size == 0 or crop.shape[0] < 20:
                 continue
             gray = np.array(Image.fromarray(crop).convert('L'))
-            cleaned, done = clean_array(gray)
+            cleaned, done = clean_fin_all(gray)
             rgb = crop.copy()
             mask = (cleaned == 255) & (gray != 255)
             rgb[mask] = 255
