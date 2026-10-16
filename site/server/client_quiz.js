@@ -72,13 +72,16 @@ function spec(){
   //   الصفان 11-12: المجموع 10 · المفردات 5 · هدف التقويم الأول 5 والثاني 5
   //     مفردتان اختيار من متعدد (1 لكل) + مفردتان إجابة قصيرة (2 لكل) + مفردة إجابة طويلة (4)
   if(isMath()){
+    // mcqCount = 0: مفردات بنك الرياضيات (المستخرجة من أوراق الوزارة) إجابة
+    // قصيرة أو طويلة — لا اختيار من متعدد. وطلب مفردتين كان يمنع توليد أي ورقة
+    // فتسقط إلى الاحتياطي بورقة ناقصة (8 من 10). يُرفع إلى 2 عند إغناء البنك.
     if(g>=11){
-      return {total:10,targets:{AO1:5,AO2:5},mcqCount:2,mcqAos:2,
+      return {total:10,targets:{AO1:5,AO2:5},mcqCount:0,mcqAos:0,
               long:{count:1,marks:[4]},shortMax:2,items:[5,5],label:'11–12 (الرياضيات)'};
     }
     // الصفوف 7-10 فيها مفردة إجابة طويلة بثلاث درجات؛ 5-6 بلا إجابة طويلة
     var hasLong = g >= 7;
-    return {total:10,targets:{'معرفة':4,'تطبيق':4,'استدلال':2},mcqCount:2,mcqAos:2,
+    return {total:10,targets:{'معرفة':4,'تطبيق':4,'استدلال':2},mcqCount:0,mcqAos:0,
             long:{count:hasLong?1:0,marks:hasLong?[3]:[]},shortMax:2,items:[6,7],
             label:hasLong?'7–10 (الرياضيات)':'5–6 (الرياضيات)'};
   }
@@ -100,12 +103,19 @@ function prepPool(pool,sp){
 
 // ---------- تكوين الاختبار تلقائيًا (بحث دقيق يطابق جدول المواصفات) ----------
 function subsets(items,target,maxSol){ // مجموعات عشوائية من المفردات مجموع درجاتها = target
-  var out=[],arr=shuffleP(items),seen={};
+  var out=[],seen={};
+  // نرتّب المفردات **بالدرجة تنازليًّا** (مع خلط أولًا لتنويع متساويات الدرجة):
+  // بحث DFS يجمع الحلول المتفكّكة أولًا (خمس مفردات بدرجة واحدة لهدف من 5)،
+  // فتتجاوز الورقة حدّ عدد المفردات في الوثيقة (5 للصفين 11-12 · 6-7 لغيرهما)
+  // ويسقط التوليد إلى الاحتياطي بورقة ناقصة. فتقديم الأكبر درجة يُنتج الحلول
+  // المُحكمة (2+2+1) مبكرًا. وترتيب Array.sort مستقرّ فتظلّ المتساويات مخلوطة.
+  var arr=shuffleP(items).slice().sort(function(a,b){return b.marks-a.marks;});
   (function dfs(k,sum,cur){
     if(out.length>=maxSol)return;
     if(sum===target){var key=cur.map(function(x){return x.qid;}).sort().join(',');if(!seen[key]){seen[key]=1;out.push(cur.slice());}return;}
     for(var i=k;i<arr.length&&out.length<maxSol;i++){if(sum+arr[i].marks<=target){cur.push(arr[i]);dfs(i+1,sum+arr[i].marks,cur);cur.pop();}}
   })(0,0,[]);
+  out.sort(function(a,b){return a.length-b.length;});
   return out;
 }
 function assemble(pool,sp,lessonIds){
@@ -113,7 +123,7 @@ function assemble(pool,sp,lessonIds){
   var order={};lessonIds.forEach(function(id,i){order[id]=i;});
   var aos=Object.keys(sp.targets),mcqs=pool.filter(function(x){return x.type==='mcq';}),longs=pool.filter(function(x){return x.type==='long';}),shorts=pool.filter(function(x){return x.type==='short';});
   var best=null,bestScore=-1e9;
-  for(var att=0;att<60;att++){
+  for(var att=0;att<90;att++){
     // اختيار الاختيار من متعدد
     var mc=[],usedQ={};
     if(sp.mcq){Object.keys(sp.mcq).forEach(function(ao){var c=shuffleP(mcqs.filter(function(x){return x.ao===ao;}));for(var n=0;n<sp.mcq[ao]&&c.length;n++)mc.push(c.shift());});}
@@ -123,7 +133,7 @@ function assemble(pool,sp,lessonIds){
     var need={};aos.forEach(function(a){need[a]=sp.targets[a];});
     mc.concat(lg).forEach(function(x){need[x.ao]-=x.marks;usedQ[x.qid]=1;});
     if(aos.some(function(a){return need[a]<0;}))continue;
-    var opts=aos.map(function(a){return need[a]===0?[[]]:subsets(shorts.filter(function(x){return x.ao===a;}),need[a],12);});
+    var opts=aos.map(function(a){return need[a]===0?[[]]:subsets(shorts.filter(function(x){return x.ao===a;}),need[a],48);});
     if(opts.some(function(o){return !o.length;}))continue;
     for(var t=0;t<25;t++){
       var pickd=mc.concat(lg);opts.forEach(function(o){pickd=pickd.concat(pick(o));});
