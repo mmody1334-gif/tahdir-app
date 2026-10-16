@@ -16,8 +16,10 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function track(type,detail,title){try{fetch('/api/event',{method:'POST',credentials:'same-origin',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,grade:course&&course.grade,detail:detail||'',title:title||''})});}catch(e){}}
 function gnum(g){return GRADE_NUM[g]||99;}
 function isIT(){return !!course&&/تقنية/.test(course.subject||'');}
-function isHi(){return course&&gnum(course.grade)>=11&&!isIT();}
-function aoList(){return isIT()?IT_AO:(isHi()?HI_AO:LO_AO);}
+// التربية الإسلامية: لها جدول مواصفات خاص في وثيقة تقويم تعلم الطلبة (5-12) 2026
+function isIslam(){return !!course&&/إسلام/.test(course.subject||'');}
+function isHi(){return course&&gnum(course.grade)>=11&&!isIT()&&!isIslam();}
+function aoList(){return isIT()?IT_AO:(isIslam()?LO_AO:(isHi()?HI_AO:LO_AO));}
 var IT_AO=['تذكر وفهم','تطبيق','استدلال'];
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
@@ -32,6 +34,14 @@ function shuffleP(a){return a.map(function(x){return [Math.random()*(x&&x.img?0.
 // جدول مواصفات الاختبار القصير الرسمي (الصفوف 5–12)
 function spec(){
   var g=gnum(course.grade);
+  // جدول مواصفات الاختبار القصير — التربية الإسلامية (وثيقة تقويم تعلم الطلبة 5-12 · 2026)
+  // السؤال الأول (6): أ- كتابة نص قرآني 3 · ب- الحديث الشريف 3
+  // السؤال الثاني (5): أ- مفردة تجويد 1 موضوعي · ب- مفردتان 2 موضوعي · ج- مفردتان قدرات عليا 2 مقالي
+  // السؤال الثالث (4): أ- مفردة 2 مقالي · ب- مفردة قدرات عليا 2 مقالي        المجموع 15
+  if(isIslam()){
+    var tg=g>=9?{'معرفة':6,'تطبيق':6,'استدلال':3}:{'معرفة':6,'تطبيق':6,'استدلال':3};
+    return {total:15,targets:tg,mcqCount:3,mcqAos:2,long:{count:0,marks:[]},shortMax:2,items:[9,12],label:'التربية الإسلامية'};
+  }
   if(isIT()){ // وثيقة تقويم تقنية المعلومات (الاختبار القصير): تذكر وفهم 50% · تطبيق 30% · استدلال 20%
     if(g>=11)return {total:10,targets:{'تذكر وفهم':5,'تطبيق':3,'استدلال':2},mcqCount:2,mcqAos:2,long:{count:1,marks:[3]},shortMax:2,items:[6,8],label:'11–12 (تقنية المعلومات)'};
     if(g>=9)return {total:20,targets:{'تذكر وفهم':10,'تطبيق':6,'استدلال':4},mcqCount:4,mcqAos:2,long:{count:1,marks:[3]},shortMax:2,items:[12,18],label:'9–10 (تقنية المعلومات)'};
@@ -132,11 +142,12 @@ function itemHtml(it,n,tno,word,ctrl){
   if(ctrl)h+=ctrl;
   if(it.img){ // سؤال من امتحان الوزارة بصورته الأصلية (فيه الرسم والاختيارات وأسطر الإجابة)
     var W=word?Math.min(560,it.iw||560):0;
-    // الصورة نفسها تحمل رقم السؤال الأصلي ونصّه. نعرض الرقم المولَّد في سطر ملاصق
-    // ونمنع انقسام السؤال على صفحتين، فلا يبقى الرقم وحده في أسفل الورقة.
-    h+='<div style="page-break-inside:avoid;break-inside:avoid"><p style="margin:0 0 3px">'+
-      '<b>'+n+')</b></p>'+
-      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;'+(W?'width:'+W+'px;':'')+'margin:0 auto"></div>';
+    // الصورة نفسها تحمل نص السؤال ورسومه. نضع الرقم **ملاصقًا** لأعلى الصورة بلا
+    // فراغ (كما في الأسئلة الكتابية: «3) نص السؤال»)، فلا يبدو الرقم منفصلًا عن
+    // سؤاله. ونمنع انقسام السؤال على صفحتين فلا يبقى الرقم وحده أسفل الورقة.
+    h+='<div style="page-break-inside:avoid;break-inside:avoid">'+
+      '<p style="margin:0;line-height:1"><b>'+n+')</b></p>'+
+      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;vertical-align:top;'+(W?'width:'+W+'px;':'')+'margin:0 auto"></div>';
     return h+'</div>';
   }
   h+='<p style="margin:0 0 4px"><b>'+n+')</b> '+rich(stem)+'</p>';
