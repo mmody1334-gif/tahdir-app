@@ -191,7 +191,7 @@ function cookies(req) {
   return out;
 }
 function setCookie(name, val, maxAgeSec) {
-  return `${name}=${encodeURIComponent(val)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAgeSec}`;
+  return `${name}=${encodeURIComponent(val)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSec}`;
 }
 function ipOf(req) { return req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''; }
 // مدة مختصرة بالعربية لعرضها في رسائل الأجهزة
