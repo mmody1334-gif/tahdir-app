@@ -16,6 +16,8 @@ BRAND_ICONS = {'/brand/' + f: _b64.b64encode(open(os.path.join(_BR, f), 'rb').re
 BANNER = f'''<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{LOGO}</div><div class="kb-name"><b>الكبسولة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>'''
 base_css = base_css.replace('--bg:#f1f7f4; --paper:#ffffff; --ink:#10261f; --mute:#58726a; --line:#d4e5de;', '--bg:#f6f4ee; --paper:#ffffff; --ink:#10261f; --mute:#5b6d67; --line:#e2e0d6;', 1)
 base_css = base_css.replace('--main:#0c7a63; --main-d:#08503f; --main-l:#e1f3ec; --leaf:#5fae3c; --accent:#c4861a; --accent-l:#fbf0db', '--main:#1f8a70; --main-d:#0b3b33; --main-l:#e3f1eb; --leaf:#e0a93b; --accent:#c98a1e; --accent-l:#fbf0db', 1)
+# منع ضبط النص (justify) وتمدد الحروف في الدروس والمربعات: كان يفرّق الكلمات العربية في الأسطر المكسورة
+base_css += '\ntextarea,[contenteditable],.lesson,.lesson *,.tree,.tree *{text-align:right !important;text-justify:none !important;letter-spacing:normal !important;word-spacing:normal !important;}'
 lessons = json.load(open(os.path.join(DATA, 'lessons.json'), encoding='utf-8'))
 # دروس اللغة العربية تأتي من ملفها الخاص، وقيمة grade فيه مكتوبة «الصف التاسع» بينما كل الملفات
 # الأخرى تكتبها «التاسع». الواجهة تضيف «الصف » بنفسها، فكانت تظهر «الصف الصف التاسع»،
@@ -734,7 +736,7 @@ def NAV(active, extra=''):
     # والوسائل ومصادر التعلم)، لأن كل مادة — بل كل درس — يحتاج قيمه الخاصة.
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
     # دليل الاستخدام: يُعاد فتحه متى شاء المعلم (يظهر تلقائيًّا في أول دخول)
-    h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام"> دليلك للإستخدام</button>'
+    h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام">دليلك للاستخدام!</button>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
         ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''
