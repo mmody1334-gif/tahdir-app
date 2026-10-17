@@ -734,7 +734,7 @@ def NAV(active, extra=''):
     # والوسائل ومصادر التعلم)، لأن كل مادة — بل كل درس — يحتاج قيمه الخاصة.
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
     # دليل الاستخدام: يُعاد فتحه متى شاء المعلم (يظهر تلقائيًّا في أول دخول)
-    h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام">؟ دليل</button>'
+    h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام"> دليلك للإستخدام</button>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
         ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''
