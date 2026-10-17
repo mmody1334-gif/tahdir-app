@@ -80,35 +80,40 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
     const scBtn = [...document.querySelectorAll('[data-act="scope"]')][0];
     if (!scBtn) return { err: 'لا زر صلاحيات' };
     scBtn.click(); await new Promise(x => setTimeout(x, 1200));
-    const subs = [...document.querySelectorAll('#scSubs [data-sub]')].map(x => ({
-      s: x.getAttribute('data-sub'), t: x.textContent.trim(), on: x.classList.contains('on')
+    const accs = [...document.querySelectorAll('#scAcc .sc-acc')].map(a => ({
+      s: a.getAttribute('data-acc'), open: a.open, badge: (a.querySelector('.sc-e') || {}).textContent || ''
     }));
-    const grades = [...document.querySelectorAll('#scGrades [data-sc]')].map(x => x.getAttribute('data-sc'));
-    const cur = (document.querySelector('#scGrades .sc-ghead b') || {}).textContent || '';
-    return { subs, grades, cur, hasAll: !!document.querySelector('[data-toggleall]') };
+    const firstOpen = document.querySelector('#scAcc .sc-acc[open]') || document.querySelector('#scAcc .sc-acc');
+    const grades = [...firstOpen.querySelectorAll('[data-sc]')].map(x => x.getAttribute('data-sc'));
+    return { accs, cur: firstOpen.getAttribute('data-acc'), grades,
+             hasAll: !!firstOpen.querySelector('[data-all]') };
   });
   if (dlg.err) { ok('نافذة الصلاحيات', false, dlg.err); }
   else {
-    console.log('المواد في النافذة: ' + JSON.stringify(dlg.subs.slice(0, 6).map(x => x.t)));
+    console.log('المواد في النافذة: ' + JSON.stringify((dlg.accs||[]).slice(0, 6).map(x => x.s + ' ' + x.badge)));
     console.log('صفوف المادة المفتوحة (' + dlg.cur + '): ' + JSON.stringify(dlg.grades.slice(0, 6)));
-    ok('النافذة تعرض المواد أولًا', dlg.subs.length > 0, dlg.subs.length + ' مادة');
+    ok('النافذة تعرض المواد قوائم منسدلة', (dlg.accs||[]).length > 0, (dlg.accs||[]).length + ' مادة');
     ok('تُفتح صفوف المادة المختارة', dlg.grades.length > 0, dlg.grades.length + ' صفًا');
     ok('زر «تحديد كل الصفوف» موجود', dlg.hasAll, 'موجود');
     ok('مفاتيح الصفوف بصيغة «مادة|صف»', dlg.grades.every(g => /\|/.test(g)), dlg.grades[0] || '');
 
-    // نختار كل صفوف المادة ثم نبدّل إلى مادة أخرى ونختار صفًّا واحدًا
+    // نختار كل صفوف المادة ثم نفتح مادة أخرى ونختار صفًّا منها
     const sel = await p.evaluate(async () => {
-      const all = document.querySelector('[data-toggleall]');
-      all.click(); await new Promise(x => setTimeout(x, 700));
-      const afterAll = [...document.querySelectorAll('#scGrades [data-sc]')].filter(x => x.checked).length;
-      const subs = [...document.querySelectorAll('#scSubs [data-sub]')];
-      if (subs.length > 1) { subs[1].click(); await new Promise(x => setTimeout(x, 900)); }
-      const g2 = [...document.querySelectorAll('#scGrades [data-sc]')];
+      const openAcc = document.querySelector('#scAcc .sc-acc[open]') || document.querySelector('#scAcc .sc-acc');
+      const all = openAcc.querySelector('[data-all]');
+      all.checked = true; all.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(x => setTimeout(x, 900));
+      // بعد إعادة الرسم تُستبدل العناصر، فنقرأ من الشجرة الجديدة
+      const acc1 = document.querySelector('#scAcc .sc-acc[open]') || document.querySelector('#scAcc .sc-acc');
+      const afterAll = [...acc1.querySelectorAll('[data-sc]')].filter(x => x.checked).length;
+      const accs = [...document.querySelectorAll('#scAcc .sc-acc')];
+      const second = accs[1] || accs[0];
+      if (second) { second.open = true; await new Promise(x => setTimeout(x, 500)); }
+      const g2 = second ? [...second.querySelectorAll('[data-sc]')] : [];
       if (g2[0]) { g2[0].checked = true; g2[0].dispatchEvent(new Event('change', { bubbles: true })); }
-      await new Promise(x => setTimeout(x, 600));
-      const cur2 = (document.querySelector('#scGrades .sc-ghead b') || {}).textContent || '';
+      await new Promise(x => setTimeout(x, 700));
+      const cur2 = second ? second.getAttribute('data-acc') : '';
       const count = (document.getElementById('scCount') || {}).textContent || '';
-      const badges = [...document.querySelectorAll('#scSubs em')].map(x => x.textContent.trim());
+      const badges = [...document.querySelectorAll('#scAcc .sc-e')].map(x => x.textContent.trim());
       return { afterAll, cur2, count, badges };
     });
     console.log('بعد «تحديد الكل»: ' + sel.afterAll + ' صفًا · المادة الثانية: ' + sel.cur2 + ' · ' + sel.count);

@@ -2,12 +2,33 @@ function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 var toastTimer=null;
 function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg||'تم';t.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('on');},1800);}
+// رمز الجلسة الاحتياطي: بعض المتصفحات (متصفح واتساب/إنستقرام المدمج، أو إعداد
+// «حجب كوكيز الطرف الأول») ترفض كوكي الجلسة، فيعود المعلم لصفحة الدخول بعد كل
+// محاولة ويُسجَّل جهاز جديد كل مرة. فصار الخادم يرسل الرمز في جسم الاستجابة
+// أيضًا، ويُحفظ هنا ويُرسَل في ترويسة — فتعمل الجلسة بلا كوكيز.
+var SID_KEY='tahdir_sid_v1',DID_KEY='tahdir_did_v1';
+function didGet(){try{return localStorage.getItem(DID_KEY)||'';}catch(e){return '';}}
+function didSet(v){try{if(v)localStorage.setItem(DID_KEY,v);else localStorage.removeItem(DID_KEY);}catch(e){}}
+function sidGet(){try{return localStorage.getItem(SID_KEY)||'';}catch(e){return '';}}
+function sidSet(v){try{if(v)localStorage.setItem(SID_KEY,v);else localStorage.removeItem(SID_KEY);}catch(e){}}
 function api(path,data,method){
   var o={method:method||(data?'POST':'GET'),credentials:'same-origin',headers:{}};
   if(data){o.headers['Content-Type']='application/json';o.body=JSON.stringify(data);}
+  var sid=sidGet(),did=didGet();
+  if(path!=='/api/login'){if(sid)o.headers['X-Tahdir-Sid']=sid;if(did)o.headers['X-Tahdir-Did']=did;}
+  else if(did){o.headers['X-Tahdir-Did']=did;}
   return fetch(path,o).then(function(r){
-    if(r.status===401&&path!=='/api/login'){location.href='/';return Promise.reject(new Error('انتهت الجلسة'));}
-    return r.json().catch(function(){return {};}).then(function(j){if(!r.ok)throw new Error(j.error||'حدث خطأ');return j;});
+    if(r.status===401&&path!=='/api/login'){
+      // الرمز الاحتياطي لم يعد صالحًا: نمسحه ونعيد للدخول
+      sidSet('');
+      location.href='/';return Promise.reject(new Error('انتهت الجلسة'));
+    }
+    return r.json().catch(function(){return {};}).then(function(j){
+      if(!r.ok)throw new Error(j.error||'حدث خطأ');
+      if(j&&j.sid)sidSet(j.sid);
+      if(j&&j.did)didSet(j.did);
+      return j;
+    });
   });
 }
 function copyText(text){
@@ -68,7 +89,7 @@ function guard(){
   },true);
   document.addEventListener('dragstart',function(e){e.preventDefault();});
 }
-function logout(){api('/api/logout',{}).then(function(){location.href='/';},function(){location.href='/';});}
+function logout(){api('/api/logout',{}).then(function(){sidSet('');didSet('');location.href='/';},function(){sidSet('');didSet('');location.href='/';});}
 function fmtDate(t){if(!t)return '—';var d=new Date(t);return d.toLocaleDateString('ar-OM',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('ar-OM',{hour:'2-digit',minute:'2-digit'});}
 function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if(s<60)return 'الآن';if(s<3600)return 'منذ '+Math.floor(s/60)+' دقيقة';if(s<86400)return 'منذ '+Math.floor(s/3600)+' ساعة';var d=Math.floor(s/86400);return d===1?'أمس':'منذ '+d+' يوم';}
 // ---------- أداة نور (مشتركة لكل الصفحات) ----------

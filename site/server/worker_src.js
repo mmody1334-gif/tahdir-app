@@ -244,10 +244,14 @@ function cleanUser(u) { return String(u || '').trim().toLowerCase().slice(0, 60)
 // ---------- auth ----------
 async function currentUser(req, env) {
   const c = cookies(req);
-  if (!c.sid) return null;
+  // الجلسة تُقرأ من الكوكي أولًا، ثم من ترويسة X-Tahdir-Sid. بعض المتصفحات
+  // (المدمجة في واتساب/إنستقرام، أو مع حجب كوكيز الطرف الأول) ترفض كوكي الجلسة
+  // فيعود المعلم لصفحة الدخول بعد كل محاولة ويُسجَّل جهاز جديد كل مرة.
+  const sid = c.sid || String(req.headers.get('X-Tahdir-Sid') || '').trim();
+  if (!sid) return null;
   const row = await env.DB.prepare(
     `SELECT s.token, s.device_id, s.expires_at, s.last_seen, u.id, u.name, u.username, u.role, u.active, u.scope
-     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).bind(c.sid).first();
+     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).bind(sid).first();
   if (!row || row.expires_at < now() || !row.active) return null;
   // device must still be registered (admin may have removed it)
   if (row.role !== 'admin') {
@@ -271,7 +275,9 @@ async function login(req, env) {
   const label = deviceLabel(ua) + (b.screen ? ' · ' + String(b.screen).slice(0, 15) : '');
   const ip = ipOf(req);
   const c = cookies(req);
-  let did = /^[a-f0-9]{48}$/.test(c.did || '') ? c.did : null;
+  // معرّف الجهاز من الكوكي، وإلا من ترويسة X-Tahdir-Did (متصفح بلا كوكيز).
+  const hDid = String(req.headers.get('X-Tahdir-Did') || '').trim();
+  let did = /^[a-f0-9]{48}$/.test(c.did || '') ? c.did : (/^[a-f0-9]{48}$/.test(hDid) ? hDid : null);
   const t = now();
   const logA = (ok, reason, uid) => env.DB.prepare('INSERT INTO attempts(username,user_id,ok,reason,device_id,label,ip,at) VALUES(?,?,?,?,?,?,?,?)').bind(username, uid || null, ok ? 1 : 0, reason, did || '', label, ip, t).run();
 
@@ -326,7 +332,8 @@ async function login(req, env) {
   const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC_HEADERS });
   headers.append('Set-Cookie', setCookie('sid', token, SESSION_DAYS * 86400));
   headers.append('Set-Cookie', setCookie('did', did, 63072000));
-  return new Response(JSON.stringify({ ok: true, role: u.role, name: u.name }), { headers });
+  // نُعيد الرمز في الجسم أيضًا ليعمل المتصفح الذي يرفض الكوكيز (انظر currentUser).
+  return new Response(JSON.stringify({ ok: true, role: u.role, name: u.name, sid: token, did }), { headers });
 }
 
 // ---------- lessons ----------
@@ -593,6 +600,8 @@ export default {
       const me = await currentUser(req, env);
       if (p === '/api/logout' && m === 'POST') {
         const c = cookies(req); if (c.sid) await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(c.sid).run();
+        const cs = cookies(req), tk = cs.sid || String(req.headers.get('X-Tahdir-Sid') || '').trim();
+        if (tk) { try { await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(tk).run(); } catch (e) {} }
         return json({ ok: true }, 200, { 'Set-Cookie': setCookie('sid', '', 0) });
       }
       if (p === '/') {

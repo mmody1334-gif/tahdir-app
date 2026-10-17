@@ -130,47 +130,47 @@ function scopeDialog(u){
   var picked={};
   parseScope(u).list.forEach(function(k){picked[k]=1;});
   var subs=scopeSubjects();
-  var cur=subs[0]||'';
-  // اختيار المادة أولًا (لأن المعلم عادةً «معلم لغة عربية» لا «صفوف متفرقة»)،
-  // ثم تُفتح صفوف المادة المختارة. ويبقى المحفوظ تراكميًّا بين المواد.
+  // قوائم منسدلة: كل مادة سطر واحد يُفتح بضغطة ليُظهر صفوفها (بدل قائمة مسطّحة
+  // بكل الصفوف معًا كانت تُلبِس المعلم وتُطيل النافذة). الاختيار تراكميٌّ بين
+  // المواد، وعدّاد كل مادة يظهر على سطرها حتى وهي مغلقة.
   function countOf(s){return subjectGrades(s).filter(function(g){return picked[s+'|'+g];}).length;}
-  function subjPane(){
+  function badge(s){
+    var all=subjectGrades(s),n=countOf(s);
+    if(!n)return '<em class="sc-e">—</em>';
+    return '<em class="sc-e '+(n===all.length?'full':'part')+'">'+(n===all.length?'كل الصفوف ('+all.length+')':n+' من '+all.length)+'</em>';
+  }
+  function rows(){
     return subs.map(function(s){
-      var all=subjectGrades(s),n=countOf(s);
-      return '<button type="button" class="sc-sub'+(s===cur?' on':'')+'" data-sub="'+esc(s)+'">'+
-        '<span class="sc-t">'+esc(s)+'</span>'+
-        '<em class="'+(n===0?'':(n===all.length?'full':'part'))+'">'+(n===0?'—':(n===all.length?'كل الصفوف':n+' من '+all.length))+'</em></button>';
+      var all=subjectGrades(s),open=false;
+      // نفتح تلقائيًّا المواد التي فيها اختيار جزئي (ليتذكّر المعلم ما اختاره)
+      var n=countOf(s); open = n>0 && n<all.length;
+      var body='<div class="sc-in">'+
+        '<label class="sc-all"><input type="checkbox" data-all="'+esc(s)+'"'+(n===all.length&&n>0?' checked':'')+'> تحديد كل صفوف '+esc(s)+'</label>'+
+        '<div class="sc-glist">'+all.map(function(g){
+          var k=s+'|'+g;
+          return '<label class="sc-gi"><input type="checkbox" data-sc="'+esc(k)+'"'+(picked[k]?' checked':'')+'> الصف '+esc(gLabel(g))+'</label>';
+        }).join('')+'</div></div>';
+      return '<details class="sc-acc" data-acc="'+esc(s)+'"'+(open?' open':'')+'>'+
+        '<summary><span class="sc-t">'+esc(s)+'</span>'+badge(s)+'</summary>'+body+'</details>';
     }).join('');
   }
-  function gradePane(){
-    if(!cur)return '<p class="muted">لا توجد مواد بعد.</p>';
-    var all=subjectGrades(cur),n=countOf(cur);
-    return '<div class="sc-ghead"><b>'+esc(cur)+'</b><button type="button" class="btn small" data-toggleall="'+esc(cur)+'">'+(n===all.length?'إلغاء الكل':'تحديد كل الصفوف')+'</button></div>'+
-      '<div class="sc-glist">'+all.map(function(g){
-        var k=cur+'|'+g;
-        return '<label class="sc-gi"><input type="checkbox" data-sc="'+esc(k)+'"'+(picked[k]?' checked':'')+'> الصف '+esc(gLabel(g))+'</label>';
-      }).join('')+'</div>';
-  }
   function paint(){
-    $('scSubs').innerHTML=subjPane();
-    $('scGrades').innerHTML=gradePane();
+    $('scAcc').innerHTML=rows();
     var total=Object.keys(picked).length;
-    $('scCount').textContent=total?('محدَّد: '+total+' صفًا'):'لم تحدّد شيئًا — سيرى المعلم كل الصفوف';
-    Array.prototype.forEach.call(box.querySelectorAll('[data-sub]'),function(b){b.onclick=function(){cur=b.getAttribute('data-sub');paint();};});
-    Array.prototype.forEach.call(box.querySelectorAll('[data-toggleall]'),function(b){b.onclick=function(){
-      var s=b.getAttribute('data-toggleall'),all=subjectGrades(s),n=countOf(s);
-      all.forEach(function(g){if(n===all.length)delete picked[s+'|'+g];else picked[s+'|'+g]=1;});
-      paint();};});
+    $('scCount').textContent=total?('محدَّد: '+total+' صفًا في '+Object.keys(parseScope({scope:JSON.stringify(Object.keys(picked))}).by).length+' مادة'):'لم تحدّد شيئًا — سيرى المعلم كل الصفوف';
     Array.prototype.forEach.call(box.querySelectorAll('[data-sc]'),function(c){c.onchange=function(){
       if(c.checked)picked[c.getAttribute('data-sc')]=1;else delete picked[c.getAttribute('data-sc')];
-      $('scSubs').innerHTML=subjPane();
-      Array.prototype.forEach.call(box.querySelectorAll('[data-sub]'),function(b){b.onclick=function(){cur=b.getAttribute('data-sub');paint();};});
-      var total=Object.keys(picked).length;
-      $('scCount').textContent=total?('محدَّد: '+total+' صفًا'):'لم تحدّد شيئًا — سيرى المعلم كل الصفوف';};});
+      var s=c.getAttribute('data-sc').split('|')[0], det=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]');
+      var op=det?det.open:false; paint();
+      var d2=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'); if(d2)d2.open=op;};});
+    Array.prototype.forEach.call(box.querySelectorAll('[data-all]'),function(c){c.onchange=function(){
+      var s=c.getAttribute('data-all'),all=subjectGrades(s),on=c.checked;
+      all.forEach(function(g){if(on)picked[s+'|'+g]=1;else delete picked[s+'|'+g];});
+      var det=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'),op=det?det.open:true; paint();
+      var d2=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'); if(d2)d2.open=op;};});
   }
-  var h='<p class="m-msg">اختر المادة أولًا ثم صفوفها. ما تختاره يظهر لـ '+esc(u.name)+' في صفحة الدروس والتقويم والنهائيات. وإن تركت الكل فارغًا يرى كل الصفوف.</p>'+
-    '<div class="scope-2"><div class="scope-subs" id="scSubs"></div><div class="scope-grades" id="scGrades"></div></div>'+
-    '<div class="sc-foot" id="scCount"></div>';
+  var h='<p class="m-msg">افتح المادة من القائمة المنسدلة ثم اختر صفوفها. ما تختاره يظهر لـ '+esc(u.name)+' في صفحة الدروس والتقويم والنهائيات. وإن تركت الكل فارغًا يرى كل الصفوف.</p>'+
+    '<div class="sc-accordion" id="scAcc"></div><div class="sc-foot" id="scCount"></div>';
   var ov=$('modal'),box=$('modalBox');
   box.innerHTML='<h3 id="mTitle">المواد والصفوف المسموحة</h3>'+h+'<div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">حفظ</button></div>';ov.hidden=false;
   var close=function(){ov.hidden=true;box.innerHTML='';};
