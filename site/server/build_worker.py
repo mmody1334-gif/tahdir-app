@@ -252,6 +252,22 @@ extra_css = '''
 .sc-full li:last-child{border-bottom:0}
 .sc-g2{margin-top:5px;display:flex;flex-wrap:wrap;gap:2px}
 .pill.ok{background:var(--main-l);color:var(--main-d)}
+/* دليل الاستخدام: طبقة تعتيم + بقعة مضيئة على العنصر + فقاعة بسهم */
+.tour-ov{position:fixed;inset:0;z-index:9000;background:rgba(8,26,22,.62);backdrop-filter:blur(1.5px)}
+.tour-spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(8,26,22,.62),0 0 0 2px #36b37e,0 0 22px 6px rgba(54,179,126,.55);background:transparent;pointer-events:none;transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease}
+.tour-ov:has(.tour-spot:not([hidden])){background:transparent;backdrop-filter:none}
+.tour-tip{position:fixed;z-index:9001;width:min(330px,calc(100vw - 24px));background:var(--paper,#fff);color:var(--ink,#163);border:1px solid var(--line,#d9e5df);border-radius:14px;box-shadow:0 18px 44px rgba(6,30,24,.34);padding:13px 15px;transition:left .18s ease,top .18s ease}
+.tour-tip.center{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:min(400px,calc(100vw - 28px))}
+.tour-tip:after{content:'';position:absolute;width:0;height:0;border:10px solid transparent}
+.tour-tip.down:after{border-bottom-color:var(--paper,#fff);top:-20px;inset-inline-start:var(--ax,24px)}
+.tour-tip.up:after{border-top-color:var(--paper,#fff);bottom:-20px;inset-inline-start:var(--ax,24px)}
+.tour-h{font-weight:800;font-size:1rem;margin-bottom:5px;color:var(--main-d,#0b3b33)}
+.tour-b{font-size:.86rem;line-height:1.85;color:var(--mute,#4a5a55)}
+.tour-f{display:flex;align-items:center;gap:6px;margin-top:11px;flex-wrap:wrap}
+.tour-n{font-size:.76rem;color:var(--mute,#4a5a55);margin-inline-end:auto}
+@keyframes tourPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.tour-tip .btn.primary.small{animation:tourPulse 1.6s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.tour-tip,.tour-spot{transition:none}.tour-tip .btn.primary.small{animation:none}}
 @media(max-width:640px){.scope-2{grid-template-columns:1fr}}
 /* «الصفوف المستخدمة»: تفاصيل تُفتح بدل صفّ رقاقات يمدّ الجدول */
 .sc-used-cell{white-space:nowrap}
@@ -712,6 +728,8 @@ def NAV(active, extra=''):
     # «القيم الثابتة» لم تعد قسمًا مستقلًا: صارت حقولًا داخل تحضير كل درس (الاستراتيجيات
     # والوسائل ومصادر التعلم)، لأن كل مادة — بل كل درس — يحتاج قيمه الخاصة.
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
+    # دليل الاستخدام: يُعاد فتحه متى شاء المعلم (يظهر تلقائيًّا في أول دخول)
+    h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام">؟ دليل</button>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
         ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''

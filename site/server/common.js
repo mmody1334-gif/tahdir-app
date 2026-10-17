@@ -168,6 +168,7 @@ function initNav(me){
     document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
   }
   if($('logoutBtn'))$('logoutBtn').onclick=logout;
+  if($('tourBtn'))$('tourBtn').onclick=function(){var o=$('tourOv');if(o)return;tourStart();};
   if($('toolBtn')){
     if(IN_APP)$('toolBtn').hidden=true;
     else{$('toolBtn').onclick=function(){toolDialog('');};setTimeout(function(){if(toolVersion()||hasExt()){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},1500);}
@@ -222,7 +223,115 @@ function toggleFull(el){
   if(fn&&!IN_APP){try{var r=fn.call(el);done=true;if(r&&r.catch)r.catch(function(){el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');});}catch(e){done=false;}}
   if(!done){el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');}
 }
-// رسالة ترحيبية لمرة واحدة بعد تغيير الهوية إلى «الكبسولة»
+// ---------- دليل الاستخدام: جولة مصوّرة بأسهم لأول دخول ----------
+// تُخزَّن مرة واحدة في localStorage، وتُعاد من زر «؟ دليل» في الشريط.
+// كل خطوة تُظلّل عنصرًا (spotlight) وتُظهر فقاعة بجانبه مع سهم يشير إليه.
+var TOUR_KEY='tahdir_tour_v1',tourEls=null,tourI=0,tourList=[];
+function tourPage(){var p=location.pathname;return p==='/app'?'app':p==='/quiz'?'quiz':p==='/finals'?'finals':p==='/games'?'games':p==='/remedial'?'remedial':p==='/summaries'?'summaries':'other';}
+function tourSteps(){
+  var pg=tourPage();
+  if(pg==='app')return [
+    {sel:null,title:'أهلًا بك في «الكبسولة» 💊',text:'دليل سريع في أربع خطوات: من اختيار الصف إلى إرسال التحضير إلى نور. تقدر تعيده في أي وقت من زر «؟ دليل» أعلى الصفحة.'},
+    {sel:'#subjSel',title:'١) اختر المادة',text:'القائمة الأولى للمواد المتاحة لك، والثانية للصفوف. تظهر لك المواد التي سمح بها المدير فقط.'},
+    {sel:'.g-btn',title:'٢) اختر الصف',text:'اضغط الصف ليفتح، ثم اختر الوحدة، ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في نور.'},
+    {sel:'#toolBtn',title:'٣) ثبّت «أداة نور» مرة واحدة',text:'خطوة واحدة فقط: اضغط الزر ثم «إضافة إلى Chrome». بعدها يصبح الإرسال إلى نور والتصحيح التلقائي بضغطة. (في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.)',cta:'كيف أثبّتها؟'},
+    {sel:'#sendPrepBtn',title:'٤) أرسل التحضير إلى نور',text:'اضغط «إرسال التحضير إلى نور» ونور مفتوحة: تُفتح «إضافة تحضير» للصف ويُختار الدرس وتُملأ الأركان. يبقى لك التاريخ وزر «إضافة».'},
+    {sel:null,title:'كل شيء جاهز ✓',text:'تقدر تعيد هذا الدليل من زر «؟ دليل»، وتجده أيضًا في صفحة «أداة نور».'}
+  ];
+  if(pg==='quiz')return [
+    {sel:null,title:'التقويم والاختبارات',text:'تُبنى الورقة آليًّا من بنك أسئلة الوزارة وفق وثيقة التقويم لصفّك.'},
+    {sel:'#courseSel',title:'١) اختر الصف',text:'ثم علّم الدروس المطلوبة من الشجرة.'},
+    {sel:'#makeBtn',title:'٢) كوّن الورقة',text:'اضغط «كوّن الاختبار» فتظهر الورقة بالدرجات والتوزيع.'},
+    {sel:null,title:'جاهز ✓',text:'تقدر تطبعها أو تنزّلها Word من الأزرار أعلى الورقة.'}
+  ];
+  if(pg==='finals')return [
+    {sel:null,title:'الاختبارات النهائية',text:'أسئلة الوزارة للأعوام السابقة، مقصوصة كما وردت مع الإجابات.'},
+    {sel:'#courseSel',title:'١) اختر المقرر',text:'ثم اختر الوحدة من الشريط الجانبي.'},
+    {sel:null,title:'جاهز ✓',text:'فعّل «إظهار الإجابات» للمراجعة، أو اطبع المختار من الشريط.'}
+  ];
+  return [{sel:null,title:'دليل الاستخدام',text:'تنقّل بين الصفحات من القائمة أعلى الشاشة: التحضير · التقويم · الألعاب · النهائيات.'}];
+}
+function tourRender(){
+  var s=tourList[tourI];if(!s)return tourClose();
+  var ov=$('tourOv'),spot=$('tourSpot'),tip=$('tourTip');if(!ov)return;
+  var t=null;if(s.sel){try{var all=document.querySelectorAll(s.sel);for(var i=0;i<all.length;i++){var r=all[i].getBoundingClientRect();if(r.width>4&&r.height>4&&r.bottom>0&&r.top<innerHeight){t=all[i];break;}}}catch(e){}}
+  if(!t&&s.sel){ // العنصر غير موجود في هذه الصفحة → نتخطّاه
+    if(tourI<tourList.length-1){tourI++;return tourRender();}
+    return tourClose();
+  }
+  if(t){
+    var b=t.getBoundingClientRect(),pad=6;
+    spot.hidden=false;
+    spot.style.left=(b.left-pad)+'px';spot.style.top=(b.top-pad)+'px';
+    spot.style.width=(b.width+pad*2)+'px';spot.style.height=(b.height+pad*2)+'px';
+    t.scrollIntoView({block:'center',behavior:'smooth'});
+  }else spot.hidden=true;
+  tip.className='tour-tip'+(t?'':' center');
+  var h='<div class="tour-h">'+esc(s.title)+'</div><div class="tour-b">'+esc(s.text)+'</div><div class="tour-f">'+
+    '<span class="tour-n">'+(tourI+1)+' / '+tourList.length+'</span>'+
+    (s.cta?'<button type="button" class="btn small" id="tourCta">'+esc(s.cta)+'</button>':'')+
+    '<button type="button" class="btn small" id="tourSkip">تخطّي</button>'+
+    (tourI>0?'<button type="button" class="btn small" id="tourPrev">السابق</button>':'')+
+    '<button type="button" class="btn primary small" id="tourNext">'+(tourI===tourList.length-1?'تم':'التالي')+'</button></div>';
+  tip.innerHTML=h;
+  if(t){
+    var r=t.getBoundingClientRect(),tw=Math.min(330,innerWidth-24),th=tip.offsetHeight||150;
+    var left=Math.max(12,Math.min(innerWidth-tw-12,r.left+r.width/2-tw/2));
+    var below=r.bottom+14,above=r.top-th-14;
+    var top=(below+th<innerHeight-12)?below:Math.max(12,above);
+    tip.style.left=left+'px';tip.style.top=top+'px';
+    tip.className='tour-tip'+(top<r.top?' up':' down');
+    // السهم يصوّب على **مركز العنصر** المُظلَّل، لا على حافة الفقاعة
+    var cx=r.left+r.width/2-left;
+    cx=Math.max(22,Math.min(tw-22,cx));
+    tip.style.setProperty('--ax',cx+'px');
+  }else{
+    tip.style.left='50%';tip.style.top='50%';
+    tip.style.transform='translate(-50%,-50%)';
+  }
+  if(t)tip.style.transform='';
+  if($('tourNext'))$('tourNext').onclick=function(){if(tourI>=tourList.length-1)return tourClose();tourI++;tourRender();};
+  if($('tourPrev'))$('tourPrev').onclick=function(){if(tourI>0)tourI--;tourRender();};
+  if($('tourSkip'))$('tourSkip').onclick=tourClose;
+  if($('tourCta'))$('tourCta').onclick=function(){if(typeof toolDialog==='function')toolDialog('');};
+}
+function tourStart(){
+  tourList=tourSteps();tourI=0;
+  if(!tourList.length)return;
+  var ov=document.createElement('div');ov.id='tourOv';ov.className='tour-ov';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
+  ov.innerHTML='<div class="tour-spot" id="tourSpot" hidden></div><div class="tour-tip" id="tourTip"></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)tourClose();});
+  tourRender();
+  window.addEventListener('resize',tourRender);
+  window.addEventListener('scroll',tourRender,{passive:true});
+  document.addEventListener('keydown',tourKey,true);
+}
+function tourKey(e){if(e.key==='Escape'){e.stopPropagation();tourClose();}}
+function tourClose(){
+  var ov=$('tourOv');if(ov)ov.remove();
+  window.removeEventListener('resize',tourRender);
+  window.removeEventListener('scroll',tourRender);
+  document.removeEventListener('keydown',tourKey,true);
+  try{localStorage.setItem(TOUR_KEY,'1');}catch(e){}
+}
+function tourMaybe(){
+  try{if(localStorage.getItem(TOUR_KEY))return;}catch(e){return;}
+  // لا نُشغّل الجولة في المتصفحات الآلية (لقطات الاختبار) إلا بطلب صريح
+  var force=false;try{force=localStorage.getItem('tahdir_force_tour')==='1';}catch(e){}
+  if(navigator.webdriver&&!force)return;
+  // ننتظر حتى تُغلق أي نافذة مفتوحة (نافذة الترحيب تظهر أول مرة عند 900ms،
+  // والجولة عند 1500ms) — وإلا حُجبت الجولة ولم تظهر أبدًا لأول معلم.
+  var tries=0;
+  setTimeout(function wait(){
+    if(!document.querySelector('header.top'))return;
+    var ov=$('modal');
+    if(ov&&!ov.hidden){if(++tries<40)return setTimeout(wait,500);return;}
+    tourStart();
+  },1000);
+}
+document.addEventListener('DOMContentLoaded',tourMaybe);
+
 (function(){
   var K='kbs_welcome_v1';
   if(navigator.webdriver)return;
