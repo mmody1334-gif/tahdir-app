@@ -158,6 +158,10 @@ function showAnnouncement(){
 }
 // ---------- شريط التنقل: الأساسي ظاهر والباقي في قائمة ----------
 function initNav(me){
+  // «أول دخول» يأتي من الخادم (عدد أحداث الدخول لهذا الحساب ≤ 1)، لا من تخزين
+  // المتصفح — فمن له زيارات سابقة لا يظهر له دليل الاستخدام تلقائيًّا ولو مسح
+  // تخزينه، ومن يدخل أول مرة يراه مرة واحدة.
+  window.IS_FIRST=!!(me&&me.first);
   var mb=$('menuBtn'),ml=$('menuList');
   if(mb&&ml){
     var close=function(){ml.hidden=true;mb.setAttribute('aria-expanded','false');};
@@ -231,10 +235,10 @@ function tourPage(){var p=location.pathname;return p==='/app'?'app':p==='/quiz'?
 function tourSteps(){
   var pg=tourPage();
   if(pg==='app')return [
-    {sel:null,title:'أهلًا بك في «الكبسولة» 💊',text:'دليل سريع في أربع خطوات: من اختيار الصف إلى إرسال التحضير إلى نور. تقدر تعيده في أي وقت من زر «؟ دليل» أعلى الصفحة.'},
-    {sel:'#subjSel',title:'١) اختر المادة',text:'القائمة الأولى للمواد المتاحة لك، والثانية للصفوف. تظهر لك المواد التي سمح بها المدير فقط.'},
-    {sel:'.g-btn',title:'٢) اختر الصف',text:'اضغط الصف ليفتح، ثم اختر الوحدة، ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في نور.'},
-    {sel:'#toolBtn',title:'٣) ثبّت «أداة نور» مرة واحدة',text:'خطوة واحدة فقط: اضغط الزر ثم «إضافة إلى Chrome». بعدها يصبح الإرسال إلى نور والتصحيح التلقائي بضغطة. (في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.)',cta:'كيف أثبّتها؟'},
+    {sel:null,title:'أهلًا بك في «الكبسولة» 💊',text:'خطوتان تفصلانك عن تحضير جاهز يُرسل إلى نور بضغطة: ثبّت أداة نور (مرة واحدة)، ثم اختر صفّك. تقدر تعيد هذا الدليل في أي وقت من زر «؟ دليل» أعلى الصفحة.'},
+    {sel:'#toolBtn',step:'tool',title:'١) ثبّت «أداة نور» — مرة واحدة فقط',text:'هذه هي الخطوة الأولى والأهم: هي التي تُرسل التحضير والواجب إلى نور وتصحّح الواجبات تلقائيًا. اضغط الزر ثم «إضافة إلى Chrome». (في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.)',cta:'كيف أثبّتها؟'},
+    {sel:'#subjSel',title:'٢) اختر المادة',text:'بعد تثبيت الأداة: القائمة الأولى للمواد المتاحة لك، والثانية للصفوف. تظهر لك المواد التي سمح بها المدير فقط.'},
+    {sel:'.g-btn',title:'٣) اختر الصف',text:'اضغط الصف ليفتح، ثم اختر الوحدة، ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في نور.'},
     {sel:'#sendPrepBtn',title:'٤) أرسل التحضير إلى نور',text:'اضغط «إرسال التحضير إلى نور» ونور مفتوحة: تُفتح «إضافة تحضير» للصف ويُختار الدرس وتُملأ الأركان. يبقى لك التاريخ وزر «إضافة».'},
     {sel:null,title:'كل شيء جاهز ✓',text:'تقدر تعيد هذا الدليل من زر «؟ دليل»، وتجده أيضًا في صفحة «أداة نور».'}
   ];
@@ -267,9 +271,20 @@ function tourRender(){
     t.scrollIntoView({block:'center',behavior:'smooth'});
   }else spot.hidden=true;
   tip.className='tour-tip'+(t?'':' center');
-  var h='<div class="tour-h">'+esc(s.title)+'</div><div class="tour-b">'+esc(s.text)+'</div><div class="tour-f">'+
+  // خطوة الأداة تتغيّر إن كانت مثبتة أصلًا (أو كنا داخل التطبيق حيث الأداة مدمجة)
+  var tt=s.title,tb=s.text,cta=s.cta;
+  if(s.step==='tool'){
+    var inst=IN_APP||!!toolVersion()||hasExt();
+    if(inst){
+      tt='١) أداة نور جاهزة ✓';
+      tb=IN_APP?'أنت داخل تطبيق «الكبسولة»، والأداة مدمجة فيه وتتحدّث تلقائيًا — لا تحتاج تثبيت أي شيء. تابع للخطوة التالية.'
+        :'الأداة مثبتة وتعمل على متصفحك ✓ — تقدر ترسل التحضير والواجب إلى نور وتصحّح الواجبات بضغطة. تابع للخطوة التالية.';
+      cta='';
+    }
+  }
+  var h='<div class="tour-h">'+esc(tt)+'</div><div class="tour-b">'+esc(tb)+'</div><div class="tour-f">'+
     '<span class="tour-n">'+(tourI+1)+' / '+tourList.length+'</span>'+
-    (s.cta?'<button type="button" class="btn small" id="tourCta">'+esc(s.cta)+'</button>':'')+
+    (cta?'<button type="button" class="btn small" id="tourCta">'+esc(cta)+'</button>':'')+
     '<button type="button" class="btn small" id="tourSkip">تخطّي</button>'+
     (tourI>0?'<button type="button" class="btn small" id="tourPrev">السابق</button>':'')+
     '<button type="button" class="btn primary small" id="tourNext">'+(tourI===tourList.length-1?'تم':'التالي')+'</button></div>';
@@ -335,20 +350,31 @@ function tourClose(){
 }
 function tourMaybe(){
   try{if(localStorage.getItem(TOUR_KEY))return;}catch(e){return;}
-  // لا نُشغّل الجولة في المتصفحات الآلية (لقطات الاختبار) إلا بطلب صريح
-  var force=false;try{force=localStorage.getItem('tahdir_force_tour')==='1';}catch(e){}
-  if(navigator.webdriver&&!force)return;
-  // ننتظر حتى تُغلق أي نافذة مفتوحة (نافذة الترحيب تظهر أول مرة عند 900ms،
-  // والجولة عند 1500ms) — وإلا حُجبت الجولة ولم تظهر أبدًا لأول معلم.
+  var force=false,testTour=false;
+  try{
+    force=localStorage.getItem('tahdir_force_tour')==='1';      // تجاوز كل الشروط (لقطات)
+    testTour=localStorage.getItem('tahdir_test_tour')==='1';    // تجاوز webdriver فقط
+  }catch(e){}
+  if(navigator.webdriver&&!force&&!testTour)return;
+  // **أول دخول فقط**: العلم من الخادم (IS_FIRST) لا من المتصفح، فمن سبقت له
+  // زيارات لا يظهر له الدليل تلقائيًّا ولو مسح تخزين المتصفح.
+  // مهم: الفحص **داخل** حلقة الانتظار أدناه — لأن IS_FIRST لا يكون مضبوطًا إلا
+  // بعد وصول /api/me، والفحص هنا مبكرًا كان يُلغي الجولة للجميع.
   var tries=0;
-  setTimeout(function wait(){
+  (function wait(){
     if(!document.querySelector('header.top'))return;
+    // ننتظر وصول بيانات المستخدم من الخادم (IS_FIRST يُضبط داخل initNav)
+    if(typeof window.IS_FIRST!=='boolean'){if(++tries<30)return setTimeout(wait,300);return;}
+    if(!force&&!window.IS_FIRST)return;
     var ov=$('modal');
-    if(ov&&!ov.hidden){if(++tries<40)return setTimeout(wait,500);return;}
+    if(ov&&!ov.hidden){if(++tries<60)return setTimeout(wait,500);return;}
     tourStart();
-  },1000);
+  })();
 }
-document.addEventListener('DOMContentLoaded',tourMaybe);
+// السكربت يُحقن في نهاية <body>، وقد يكون DOMContentLoaded وقع بالفعل — فنفحص
+// حالة الاستعداد بدل الاعتماد على الحدث وحده (وإلا لم تُشغَّل الجولة أبدًا).
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',tourMaybe);
+else setTimeout(tourMaybe,0);
 
 (function(){
   var K='kbs_welcome_v1';

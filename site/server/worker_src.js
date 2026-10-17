@@ -602,7 +602,17 @@ export default {
       if (!me) return p.startsWith('/api/') ? json({ error: 'سجّل الدخول أولًا.' }, 401) : redirect('/');
 
       if (p === '/app') return html('app');
-      if (p === '/api/me') return json({ name: me.name, username: me.username, role: me.role });
+      if (p === '/api/me') {
+        // «first»: أول دخول لهذا الحساب — يُستخدم لإظهار دليل الاستخدام مرة واحدة
+        // لمن يدخل أول مرة فقط. معلم له زيارات سابقة (أحداث دخول أكثر من واحد)
+        // لا يظهر له الدليل تلقائيًّا، ولو كان قد مسح تخزين المتصفح.
+        let lg = 0;
+        try {
+          const r = await env.DB.prepare("SELECT COUNT(*) n FROM events WHERE user_id = ? AND type = 'login'").bind(me.id).first();
+          lg = (r && r.n) || 0;
+        } catch (e) { lg = 0; }
+        return json({ name: me.name, username: me.username, role: me.role, first: lg <= 1 });
+      }
       if (p === '/quiz') return html('quiz');
       if (p === '/games') return html('games');
       if (p === '/grading') return html('grading');
