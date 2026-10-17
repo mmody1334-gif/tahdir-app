@@ -226,7 +226,7 @@ function toggleFull(el){
 // ---------- دليل الاستخدام: جولة مصوّرة بأسهم لأول دخول ----------
 // تُخزَّن مرة واحدة في localStorage، وتُعاد من زر «؟ دليل» في الشريط.
 // كل خطوة تُظلّل عنصرًا (spotlight) وتُظهر فقاعة بجانبه مع سهم يشير إليه.
-var TOUR_KEY='tahdir_tour_v1',tourEls=null,tourI=0,tourList=[];
+var TOUR_KEY='tahdir_tour_v1',tourEls=null,tourI=0,tourList=[],tourObs=null;
 function tourPage(){var p=location.pathname;return p==='/app'?'app':p==='/quiz'?'quiz':p==='/finals'?'finals':p==='/games'?'games':p==='/remedial'?'remedial':p==='/summaries'?'summaries':'other';}
 function tourSteps(){
   var pg=tourPage();
@@ -306,13 +306,31 @@ function tourStart(){
   window.addEventListener('resize',tourRender);
   window.addEventListener('scroll',tourRender,{passive:true});
   document.addEventListener('keydown',tourKey,true);
+  // أي نافذة تُفتح أثناء الجولة (إعلان تحديث · تنبيه) تُقدَّم عليها الجولة:
+  // نُخفيها **بلا** وسمها كمُنجَزة كي تعود في زيارة تالية، وإلا حجبت الأزرار.
+  var md=$('modal');
+  if(md&&window.MutationObserver){
+    tourObs=new MutationObserver(function(){
+      if(md&&!md.hidden){tourPause();}
+    });
+    tourObs.observe(md,{attributes:true,attributeFilter:['hidden']});
+  }
+}
+// إخفاء مؤقّت: لا يوسم الجولة كمُنجَزة
+function tourPause(){
+  var ov=$('tourOv');if(ov)ov.remove();
+  tourDetach();
+}
+function tourDetach(){
+  window.removeEventListener('resize',tourRender);
+  window.removeEventListener('scroll',tourRender);
+  document.removeEventListener('keydown',tourKey,true);
+  if(tourObs){try{tourObs.disconnect();}catch(e){}tourObs=null;}
 }
 function tourKey(e){if(e.key==='Escape'){e.stopPropagation();tourClose();}}
 function tourClose(){
   var ov=$('tourOv');if(ov)ov.remove();
-  window.removeEventListener('resize',tourRender);
-  window.removeEventListener('scroll',tourRender);
-  document.removeEventListener('keydown',tourKey,true);
+  tourDetach();
   try{localStorage.setItem(TOUR_KEY,'1');}catch(e){}
 }
 function tourMaybe(){
