@@ -183,6 +183,17 @@ function kpis(){
   var items=[['المعلمون',t.teachers,''],['نشطون هذا الأسبوع',t.active7,''],['مرات الدخول',t.logins,''],['دروس منسوخة',t.copies,''],['أجهزة مرفوضة',blocked,blocked?'warn':'']];
   return '<div class="kpis">'+items.map(function(k){return '<div class="kpi '+k[2]+'"><span class="kpi-n">'+k[1]+'</span><span class="kpi-l">'+k[0]+'</span></div>';}).join('')+'</div>';
 }
+// «الصفوف المستخدمة»: تُعرض قائمةً تُفتح بدل صفٍّ من الرقاقات يمدّ الجدول.
+// وحساب المدير لا تُعرض له إطلاقًا (استخدامه ليس موضوع التقرير).
+function usedGrades(u){
+  if(u.role==='admin')return '<span class="muted">—</span>';
+  var gs=(u.grades||[]).map(function(g){return g.grade;}).filter(Boolean);
+  gs.sort(function(a,b){return gn(a)-gn(b);});
+  if(!gs.length)return '<span class="muted">—</span>';
+  var chips=gs.map(function(g){return '<span class="chip-s">'+esc(g)+'</span>';}).join('');
+  if(gs.length<=2)return chips;
+  return '<details class="sc-used"><summary>'+gs.length+' صفوف</summary><div class="sc-used-in">'+chips+'</div></details>';
+}
 function teacherRows(){
   var list=data.users.filter(function(u){return !q||(u.name+u.username).toLowerCase().indexOf(q)>=0;});
   if(!list.length)return '<div class="empty-state">لا يوجد معلمون بعد. أضف المعلمين من زر «إضافة معلمين».</div>';
@@ -193,7 +204,7 @@ function teacherRows(){
       return '<tr><td><button type="button" class="link-btn" data-open="'+u.id+'"><b>'+esc(u.name)+'</b></button> '+st+'<div class="sub ltr">'+esc(u.username)+'</div></td>'+
         '<td class="num">'+u.logins+'</td><td>'+esc(ago(u.last_login))+'</td>'+
         '<td class="sc-cell">'+(u.role==='admin'?'<span class="muted">الكل</span>':scopeChips(u))+'</td>'+
-        '<td>'+(u.grades.length?u.grades.map(function(g){return '<span class="chip-s">'+esc(g.grade)+'</span>';}).join(''):'<span class="muted">—</span>')+'</td>'+
+        '<td class="sc-used-cell">'+usedGrades(u)+'</td>'+
         '<td class="num">'+u.lessons_copied+'<span class="sub"> درس · '+u.copies+' نسخة</span></td>'+
         '<td><span class="num">'+dv+'/'+(u.role==='admin'?'∞':u.max_devices)+'</span> '+warn+'</td>'+
         '<td><button type="button" class="btn small" data-open="'+u.id+'">التفاصيل</button></td></tr>';

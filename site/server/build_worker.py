@@ -253,6 +253,13 @@ extra_css = '''
 .sc-g2{margin-top:5px;display:flex;flex-wrap:wrap;gap:2px}
 .pill.ok{background:var(--main-l);color:var(--main-d)}
 @media(max-width:640px){.scope-2{grid-template-columns:1fr}}
+/* «الصفوف المستخدمة»: تفاصيل تُفتح بدل صفّ رقاقات يمدّ الجدول */
+.sc-used-cell{white-space:nowrap}
+.sc-used summary{cursor:pointer;font-size:.82rem;color:var(--main-d);font-weight:700;list-style:none;display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border:1px solid var(--line);border-radius:999px;background:var(--main-l)}
+.sc-used summary::-webkit-details-marker{display:none}
+.sc-used summary:before{content:'▾';font-size:.7rem;transition:transform .15s}
+.sc-used[open] summary:before{transform:rotate(180deg)}
+.sc-used-in{margin-top:5px;display:flex;flex-wrap:wrap;gap:2px;max-width:230px}
 .empty-state{background:var(--paper);border:1px dashed var(--line);border-radius:16px;padding:28px;text-align:center;color:var(--mute)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);min-width:0}
