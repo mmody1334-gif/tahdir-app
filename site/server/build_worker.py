@@ -229,6 +229,30 @@ extra_css = '''
 .pill.adm{background:var(--main-l);color:var(--main-d)}
 .pill.warn{background:color-mix(in srgb,var(--danger) 14%,var(--paper));color:var(--danger)}
 .chip-s{display:inline-block;font-size:.74rem;padding:1px 8px;margin:1px;border-radius:999px;background:var(--main-l);color:var(--main-d)}
+/* الصلاحيات بالمواد: رقاقة المادة وعدد صفوفها، ونافذة اختيار (مادة ثم صفوفها) */
+.chip-s .sc-n{display:inline-block;margin-inline-start:5px;font-size:.7rem;font-weight:700;opacity:.75}
+.chip-s .sc-g{margin-inline-start:5px;opacity:.8}
+.sc-cell{max-width:280px}
+.sc-cell .chip-s{display:inline-flex;align-items:center;gap:2px;margin:2px 2px}
+.scope-2{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1.4fr);gap:12px;margin:10px 0;align-items:start}
+.scope-subs{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;padding-inline-end:2px}
+.sc-sub{display:flex;justify-content:space-between;align-items:center;gap:8px;font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);cursor:pointer;text-align:start}
+.sc-sub.on{border-color:var(--main);background:var(--main-l);font-weight:700}
+.sc-sub em{font-style:normal;font-size:.74rem;color:var(--mute);white-space:nowrap}
+.sc-sub em.full{color:var(--main-d);font-weight:700}
+.sc-sub em.part{color:#a76a00;font-weight:700}
+.scope-grades{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--paper);min-height:180px}
+.sc-ghead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.sc-glist{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.sc-gi{display:flex;align-items:center;gap:6px;font-size:.86rem;padding:5px 6px;border-radius:8px;cursor:pointer}
+.sc-gi:hover{background:var(--main-l)}
+.sc-foot{margin-top:6px;font-size:.82rem;color:var(--mute)}
+.sc-full{list-style:none;margin:0 0 4px;padding:0}
+.sc-full li{padding:7px 0;border-bottom:1px dashed var(--line)}
+.sc-full li:last-child{border-bottom:0}
+.sc-g2{margin-top:5px;display:flex;flex-wrap:wrap;gap:2px}
+.pill.ok{background:var(--main-l);color:var(--main-d)}
+@media(max-width:640px){.scope-2{grid-template-columns:1fr}}
 .empty-state{background:var(--paper);border:1px dashed var(--line);border-radius:16px;padding:28px;text-align:center;color:var(--mute)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);min-width:0}
