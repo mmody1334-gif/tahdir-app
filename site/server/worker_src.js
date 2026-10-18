@@ -103,6 +103,8 @@ function finQuizItems(key) {
   return out;
 }
 const BUILD = __BUILD__;
+// أسئلة ألعاب مولّدة من أهداف دروس الرياضيات 5-9 (لا تمسّ توليد الاختبارات)
+const GMATH = __GAMESMATH__;
 LESSONS.forEach(l => { if (!l.subject) l.subject = l.grade === 'الخامس' ? 'العلوم' : 'الأحياء'; if (!l.term) l.term = 1; });
 const LESSON_IDS = new Set(LESSONS.map(l => l.id));
 const courseKey = l => (l.subject || '') + '|' + (l.grade || '');
@@ -571,7 +573,9 @@ async function gamesData(env, me, key) {
   // («اختر الإجابة الصحيحة» بلا سؤال). فنشترط خيارين على الأقل لصلاحية اللعب.
   const playable = q => (q.choices || []).length >= 2;
   const items = QBANK.filter(q => ids.has(q.lesson_id) && playable(q)).map(q => ({ ...q, src: 'bank' }))
-    .concat(finQuizItems(key).filter(q => ids.has(q.lesson_id) && playable(q)).map(q => ({ ...q, src: 'fin' })));
+    .concat(finQuizItems(key).filter(q => ids.has(q.lesson_id) && playable(q)).map(q => ({ ...q, src: 'fin' })))
+    // أسئلة الرياضيات المولّدة من أهداف الدروس (حزمة مستقلة: لا تمسّ توليد الاختبارات)
+    .concat(GMATH.filter(q => ids.has(q.lesson_id) && playable(q)));
   let k = 0;
   ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
     const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;
