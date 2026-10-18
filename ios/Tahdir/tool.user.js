@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.5
+// @version      3.4.6
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -80,13 +80,28 @@
       g.__TAHDIR_READY = ready;
     }catch(e){}
   })();
-  const VERSION = '3.4.5';
+  const VERSION = '3.4.6';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
   const PENDING_KEY = 'tahdir_pending_hw';
   const PREP_KEY = 'tahdir_pending_prep';
+  // **استقبال المهمة من الرابط**: إن جاء نور برابط يحمل #tahdir=… فكّ الترميز
+  // واحفظها كأنها وصلت عبر التخزين، ثم نظّف الرابط. هذا يجعل النقل بين المنصة
+  // ونور يعمل بلا اعتماد على تخزين مشترك بين المواقع (شرط عملها على سافاري/iOS).
+  try {
+    const m = /[#&]tahdir=([^&]+)/.exec(location.hash || '');
+    if (m) {
+      const json = decodeURIComponent(escape(atob(decodeURIComponent(m[1]))));
+      const data = JSON.parse(json);
+      if (data && data.source === 'tahdir-al-aali') {
+        const key = data.kind === 'homework' ? PENDING_KEY : PREP_KEY;
+        GM_setValue(key, { data: data, ts: Date.now(), routed: true });
+        try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      }
+    }
+  } catch (e) {}
   const CID_KEY = 'tahdir_last_cid';
   const GRADES_KEY = 'tahdir_grade_cids';
   const TASKS_KEY = 'tahdir_nour_tasks';   // المهام الإلكترونية التي قرأتها الأداة من نور (لكل صف)
@@ -169,7 +184,15 @@
       GM_setValue(kind === 'prep' ? PREP_KEY : PENDING_KEY, { data: data, ts: Date.now(), routed: false });
       document.dispatchEvent(new CustomEvent('tahdir-' + kind + '-ack'));
       // نفتح نور مباشرة على صفحة هذا الصف (أو الرئيسية أول مرة لنتعرف على أرقام الصفوف)
-      GM_openInTab(routeUrl(kind, data.grade || '', data.subject || ''), { active: true });
+      let url = routeUrl(kind, data.grade || '', data.subject || '');
+      // **نقل المهمة داخل الرابط** كمسار مضمون لا يعتمد على التخزين المشترك بين
+      // المواقع (سافاري/iOS قد لا يوفّره). نور يقرأ الهاش عند الإقلاع فيتصرّف.
+      try {
+        const json = JSON.stringify(data);
+        const b64 = btoa(unescape(encodeURIComponent(json)));
+        if (b64.length < 60000) url += (url.indexOf('#') >= 0 ? '&' : '#') + 'tahdir=' + encodeURIComponent(b64);
+      } catch (e) {}
+      GM_openInTab(url, { active: true });
     }
     // ---- التصحيح التلقائي: الموقع يطلب المهام المحفوظة، أو جلبها من نور، أو بدء التصحيح ----
     const reply = (type, obj) => document.dispatchEvent(new CustomEvent('tahdir-' + type, { detail: JSON.stringify(obj) }));
