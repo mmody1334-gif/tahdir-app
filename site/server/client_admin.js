@@ -239,16 +239,51 @@ function render(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-dell]'),function(b){b.onclick=function(){dialog({title:'حذف هذا الدرس؟',message:'يُحذف من صفحة الدروس لكل المعلمين.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/custom_lessons/'+b.getAttribute('data-dell'),null,'DELETE').then(function(){toast('حُذف الدرس');load();});});};});
 }
 function addTeachers(){
-  var sc='<p class="m-msg">الصفوف التي تظهر لهم (اتركها كلها فارغة ليروا كل الصفوف، ويمكن تعديلها لاحقًا لكل معلم):</p><div class="parts" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'+sortedCourses().map(function(c){return '<label><input type="checkbox" data-isc="'+esc(c.key)+'"> '+esc(c.subject)+' — '+esc(gLabel(c.grade))+'</label>';}).join('')+'</div>';
-  // نقرأ الصفوف المختارة من النافذة نفسها قبل إغلاقها (المؤقت السابق كان قد لا يلحق ربط المربعات)
-  var chosenOf=function(box){
-    var out=[];
-    Array.prototype.forEach.call(box.querySelectorAll('[data-isc]'),function(c){if(c.checked)out.push(c.getAttribute('data-isc'));});
-    return out;
-  };
-  dialog({title:'إضافة معلمين',message:'اكتب كل معلم في سطر: الاسم، اسم المستخدم، كلمة المرور. لو تركت كلمة المرور فاضية تُنشأ تلقائيًا.',html:sc,textarea:true,placeholder:'أحمد البلوشي، ahmed.b، 123456\nسالم الهنائي، salim.h',okText:'إضافة',
-    // على «موافق» نُرجع النص والصفوف معًا؛ وعلى الإلغاء المصدر لم يُقرأ فلا نضيف أحدًا
-    extra:function(box){var scopes=chosenOf(box);return {text:(box.querySelector('#mText')||{}).value||'',scope:scopes};}}).then(function(r){
+  // قوائم منسدلة بدل شبكة ضخمة بكل المقررات: مادة واحدة تُفتح لتُظهر صفوفها،
+  // وخيار «تحديد كل الصفوف» لكل مادة — أخفّ بكثير عند إضافة معلم.
+  var picked={};
+  function countOf(s){return subjectGrades(s).filter(function(g){return picked[s+'|'+g];}).length;}
+  function accHtml(){
+    return scopeSubjects().map(function(s){
+      var all=subjectGrades(s), n=countOf(s);
+      var badge = n ? (n===all.length?'كل الصفوف ('+all.length+')':n+' من '+all.length) : '—';
+      return '<details class="sc-acc" data-acc="'+esc(s)+'"'+(n>0&&n<all.length?' open':'')+'>'+
+        '<summary><span class="sc-t">'+esc(s)+'</span><em class="sc-e'+(n===all.length&&n?' full':(n?' part':''))+'">'+badge+'</em></summary>'+
+        '<div class="sc-in"><label class="sc-all"><input type="checkbox" data-all="'+esc(s)+'"'+(n===all.length&&n?' checked':'')+'> تحديد كل صفوف '+esc(s)+'</label>'+
+        '<div class="sc-glist">'+all.map(function(g){
+          var k=s+'|'+g;
+          return '<label class="sc-gi"><input type="checkbox" data-sc="'+esc(k)+'"'+(picked[k]?' checked':'')+'> الصف '+esc(gLabel(g))+'</label>';
+        }).join('')+'</div></div></details>';
+    }).join('');
+  }
+  var sc='<p class="m-msg">اختر المواد والصفوف التي ستظهر لهم. اتركها فارغة ليروا كل الصفوف — ويمكن تعديلها لاحقًا لكل معلم.</p>'+
+    '<div class="sc-accordion" id="addAcc"></div><p class="sc-foot" id="addCount"></p>';
+  var pr=dialog({title:'إضافة معلمين',message:'اكتب كل معلم في سطر: الاسم، اسم المستخدم، كلمة المرور. لو تركت كلمة المرور فاضية تُنشأ تلقائيًا.',html:sc,textarea:true,placeholder:'أحمد البلوشي، ahmed.b، 123456\nسالم الهنائي، salim.h',okText:'إضافة',
+    extra:function(box){return {text:(box.querySelector('#mText')||{}).value||'',scope:Object.keys(picked)};}});
+  // بناء القوائم بعد إدراجها في النافذة
+  (function bind(){
+    var box=$('modalBox'); if(!box||!$('addAcc'))return;
+    function paint(){
+      $('addAcc').innerHTML=accHtml();
+      var total=Object.keys(picked).length;
+      $('addCount').textContent=total?('محدَّد: '+total+' صفًا'):'لم تحدّد شيئًا — سيرى المعلم كل الصفوف';
+      wire();
+    }
+    function wire(){
+      Array.prototype.forEach.call(box.querySelectorAll('[data-sc]'),function(c){c.onchange=function(){
+        var k=c.getAttribute('data-sc');
+        if(c.checked)picked[k]=1;else delete picked[k];
+        var s=k.split('|')[0], det=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'), op=det?det.open:false;
+        paint(); var d2=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'); if(d2)d2.open=op;};});
+      Array.prototype.forEach.call(box.querySelectorAll('[data-all]'),function(c){c.onchange=function(){
+        var s=c.getAttribute('data-all'), all=subjectGrades(s), on=c.checked;
+        all.forEach(function(g){if(on)picked[s+'|'+g]=1;else delete picked[s+'|'+g];});
+        var det=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'), op=det?det.open:true;
+        paint(); var d2=box.querySelector('[data-acc="'+s.replace(/"/g,'\\"')+'"]'); if(d2)d2.open=op;};});
+    }
+    paint();
+  })();
+  return pr.then(function(r){
     if(!r||!r.text)return;
     var chosen=r.scope||[];
     api('/api/admin/import',{text:r.text,scope:chosen}).then(function(res){
