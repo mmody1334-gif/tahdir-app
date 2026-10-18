@@ -692,7 +692,12 @@ extra_css += '''
 .chk-drop:hover,.chk-drop.over,.chk-drop:focus{background:#e8f5ef;border-color:var(--main);outline:none}
 .chk-ic{font-size:1.8rem;line-height:1}
 .chk-link{color:var(--main);font-weight:700;text-decoration:underline}
-.chk-hint{margin-top:4px;font-size:.8rem;color:var(--mute)}
+.chk-hint{margin-top:4px;font-size:.8rem;color:var(--mute)}.chk-drop.has{background:#e6f6ee;border-color:#1e8a63;border-style:solid}
+.chk-ok{display:flex;align-items:center;gap:10px;margin:10px 0 0;padding:11px 14px;background:#e6f6ee;border:2px solid #1e8a63;border-radius:12px;color:#0b5c42;font-weight:700;font-size:.94rem}
+.chk-ok-ic{width:26px;height:26px;border-radius:50%;background:#1e8a63;color:#fff;display:grid;place-items:center;font-size:.85rem;flex:0 0 auto}
+.chk-ok>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk-ok-x{border:0;background:#0b5c42;color:#fff;border-radius:9px;padding:6px 11px;cursor:pointer;font:inherit;font-size:.8rem;font-weight:700;flex:0 0 auto}
+.chk-ok-x:hover{background:#083f2c}
 .chk-grid{display:flex;gap:12px;margin:14px 0;flex-wrap:wrap;align-items:flex-start}
 .chk-lb{display:flex;flex-direction:column;gap:5px;font-size:.86rem;font-weight:700;color:#224}
 .chk-grow{flex:1;min-width:240px}
@@ -704,6 +709,7 @@ extra_css += '''
 .chk-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .chk-stat{font-size:.84rem;color:var(--mute)}
 .chk-out{margin-top:14px}
+.chk-note{background:#fff7e6;border:1px solid #f0c26a;border-radius:12px;padding:13px 15px;color:#7a4a09;font-size:.92rem;line-height:1.9}
 .chk-err{color:#9b1c1c;background:#fdeaea;border:1px solid #f3c7c7;border-radius:10px;padding:10px 12px;font-size:.9rem}
 .chk-res{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:.9rem}
 .chk-res.ok{background:#e8f6ef;border:1px solid #b9e0cd;color:#0b5c42}
@@ -856,6 +862,11 @@ QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبا
     <div><b>اسحب الملف هنا</b> أو <span class="chk-link">اختر ملفًا</span></div>
     <div class="chk-hint">Word (.docx) · PDF · نصّ (.txt)</div>
     <input type="file" id="chkFile" accept=".docx,.pdf,.txt" hidden>
+  </div>
+  <div class="chk-ok" id="chkFileOk" hidden role="status" aria-live="polite">
+    <span class="chk-ok-ic">✓</span>
+    <span id="chkFileOkTxt"></span>
+    <button type="button" class="chk-ok-x" id="chkFileClear" aria-label="إزالة الملف">✕ إزالة</button>
   </div>
   <div class="chk-grid">
     <div class="chk-lb">

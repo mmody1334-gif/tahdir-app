@@ -408,9 +408,68 @@ const SHORT_SPECS = (function () {
 })();
 
 function checkQuizText(text, grade, subject, withAnswer) {
-  const norm = String(text || '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+  const clean = s => String(s || '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').replace(/[\u200e\u200f\u202a-\u202e]/g, '')
     .replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
-    .replace(/[\u06f0-\u06f9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06f0 + 48));
+    .replace(/[\u06f0-\u06f9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06f0 + 48))
+    // درجات مكتوبة بأقواس معكوسة في بعض ملفات PDF: «]4[» بدل «[4]»
+    .replace(/\]\s*(\d{1,2})\s*\[/g, '[$1]')
+    .replace(/\[\s*(\d{1,2})\s*\[/g, '[$1]');
+  // **كشف النصّ المعكوس**: ملفات PDF عربية كثيرة تخزّن الحروف بترتيب بصري (RTL)
+  // فيخرج السطر «: مسلأا نامع ةنطلس» بدل «سلطنة عمان الأصل:». العلامة العملية أن
+  // أرقام الأسئلة تظهر **في نهاية** السطر «)1» بدل بدايته «1)». فنعكس كل سطر.
+  // **تصحيح ترتيب النصّ**: ملفات PDF العربية تُخرج الكلمات بترتيب **بصري** (الكلمة
+  // الأخيرة أوّلًا) وحروف كل كلمة سليمة. فنحاول ثلاثة ترتيبات ونختار الأصحّ بقياس
+  // عدد الكلمات العربية الشائعة الظاهرة (النصّ السليم يحتويها بكثرة).
+  const COMMON = ['من', 'في', 'على', 'أن', 'هذا', 'هذه', 'التي', 'الذي', 'مع', 'عن', 'إلى', 'الى', 'هو', 'هي', 'ما', 'لا', 'كل', 'بعد', 'قبل', 'بين', 'عند', 'كان', 'قد', 'أو', 'او', 'ثم', 'لكن', 'عدد', 'سؤال', 'الدرجة', 'يجب', 'أي', 'اي'];
+  const wordsOf = s => new Set((String(s).match(/[\u0600-\u06FF]+/g) || []));
+  const hitsOf = s => { const w = wordsOf(s); let n = 0; COMMON.forEach(x => { if (w.has(x)) n++; }); return n; };
+  const fixNum = l => {
+    const m = /^[\.\)\-،]?\s*(\d{1,2})\s*[\.\)\-،]?\s+/.exec(l);
+    return m ? (m[1] + ') ' + l.slice(m[0].length)) : l;
+  };
+  let norm = clean(text);
+  let unreversed = false;
+  const hBase = hitsOf(norm);
+  // في الترتيب البصري يأتي رقم المفردة **ملتصقًا بآخر كلمة** («…كشفت.1»).
+  // فنفصله أولًا، ثم نعكس ترتيب الكلمات، ثم نُعيد الرقم إلى أوّل السطر.
+  const revWordsLine = l => {
+    let s = l.trim(), num = null;
+    const mEnd = /^(.*?)[\s]*[\.\)\-،]?\s*(\d{1,2})\s*[\.\)\-،]?\s*$/.exec(s);
+    if (mEnd && mEnd[1].trim()) { num = mEnd[2]; s = mEnd[1].trim(); }
+    const r = s.split(/\s+/).reverse().join(' ');
+    return num ? (num + ') ' + r) : r;
+  };
+  const byChars = norm.split('\n').map(l => l.split('').reverse().join('')).join('\n');
+  const byWords = norm.split('\n').map(revWordsLine).join('\n');
+  const hChars = hitsOf(byChars), hWords = hitsOf(byWords);
+  const bestHits = Math.max(hBase, hChars, hWords);
+  if (bestHits > hBase && bestHits === hWords) {
+    norm = byWords.split('\n').map(fixNum).join('\n'); unreversed = true;
+  } else if (bestHits > hBase && bestHits === hChars) {
+    norm = byChars.split('\n').map(fixNum).join('\n'); unreversed = true;
+  }
+  // **رقم المفردة في نهاية السطر**: بعض ملفات PDF تلصق الرقم بآخر كلمة («…كشفت.1»)
+  // بدل أن تبدأ به. ننقله إلى أوّل السطر — بشرط أن يسبقه نصّ كافٍ حتى لا نحوّل
+  // أرقام الخيارات («1- …») إلى مفردات.
+  norm = norm.split('\n').map(l => {
+    const s = l.trim();
+    const m = /^(.*\S)\s*[\.\)\-،]?\s*(\d{1,2})\s*[\.\)\-،]?\s*$/.exec(s);
+    if (!m) return l;
+    const body = m[1].trim(), num = m[2];
+    if (body.length < 15) return l;                 // نصّ قصير جدًا: ليس مفردة
+    if (/^\d{1,2}\s*[\)\.\-]/.test(body)) return l;  // يبدأ برقم أصلًا
+    return num + ') ' + body;
+  }).join('\n');
+  // بوّابة جودة: نصّ عربي كثير بلا كلمات شائعة = مقروء خطأً (بصري/ممسوح)
+  if (wordsOf(norm).size >= 12 && bestHits < 3) {
+    return {
+      unreadable: true,
+      message: 'لم أستطع قراءة نصّ هذا الملف بدقة (يخزّن الحروف بترتيب بصري أو أنه صور ممسوحة). '
+        + 'افحص نسخة Word من الورقة، أو انسخ النصّ والصقه في المربّع — فالفحص يعتمد على النصّ لا على الشكل.',
+      summary: { items: 0, marks: 0, expectedMarks: 0, grade: 0, fails: 0, warns: 0, unreversed: false },
+      checks: [], items: [],
+    };
+  }
   const all = norm.split('\n').map(l => l.trim()).filter(l => l);
   const g = FG[grade] || 11;
   const spec = SHORT_SPECS[g] || SHORT_SPECS[11];
@@ -452,7 +511,12 @@ function checkQuizText(text, grade, subject, withAnswer) {
     if (mm) marks = +mm[1];
     const optMarks = (bodyNoNum.match(/(^|\s)[أبجد]\s*[\)\]]/g) || []).length;
     const bubbled = (bodyNoNum.match(/\u2b2d/g) || []).length;
-    const isMcq = optMarks >= 3 || bubbled >= 3;
+    // **خيارات مرقّمة**: كثير من أوراق الوزارة ترقّم الخيارات (1- 2- 3- 4-) بدل الحروف.
+    // وجود الأرقام 1..4 داخل المفردة علامة قوية على أنها اختيار من متعدد.
+    const numSet = {};
+    (bodyNoNum.match(/(?:^|\s)([1-4])\s*[-–\)\.]/g) || []).forEach(s => { const d = (/[1-4]/.exec(s) || [])[0]; if (d) numSet[d] = 1; });
+    const numOpts = Object.keys(numSet).length;
+    const isMcq = optMarks >= 3 || bubbled >= 3 || numOpts >= 4;
     const firstPart = bodyNoNum.split(/\n/).filter(x => !/^\s*[أبجد]\s*[\)\]]/.test(x)).join(' ').slice(0, 120);
     let goal = goalMap[s.n] || null;
     if (!goal) {
@@ -480,12 +544,19 @@ function checkQuizText(text, grade, subject, withAnswer) {
   // ③ الدرجة الكلية
   const withMarks = items.filter(x => x.marks != null);
   const total = withMarks.reduce((a, x) => a + x.marks, 0);
-  add('total', 'الدرجة الكلية ' + spec.total, (withMarks.length === cnt && total === spec.total) ? 'pass' : (withMarks.length ? 'fail' : 'warn'),
-    withMarks.length ? total + ' درجة' + (withMarks.length < cnt ? ' (لم تُقرأ درجة ' + (cnt - withMarks.length) + ' مفردات)' : '') : 'لم أتمكّن من قراءة الدرجات — تأكد أنها مكتوبة هكذا [4]');
+  const allMarks = withMarks.length === cnt;
+  add('total', 'الدرجة الكلية ' + spec.total,
+    (allMarks && total === spec.total) ? 'pass' : (allMarks ? 'fail' : 'warn'),
+    withMarks.length
+      ? (allMarks ? (total + ' درجة') : ('قُرئت ' + withMarks.length + ' من ' + cnt + ' درجة — الورقة المطبوعة قد لا تُظهر درجات المفردات'))
+      : 'لم أتمكّن من قراءة الدرجات — تأكد أنها مكتوبة هكذا [4]');
   // ④ بداية السؤال
-  const badStart = items.filter(x => x.start && !QSTART.test(x.start));
-  add('qstart', 'كل سؤال يبدأ بأداة استفهام أو فعل أمر', badStart.length ? 'warn' : 'pass',
-    badStart.length ? 'تحتاج مراجعة: ' + badStart.map(x => 'م' + x.n).join('، ') : 'كل المفردات سليمة');
+  // قاعدة الصياغة تُطبَّق على المفردات **الكتابية** فقط؛ سؤال الاختيار نصّه غالبًا
+  // عبارة يكملها الخيار («جميع ما يلي… ما عدا») فهو سليم وإن لم يبدأ باستفهام.
+  const textItems = items.filter(x => !x.isMcq);
+  const badStart = textItems.filter(x => x.start && !QSTART.test(x.start));
+  add('qstart', 'المفردات الكتابية تبدأ بأداة استفهام أو فعل أمر', badStart.length ? 'warn' : 'pass',
+    badStart.length ? 'تحتاج مراجعة: ' + badStart.map(x => 'م' + x.n).join('، ') : (textItems.length ? 'كل المفردات سليمة' : 'لا مفردات كتابية'));
   // ⑤ الخيارات
   const mcqs = items.filter(x => x.isMcq);
   const badOpt = mcqs.filter(x => x.opts !== 4);
@@ -528,7 +599,7 @@ function checkQuizText(text, grade, subject, withAnswer) {
   }
   const fails = checks.filter(c => c.status === 'fail').length, warns = checks.filter(c => c.status === 'warn').length;
   return {
-    ok: fails === 0, summary: { items: cnt, marks: total, expectedMarks: spec.total, grade: g, range: spec.items, fails, warns },
+    ok: fails === 0, summary: { items: cnt, marks: total, expectedMarks: spec.total, grade: g, range: spec.items, fails, warns, unreversed: unreversed },
     checks, items: items.map(x => ({ n: x.n, marks: x.marks, mcq: x.isMcq, opts: x.opts, goal: x.goal, start: x.start.slice(0, 90) })),
   };
 }

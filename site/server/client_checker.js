@@ -137,7 +137,7 @@
     h += '<div class="chk-sum"><span class="chk-num">' + (s.items || 0) + '</span> مفردة</div>';
     h += '<div class="chk-sum"><span class="chk-num">' + (s.marks || 0) + '</span> / ' + (s.expectedMarks || '—') + ' درجة</div>';
     h += '<div class="chk-sum"><b>' + (s.fails || 0) + '</b> خطأ · <b>' + (s.warns || 0) + '</b> ملاحظة</div>';
-    h += '</div><ul class="chk-list">';
+    h += '</div>' + (rep.pdfNote ? '<div class="chk-note" style="margin:0 0 10px">' + esc(rep.pdfNote) + '</div>' : '') + '<ul class="chk-list">';
     rep.checks.forEach(function (c) {
       h += '<li class="chk-it chk-' + c.status + '"><span class="chk-ic">' + (ICON[c.status] || '·') + '</span>'
         + '<span class="chk-tx"><b>' + esc(c.title) + '</b>' + (c.detail ? '<span class="chk-dt">' + esc(c.detail) + '</span>' : '') + '</span></li>';
@@ -187,8 +187,20 @@
       });
       var rep = await r.json();
       if (!r.ok) throw new Error(rep && rep.error || 'تعذّر الفحص');
+      // ملف تعذّرت قراءته بدقة (PDF بصري أو صور ممسوحة): نوضّح بدل عرض تقرير خاطئ
+      if (rep && rep.unreadable) {
+        if (out) out.innerHTML = '<div class="chk-note"><b>تعذّرت قراءة هذا الملف بدقة</b><br>' + esc(rep.message) + '</div>';
+        if (stat) stat.textContent = '';
+        if (btn) btn.disabled = false;
+        return;
+      }
       // PDF: غالبًا يخرج النصّ معكوسًا فيصعب الحكم على الصياغة — نوسمه
-      if (source === 'pdf') rep.checks.forEach(function (c) { if (c.id === 'qstart') { c.status = 'skip'; c.detail = 'لم يُفحص: نصّ PDF قد يخرج معكوسًا — ارفع Word أو الصق النصّ'; } });
+      // لو عُكس النصّ تلقائيًّا (PDF بصري) صار قابلًا للحكم على الصياغة أيضًا.
+      if (source === 'pdf' && !(rep.summary && rep.summary.unreversed)) {
+        rep.checks.forEach(function (c) { if (c.id === 'qstart') { c.status = 'skip'; c.detail = 'لم يُفحص: نصّ PDF قد يخرج معكوسًا — ارفع Word أو الصق النصّ'; } });
+      }
+      // ورقة خارجية بصيغة PDF: نُنبه أن بعض القواعد قد لا تُقرأ لالتصاق الكلمات
+      if (source === 'pdf') rep.pdfNote = 'قراءة PDF تقريبية: قد تلتصق بعض الكلمات وتُفقد الدرجات أو الخيارات. للدقة الكاملة ارفع نسخة Word أو الصق النصّ.';
       render(rep);
       if (stat) stat.textContent = txt.length.toLocaleString('ar') + ' حرفًا · ' + ({ docx: 'Word', pdf: 'PDF', text: 'نصّ', txt: 'نصّ' }[source] || '');
     } catch (e) {
@@ -203,6 +215,30 @@
   // فكان السحب يُفتح ويقول «اختر ملفًا» بلا فائدة.
   var droppedFile = null;
 
+  // شريط تأكيد **واضح** بعد الرفع: الاسم والحجم والنوع بلون أخضر بارز، مع زر إزالة.
+  // كان التأكيد سطرًا رماديًّا صغيرًا أسفل الزر فلا يُلاحظ أن الرفع تمّ.
+  function showFile(f) {
+    var bar = $('#chkFileOk'), txt = $('#chkFileOkTxt'), drop = $('#chkDrop'), st = $('#chkStat');
+    if (!bar || !txt) return;
+    var ext = (f.name.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase();
+    var kind = ext === 'docx' ? 'Word' : ext === 'pdf' ? 'PDF' : ext === 'txt' ? 'نصّ' : (ext || 'ملف');
+    var kb = f.size < 1024 ? f.size + ' بايت' : Math.round(f.size / 1024) + ' KB';
+    // <bdi> يعزل اتجاه اسم الملف والحجم (لاتيني) عن النصّ العربي فلا يتشابكان
+    txt.innerHTML = 'تم اختيار الملف: <bdi>' + esc(f.name) + '</bdi> · <bdi>' + esc(kb) + '</bdi> · ' + esc(kind) + ' — جاهز للفحص';
+    bar.hidden = false;
+    if (drop) drop.classList.add('has');
+    if (st) st.textContent = '';
+  }
+  function clearFile() {
+    var bar = $('#chkFileOk'), inp = $('#chkFile'), drop = $('#chkDrop'), st = $('#chkStat'), out = $('#chkOut');
+    droppedFile = null;
+    if (inp) { try { inp.value = ''; } catch (e) { } }
+    if (bar) bar.hidden = true;
+    if (drop) drop.classList.remove('has');
+    if (st) st.textContent = '';
+    if (out) out.innerHTML = '';
+  }
+
   function init() {
     var drop = $('#chkDrop'), inp = $('#chkFile'), pick = $('#chkRun'), panel = $('#chkPanel');
     if (!drop || !inp) return;
@@ -211,16 +247,17 @@
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0];
       droppedFile = null;
-      var st = $('#chkStat');
-      if (st) st.textContent = f ? ('اخترت: ' + f.name + ' · ' + Math.round(f.size / 1024) + ' KB') : '';
+      if (f) showFile(f); else clearFile();
     });
+    var clr = $('#chkFileClear');
+    if (clr) clr.addEventListener('click', function (e) { e.stopPropagation(); clearFile(); });
     function takeDrop(e) {
       var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if (!f) return;
       e.preventDefault();
       droppedFile = f;
       try { var dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; } catch (err) { }
-      var st = $('#chkStat'); if (st) st.textContent = 'اخترت: ' + f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
+      showFile(f);
       run();
     }
     // نستقبل السحب على الصندوق **وعلى القسم كله** حتى لا يفتح المتصفح الملف
@@ -240,6 +277,8 @@
     window.addEventListener('drop', function (e) { e.preventDefault(); }, false);
     if (pick) pick.addEventListener('click', run);
   }
+  // منفذ تشخيص (للاختبار الآلي فقط): يتيح فحص ما يُستخرج من الملفات بدقّة.
+  try { window.__tahdirChk = { readPdf: readPdf, readDocxEntries: readDocxEntries, xmlToText: xmlToText }; } catch (e) { }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 })();
