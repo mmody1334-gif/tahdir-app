@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.3
+// @version      3.4.4
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -36,10 +36,16 @@
       if(typeof g.GM_setValue!=='function')g.GM_setValue=function(k,v){try{localStorage.setItem(P+k,JSON.stringify(v));}catch(e){}};
       if(typeof g.GM_deleteValue!=='function')g.GM_deleteValue=function(k){try{localStorage.removeItem(P+k);}catch(e){}};
       if(typeof g.GM_registerMenuCommand!=='function')g.GM_registerMenuCommand=function(){};
-      if(typeof g.GM_openInTab!=='function')g.GM_openInTab=function(u){try{window.open(u,'_blank');}catch(e){}};
+      // فتح التبويب: نُفضّل GM.openInTab غير المتزامنة (Userscripts على iOS/سافاري)
+      // لأن سافاري يحجب window.open إذا لم يكن ناتجًا عن لمسة مباشرة، فكانت الأداة
+      // «تعمل على المنصة ولا تفتح نور». ونرجع إلى window.open عند عدم توفرها.
+      if(typeof g.GM_openInTab!=='function')g.GM_openInTab=function(u,o){
+        try{ if(g.GM&&typeof g.GM.openInTab==='function'){ g.GM.openInTab(u,!(o&&o.active)); return; } }catch(e){}
+        try{window.open(u,'_blank');}catch(e){}
+      };
     }catch(e){}
   })();
-  const VERSION = '3.4.3';
+  const VERSION = '3.4.4';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
