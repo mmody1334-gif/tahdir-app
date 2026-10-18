@@ -222,6 +222,19 @@ const SEC_HEADERS = {
 function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC_HEADERS, ...extra } });
 }
+// استجابة JSON كبيرة (كتالوج الدروس ~6.5MB) مع ETag: أول طلب يحمّل البيانات، وكل
+// عودة لاحقة تُرجع **304 بلا جسم** — فكان الرجوع للصفحة الرئيسية يعيد تنزيل
+// الكتالوج كاملًا فيبدو ثقيلًا.
+function hashStr(s) { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; } return h.toString(16); }
+function jsonETag(req, data) {
+  const body = JSON.stringify(data);
+  const etag = '"' + (BUILD && BUILD.sha || '') + '-' + body.length.toString(36) + '-' + hashStr(body) + '"';
+  const inm = req.headers.get('If-None-Match') || '';
+  if (inm && inm.split(',').map(x => x.trim()).indexOf(etag) >= 0) {
+    return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'private, no-cache', ...SEC_HEADERS } });
+  }
+  return new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-cache', ETag: etag, ...SEC_HEADERS } });
+}
 function html(name, extra = {}) {
   const nonce = rand(16);
   const body = PAGES[name].replace(/%NONCE%/g, nonce).replace('%CSS%', () => PAGES.css);
@@ -552,11 +565,13 @@ async function gamesData(env, me, key) {
   const sc = scopeOf(me); if (sc && !sc.has(key)) return { error: 'غير مسموح.' };
   const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
   const ids = new Set(ls.map(l => l.id));
-  // مفردات الألعاب من البنك المثبّت **ومن مفردات امتحانات الوزارة** معًا — وإلا
-  // خلت موادّ بلا بنك مثبّت (الرياضيات) من أي لعبة، مع أن نهائياتها مستخرجة
-  // ومربوطة بالدروس والأهداف وبنكها يعمل في صفحة التقويم.
-  const items = QBANK.filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'bank' }))
-    .concat(finQuizItems(key).filter(q => ids.has(q.lesson_id)).map(q => ({ ...q, src: 'fin' })));
+  // مفردات الألعاب من البنك المثبّت ومن واجبات MCQ ومن حزمة الألعاب.
+  // **لا نُدخل مفردات امتحانات الوزارة**: استخراجها يخزّن نص الإجابة الوزارية دون
+  // خيارات (choices فارغة)، فكانت تُرسَل إلى صفحة الألعاب وتظهر كلوحة فارغة
+  // («اختر الإجابة الصحيحة» بلا سؤال). فنشترط خيارين على الأقل لصلاحية اللعب.
+  const playable = q => (q.choices || []).length >= 2;
+  const items = QBANK.filter(q => ids.has(q.lesson_id) && playable(q)).map(q => ({ ...q, src: 'bank' }))
+    .concat(finQuizItems(key).filter(q => ids.has(q.lesson_id) && playable(q)).map(q => ({ ...q, src: 'fin' })));
   let k = 0;
   ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
     const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;
@@ -666,7 +681,7 @@ export default {
       }
       if (p === '/api/games/data') { const d = await gamesData(env, me, url.searchParams.get('key') || ''); return d.error ? json(d, 403) : json(d); }
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
-      if (p === '/api/lessons') return json({ lessons: await lessonsFor(env, me) });
+      if (p === '/api/lessons') return jsonETag(req, { lessons: await lessonsFor(env, me) });
       if (p === '/api/courses') { const sc = scopeOf(me); return json({ courses: (await coursesList(env)).filter(c => !sc || sc.has(c.key)) }); }
       if (p === '/api/quiz/bank') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);

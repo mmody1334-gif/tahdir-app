@@ -23,7 +23,11 @@ function beep(kind){if(!sound)return;try{actx=actx||new (window.AudioContext||wi
 
 // ---------- مصادر الأسئلة ----------
 function selIds(){var ids=data.lessons.map(function(l){return l.id;}).filter(function(id){return sel[id];});return ids.length?ids:[];}
-function pool(){var s={};selIds().forEach(function(i){s[i]=1;});return data.items.filter(function(x){return s[x.lesson_id];});}
+// عدد الأسئلة **الصالحة للعب** لهذا الدرس (سؤال اختيار من متعدد بخيارين على الأقل).
+// نستثني ما لا يُلعب، وإلا ظهرت لوحة فارغة («اختر الإجابة الصحيحة» بلا سؤال).
+function playableItem(x){return (x.choices||[]).length>=2;}
+function itemCount(id){return data.items.filter(function(x){return x.lesson_id===id&&playableItem(x);}).length;}
+function pool(){var s={};selIds().forEach(function(i){s[i]=1;});return data.items.filter(function(x){return s[x.lesson_id]&&playableItem(x);});}
 function mcqPool(){return pool().filter(function(x){return x.type==='mcq'&&x.choices&&x.choices.length>=2;});}
 var DIFF={'منخفضة':1,'متوسطة':2,'مرتفعة':3};
 function diff(x){return DIFF[x.difficulty]||(x.type==='long'?3:1);}
@@ -60,7 +64,12 @@ function renderSide(){
   h+='<section class="qcard"><h3>2. الدروس</h3><div class="lpick">';
   unitsList().forEach(function(u){
     h+='<div class="lp-unit"><div class="lp-uh"><label><input type="checkbox" data-unit="'+esc(u.unit)+'"'+(u.lessons.every(function(l){return sel[l.id];})?' checked':'')+'> '+(isEn()?esc(u.name||'Unit '+u.unit):'الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):''))+'</label></div>';
-    u.lessons.forEach(function(l){var n=data.items.filter(function(x){return x.lesson_id===l.id;}).length;h+='<label class="lp-l"><input type="checkbox" data-lid="'+l.id+'"'+(sel[l.id]?' checked':'')+'> <span dir="auto">'+esc(l.title)+'</span><span class="muted">'+n+'</span></label>';});
+    u.lessons.forEach(function(l){
+      var n=itemCount(l.id), off=n===0;
+      // الدروس بلا أسئلة صالحة للعب تُعطَّل (ولا تُظلَّل) بدل أن تُنتج لوحة فارغة
+      if(off&&sel[l.id])delete sel[l.id];
+      h+='<label class="lp-l'+(off?' lp-off':'')+'"'+(off?' title="لا توجد أسئلة ألعاب لهذا الدرس بعد"':'')+'><input type="checkbox" data-lid="'+l.id+'"'+(sel[l.id]?' checked':'')+(off?' disabled':'')+'> <span dir="auto">'+esc(l.title)+'</span><span class="muted">'+(off?'لا أسئلة':n)+'</span></label>';
+    });
     h+='</div>';
   });
   h+='</div><p class="muted small" id="selInfo"></p></section>';
@@ -101,6 +110,13 @@ function enough(g){
 }
 function renderHome(){
   stopAll();game=null;
+  // مادة/صف بلا أسئلة صالحة للعب: نوضّح ذلك صراحة بدل عرض ألعاب كلها معطّلة
+  if(!data.items.some(playableItem)){
+    $('gmain').innerHTML='<div class="g-none"><div class="g-none-ic">🎲</div><h2>لا توجد ألعاب لهذه المادة بعد</h2>'+
+      '<p>الألعاب تُبنى من بنك الأسئلة ومن واجبات الدروس. هذه المادة/الصف لا تحتوي أسئلة اختيار من متعدد قابلة للعب حتى الآن، فلم نعرض لوحة فارغة.</p>'+
+      '<p class="muted small">المواد المتاحة للألعاب حاليًا: العلوم · الفيزياء · الكيمياء · تقنية المعلومات (وبعض الواجبات في مواد أخرى).</p></div>';
+    return;
+  }
   var h='<div class="g-home"><div class="g-intro"><h2>🎲 ركن الألعاب التعليمية</h2><p>اختر الدروس من القائمة، ثم اللعبة. الأسئلة تُسحب من بنك الأسئلة وواجبات الدروس'+(isEn()?' والمفردات':' والمصطلحات')+'، ومستواها يناسب الصف. اعرضها على السبورة بملء الشاشة.</p></div><div class="g-cards">';
   var list=gnum()>=10?GAMES.filter(function(g){return g.teen;}).concat(GAMES.filter(function(g){return !g.teen;})):GAMES.filter(function(g){return !g.teen;});
   list.forEach(function(g,gi){

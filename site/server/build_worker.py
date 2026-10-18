@@ -630,6 +630,12 @@ extra_css += '''
 .gr-tasks td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .gr-note{font-size:.82rem;background:var(--accent-l,#fff8e6);border-radius:10px;padding:8px 12px}
 .gr-empty{color:var(--mute);text-align:center;padding:18px}
+.lp-l.lp-off{opacity:.45;cursor:not-allowed}
+.lp-l.lp-off .muted{font-size:.72rem;color:#a15c00}
+.g-none{max-width:560px;margin:40px auto;text-align:center;padding:26px 20px;background:var(--paper,#fff);border:1px dashed var(--line,#e2e0d6);border-radius:16px}
+.g-none-ic{font-size:2.6rem;margin-bottom:6px}
+.g-none h2{margin:4px 0 10px;font-size:1.15rem;color:var(--main-d,#0b3b33)}
+.g-none p{margin:0 0 8px;color:var(--mute,#5b6d67);font-size:.88rem;line-height:1.7}
 /* ---------- العروض التقديمية ---------- */
 .wrap.sl{max-width:980px;padding:14px 16px 40px}
 .sl-subj{margin-bottom:22px}
