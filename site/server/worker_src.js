@@ -192,8 +192,11 @@ function cookies(req) {
   });
   return out;
 }
-function setCookie(name, val, maxAgeSec) {
-  return `${name}=${encodeURIComponent(val)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSec}`;
+function setCookie(name, val, maxAgeSec, req) {
+  // Secure على https فقط: بعض المتصفحات (WebKit/سافاري) ترفض كوكي Secure على http
+  // — ولو كان localhost — فلا تُحفظ الجلسة ويُعاد المستخدم لصفحة الدخول.
+  const https = req ? new URL(req.url).protocol === 'https:' : true;
+  return `${name}=${encodeURIComponent(val)}; Path=/; HttpOnly${https ? '; Secure' : ''}; SameSite=Lax; Max-Age=${maxAgeSec}`;
 }
 function ipOf(req) { return req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''; }
 // مدة مختصرة بالعربية لعرضها في رسائل الأجهزة
@@ -328,7 +331,7 @@ async function login(req, env) {
         .map(d => '• ' + (d.label || 'جهاز') + ' — آخر دخول ' + ago(d.last_seen)).join('\n');
       return json({
         error: `هذا الحساب مسجّل بالفعل على ${u.max_devices} أجهزة، وكلها مستعملة حديثًا. لا يمكن الدخول من جهاز جديد.\n\nأجهزتك المسجّلة:\n${list}\n\nإن كنت غيّرت جهازك، اطلب من أ. محمد مجدي «مسح الأجهزة» ثم ادخل مرة أخرى.`
-      }, 403, { 'Set-Cookie': setCookie('did', did, 63072000) });
+      }, 403, { 'Set-Cookie': setCookie('did', did, 63072000, req) });
     }
   }
   if (!dev) {
@@ -345,8 +348,8 @@ async function login(req, env) {
     env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(t)
   ]);
   const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC_HEADERS });
-  headers.append('Set-Cookie', setCookie('sid', token, SESSION_DAYS * 86400));
-  headers.append('Set-Cookie', setCookie('did', did, 63072000));
+  headers.append('Set-Cookie', setCookie('sid', token, SESSION_DAYS * 86400, req));
+  headers.append('Set-Cookie', setCookie('did', did, 63072000, req));
   // نُعيد الرمز في الجسم أيضًا ليعمل المتصفح الذي يرفض الكوكيز (انظر currentUser).
   return new Response(JSON.stringify({ ok: true, role: u.role, name: u.name, sid: token, did }), { headers });
 }
@@ -631,7 +634,7 @@ export default {
         const c = cookies(req); if (c.sid) await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(c.sid).run();
         const cs = cookies(req), tk = cs.sid || String(req.headers.get('X-Tahdir-Sid') || '').trim();
         if (tk) { try { await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(tk).run(); } catch (e) {} }
-        return json({ ok: true }, 200, { 'Set-Cookie': setCookie('sid', '', 0) });
+        return json({ ok: true }, 200, { 'Set-Cookie': setCookie('sid', '', 0, req) });
       }
       if (p === '/') {
         if (!(await adminCount())) return redirect('/setup');
