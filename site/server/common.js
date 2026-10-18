@@ -136,15 +136,22 @@ function toolDialog(reason){
   if(ok)return dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false});
   // التثبيت لأول مرة: تبويبات بحسب المتصفح (كروم · فايرفوكس · إيدج · ماك/سافاري)
   var cur=browserKind()||'chrome';
-  var TABS=[['chrome','Chrome','🌐'],['firefox','Firefox','🦊'],['edge','Edge','🌊'],['safari','ماك / Safari','🧭']];
+  var TABS=[['chrome','Chrome','🌐'],['firefox','Firefox','🦊'],['edge','Edge','🌊'],['safari','ماك / Safari','🧭'],['ios','iPhone','📱']];
   function stepsFor(b){
+    if(b==='ios'){
+      return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+        '<li>ثبّت <b>Userscripts</b> — <b>مجاني ومفتوح المصدر</b>: <a href="https://apps.apple.com/app/userscripts/id1463298887" target="_blank" rel="noopener">افتح App Store</a>. (يحتاج iOS 15.1 فأحدث)</li>'+
+        '<li><b>الإعدادات ← سافاري ← الإضافات</b> ← فعّل <b>Userscripts</b>، ثم اسمح له بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
+        '<li>افتح رابط الأداة في سافاري (<b>/tool/tahdir-noor.user.js</b>) ← اضغط أيقونة الإضافة في شريط العنوان ← <b>Install</b>.</li></ol>'+
+        '<p class="m-msg" style="background:var(--main-l,#e3f1eb);border-radius:10px;padding:8px 11px"><b>لماذا يعمل مجانًا؟</b> أضفنا في الأداة طبقة توافق تُكمل واجهات التخزين عبر <code>localStorage</code> — فتعمل مع <b>Userscripts</b> المجاني كما تعمل مع Tampermonkey. <b>لا حاجة للدفع.</b> (من يفضّل Tampermonkey: ~$1.99 مرة واحدة، اختياري).</p>';
+    }
     if(b==='safari'){
       return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-        '<li>ثبّت <b>Tampermonkey</b> من <b>Mac App Store</b>: <a href="'+tmStoreFor('safari')+'" target="_blank" rel="noopener">افتح صفحة التطبيق</a> (مدفوعة رمزية ~$1.99).</li>'+
-        '<li><b>سافاري ← الإعدادات (⌘,) ← الإضافات</b> ← فعّل <b>Tampermonkey</b>.</li>'+
-        '<li><b>الإعدادات ← المواقع الإلكترونية ← Tampermonkey</b> ← اسمح بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
+        '<li>ثبّت <b>Userscripts</b> — <b>مجاني</b>: <a href="https://apps.apple.com/app/userscripts/id1463298887" target="_blank" rel="noopener">افتح App Store</a> (macOS 12+ · سافاري 14.1+).<br><span class="muted small">أو <b>Tampermonkey</b> من Mac App Store (~$1.99) — <a href="'+tmStoreFor('safari')+'" target="_blank" rel="noopener">صفحة التطبيق</a>.</span></li>'+
+        '<li><b>سافاري ← الإعدادات (⌘,) ← الإضافات</b> ← فعّل الإضافة.</li>'+
+        '<li><b>الإعدادات ← المواقع الإلكترونية</b> ← اسمح بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
         '<li>ارجع واضغط <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b> ثم <b>Allow</b> إن سألك سافاري.</li></ol>'+
-        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ تنبيه:</b> لا تستخدم <b>«Tampermonkey Legacy»</b> — فهي لسافاري 6–11 فقط ولن تُثبَّت على سافاري الحديث. استخدم النسخة من <b>App Store</b>.</p>';
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ تنبيه:</b> لا تستخدم <b>«Tampermonkey Legacy»</b> — فهي لسافاري 6–11 فقط ولن تُثبَّت على سافاري الحديث.</p>';
     }
     var nm=b==='firefox'?'Firefox':(b==='edge'?'Edge':'Chrome');
     return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+

@@ -38,11 +38,11 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
       shown: !document.getElementById('modal').hidden
     };
   });
-  ok('الحوار يُظهر 4 تبويبات', r.tabs.length === 4, JSON.stringify(r.tabs));
-  ok('تضم كروم وفايرفوكس وإيدج وسافاري',
-    ['chrome', 'firefox', 'edge', 'safari'].every(k => r.tabs.includes(k)), JSON.stringify(r.tabs));
+  ok('الحوار يُظهر 5 تبويبات', r.tabs.length === 5, JSON.stringify(r.tabs));
+  ok('تضم كروم وفايرفوكس وإيدج وسافاري وآيفون',
+    ['chrome', 'firefox', 'edge', 'safari', 'ios'].every(k => r.tabs.includes(k)), JSON.stringify(r.tabs));
   ok('المتصفح الحالي محدَّد تلقائيًّا', r.tabs.includes(r.active), 'المحدد: ' + r.active);
-  ok('لكل تبويب لوحة مستقلة', r.panes.length === 4, JSON.stringify(r.panes));
+  ok('لكل تبويب لوحة مستقلة', r.panes.length === 5, JSON.stringify(r.panes));
 
   // كل لوحة فيها رابط متجر صحيح
   const stores = await p.evaluate(() => [...document.querySelectorAll('.tt-pane')].map(x => x.innerHTML));
@@ -71,6 +71,16 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
   ok('التبديل إلى سافاري يعمل', saf.id === 'safari', saf.id);
   ok('يُحذّر من نسخة Legacy', saf.legacy === true, saf.legacy ? 'موجود' : 'مفقود');
   ok('يذكر خطوات تفعيل الإضافة والسماح للموقع', saf.settings && saf.allow, (saf.settings ? 'الإعدادات ' : '') + (saf.allow ? 'lms.moe ' : ''));
+
+  const ios = await p.evaluate(async () => {
+    const s=[...document.querySelectorAll('.tt-tab')].find(t=>t.getAttribute('data-tab')==='ios');
+    if(!s)return {err:'لا تبويب'};
+    s.click(); await new Promise(x=>setTimeout(x,400));
+    const pane=document.querySelector('.tt-pane.on');
+    return { id:pane.getAttribute('data-pane'), free:/Userscripts/.test(pane.textContent), openSource:/مجاني/.test(pane.textContent), appStore:pane.innerHTML.indexOf('apps.apple.com')>=0 };
+  });
+  ok('تبويب آيفون يعرض Userscripts المجاني', ios.id==='ios' && ios.free && ios.openSource, JSON.stringify(ios));
+  ok('فيه رابط App Store', ios.appStore===true, ios.appStore?'موجود':'مفقود');
 
   const real = [...new Set(errs)];
   console.log('\nأخطاء JavaScript: ' + (real.length ? real.join('\n') : '(لا شيء)'));

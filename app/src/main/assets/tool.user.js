@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.2
+// @version      3.4.3
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -24,7 +24,17 @@
 // فكانت تفشل من أول تحميل ولا تعمل إلا بعد فتح/تحديث صفحة أخرى. الآن ننتظر جاهزية المستند أولًا.
 (function () {
   'use strict';
-  const VERSION = '3.4.1';
+  (function gmCompat(){
+    try{
+      const g=(typeof globalThis!=='undefined')?globalThis:window;const P='tahdir_noor_';
+      if(typeof g.GM_getValue!=='function')g.GM_getValue=function(k,d){try{const v=localStorage.getItem(P+k);return v===null?d:JSON.parse(v);}catch(e){return d;}};
+      if(typeof g.GM_setValue!=='function')g.GM_setValue=function(k,v){try{localStorage.setItem(P+k,JSON.stringify(v));}catch(e){}};
+      if(typeof g.GM_deleteValue!=='function')g.GM_deleteValue=function(k){try{localStorage.removeItem(P+k);}catch(e){}};
+      if(typeof g.GM_registerMenuCommand!=='function')g.GM_registerMenuCommand=function(){};
+      if(typeof g.GM_openInTab!=='function')g.GM_openInTab=function(u){try{window.open(u,'_blank');}catch(e){}};
+    }catch(e){}
+  })();
+  const VERSION = '3.4.3';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
