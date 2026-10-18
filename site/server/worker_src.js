@@ -390,7 +390,140 @@ async function coursesList(env) {
   return [...m.values()];
 }
 
-// ---------- admin ----------
+// ---------- مصحّح الاختبار القصير: قواعد فحص ورقة **نصّية** مرفوعة ----------
+// المتصفح يستخرج النصّ من Word/PDF ثم يُرسله هنا. لذا لا نعرف توزيع الأهداف (AO)
+// لأنه غير مطبوع في الورقة — نفحص ما هو مرئي: الترقيم · العدد · الدرجات ·
+// صياغة بداية السؤال · سلامة الخيارات.
+const QSTART = /^(ما|ماذا|كيف|لماذا|لمَ|أي|أيّ|متى|أين|كم|هل|من|مَن|اذكر|اذكري|عدّد|عدد|عدّ|عرّف|عرف|اشرح|فسّر|فسر|وضّح|بيّن|صِف|صف|قارن|احسب|علّل|علل|صنّف|صنف|رتّب|رتب|توقّع|توقع|سمِّ|سمّ|سم|حدّد|حدد|أعط|اعط|اكتب|أكمل|اكمل|استنتج|استخرج|استدل|ميّز|ميز|قدّر|قدر|ناقش|برهن|أثبت|اثبت|أوجد|اوجد|ارسم|ضع|ظلّل|ظلل|اختر|أجب|اجب)(?=\s|$|[\?؟:،\.])/;
+function checkQuizText(text, grade, subject, withAnswer) {
+  const norm = String(text || '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+    // أرقام عربية-هندية (١٢٣) → لاتينية
+    .replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
+    .replace(/[\u06f0-\u06f9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06f0 + 48));
+  const all = norm.split('\n').map(l => l.trim()).filter(l => l);
+  // **نموذج الإجابة** قد يأتي ملحقًا بالورقة ويعيد الترقيم من 1 — فنفصله قبل التحليل،
+  // ثم نأخذ منه هدف التقويم (AO) لكل سؤال برقمه.
+  const ANS_MARK = /(نموذج\s*ال[إا]جابة|ال[إا]جابة\s*النموذجية|مفتاح\s*ال[إا]جابة|answer\s*key|marking\s*scheme)/i;
+  let ansAt = -1;
+  // المعلّم يحدّد إن كان الملف يحوي نموذج إجابة؛ وإن لم يحوِه لا نبحث عن قسم إجابات
+  // حتى لا يُقتطع من الورقة خطأً.
+  if (withAnswer !== false) {
+    for (let i = 0; i < all.length; i++) { if (ANS_MARK.test(all[i])) { ansAt = i; break; } }
+  }
+  const lines = ansAt < 0 ? all : all.slice(0, ansAt);
+  const ansLines = ansAt < 0 ? [] : all.slice(ansAt + 1);
+  const aoMap = {};
+  if (ansLines.length) {
+    let cur = null;
+    ansLines.forEach(l => {
+      const m = /^(\d{1,2})\s*[\)\.\-]/.exec(l);
+      if (m) cur = +m[1];
+      const a = /AO\s*([123])/i.exec(l);
+      if (a && cur) aoMap[cur] = 'AO' + a[1];
+      else if (cur && !aoMap[cur]) {
+        if (/استدلال|تحليل|تقييم|تطبيق/.test(l)) aoMap[cur] = 'AO2';
+        else if (/معرفة|تذكر|فهم/.test(l)) aoMap[cur] = 'AO1';
+      }
+    });
+  }
+  // تقسيم إلى مفردات: سطر يبدأ برقم متبوعًا بـ) أو - أو .
+  const starts = [];
+  // رقم المفردة يبدأ السطر بصيغة «1)» أو «1.» أو «1-» — بلا قوس مربّع،
+  // لأن [4] هي الدرجة لا رقم السؤال.
+  lines.forEach((l, i) => {
+    const m = /^(\d{1,2})\s*[\)\.\-]\s*(.*)$/.exec(l);
+    if (m) starts.push({ i, n: +m[1], rest: (m[2] || '').trim() });
+  });
+  const items = starts.map((s, k) => {
+    const end = k + 1 < starts.length ? starts[k + 1].i : lines.length;
+    const body = lines.slice(s.i, end).join('\n').trim();
+    const bodyNoNum = body.replace(/^[\(\[]?\s*\d{1,2}\s*[\)\]\-\.]\s*/, '').trim();
+    // الدرجة: [4] أو (4) في نهاية المفردة
+    let marks = null;
+    const mm = /[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum) || /\s[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum);
+    if (mm) marks = +mm[1];
+    // الاختيار من متعدد: ثلاث علامات خيارات على الأقل، أو علامات ⬭
+    const optMarks = (bodyNoNum.match(/(^|\s)[أبجد]\s*[\)\]]/g) || []).length;
+    const bubbled = (bodyNoNum.match(/\u2b2d/g) || []).length;
+    const isMcq = optMarks >= 3 || bubbled >= 3;
+    // نصّ السؤال بلا خياراته لفحص البداية
+    const firstPart = bodyNoNum.split(/\n/).filter(x => !/^\s*[أبجد]\s*[\)\]]/.test(x)).join(' ').slice(0, 120);
+    // هدف التقويم: من نموذج الإجابة المرفق (AO1/AO2/AO3) أو من وصف المستوى
+    let ao = aoMap[s.n] || null;
+    const aoM = /AO\s*([123])/i.exec(bodyNoNum);
+    if (aoM) ao = 'AO' + aoM[1];
+    else if (/استدلال|تحليل|تقييم|تطبيق/.test(bodyNoNum)) ao = 'AO2';
+    else if (/معرفة|تذكر|فهم/.test(bodyNoNum)) ao = 'AO1';
+    return { n: s.n, marks, isMcq, opts: Math.max(optMarks, bubbled), ao, start: firstPart.trim(), raw: bodyNoNum };
+  });
+  const g = FG[grade] || 0;
+  const spec = (g >= 10 || !g) ? { total: 10, items: [5, 7] } : { total: 15, items: [9, 12] };
+  const checks = [];
+  const add = (id, title, status, detail) => checks.push({ id, title, status, detail });
+  // ① الترقيم
+  const nums = items.map(x => x.n);
+  const seqOk = nums.every((n, i) => n === i + 1);
+  add('num-seq', 'ترقيم المفردات متسلسل بلا فجوات', seqOk ? 'pass' : 'fail',
+    seqOk ? ' 1 · 2 · … · ' + nums.length : 'التسلسل: ' + nums.join(' · '));
+  const dup = nums.filter((n, i) => nums.indexOf(n) !== i);
+  add('num-dup', 'لا تكرار في الأرقام', dup.length ? 'fail' : 'pass', dup.length ? 'مكرّر: ' + [...new Set(dup)].join('، ') : 'لا تكرار');
+  // ② العدد
+  const cnt = items.length, [lo, hi] = spec.items;
+  add('count', 'عدد المفردات ' + lo + '–' + hi, (cnt >= lo && cnt <= hi) ? 'pass' : 'fail', cnt + ' مفردة');
+  // ③ الدرجة الكلية
+  const withMarks = items.filter(x => x.marks != null);
+  const total = withMarks.reduce((a, x) => a + x.marks, 0);
+  add('total', 'الدرجة الكلية ' + spec.total, (withMarks.length === cnt && total === spec.total) ? 'pass' : (withMarks.length ? 'fail' : 'warn'),
+    withMarks.length ? total + ' درجة' + (withMarks.length < cnt ? ' (لم تُقرأ درجة ' + (cnt - withMarks.length) + ' مفردات)' : '') : 'لم أتمكّن من قراءة الدرجات — تأكد أنها مكتوبة هكذا [4]');
+  // ④ بداية السؤال
+  const badStart = items.filter(x => x.start && !QSTART.test(x.start));
+  add('qstart', 'كل سؤال يبدأ بأداة استفهام أو فعل أمر', badStart.length ? 'warn' : 'pass',
+    badStart.length ? 'تحتاج مراجعة: ' + badStart.map(x => 'م' + x.n).join('، ') : 'كل المفردات سليمة');
+  // ⑤ الخيارات
+  const mcqs = items.filter(x => x.isMcq);
+  const badOpt = mcqs.filter(x => x.opts !== 4);
+  add('opts', 'كل اختيار من متعدد له 4 خيارات', badOpt.length ? 'fail' : 'pass',
+    mcqs.length ? (badOpt.length ? 'عدد خاطئ في: ' + badOpt.map(x => 'م' + x.n + '(' + x.opts + ')').join('، ') : mcqs.length + ' سؤالًا بخيارات سليمة') : 'لا أسئلة اختيار');
+  // ⑥ خيارات مكرّرة
+  const dupOpt = [];
+  items.forEach(x => {
+    if (!x.isMcq) return;
+    const opts = x.raw.split(/\n/).map(l => (/(^|\s)[أبجد]\s*[\)\]]\s*/.exec(l) || [''])[0] ? l.replace(/^.*?[أبجد]\s*[\)\]]\s*/, '').trim() : '').filter(Boolean);
+    if (opts.length >= 2 && new Set(opts).size < opts.length) dupOpt.push(x.n);
+  });
+  add('opts-dup', 'لا خيارات مكرّرة', dupOpt.length ? 'warn' : 'pass', dupOpt.length ? 'في: ' + dupOpt.map(n => 'م' + n).join('، ') : 'لا تكرار');
+  // ⑦ مفردة فارغة
+  const empty = items.filter(x => (x.raw || '').replace(/\s/g, '').length < 8);
+  add('empty', 'لا مفردة فارغة', empty.length ? 'fail' : 'pass', empty.length ? 'فارغة: ' + empty.map(x => 'م' + x.n).join('، ') : 'سليمة');
+  // ⑧ أرقام وزراية متبقّية
+  const orig = items.filter(x => /^\s*\(?\s*\d{1,2}\s*\)\s*\d+\s*\)/.test(x.raw));
+  add('orig-no', 'لا رقم وزراي متبقٍّ', orig.length ? 'warn' : 'pass', orig.length ? 'في: ' + orig.map(x => 'م' + x.n).join('، ') : 'نظيف');
+
+  // ⑨ توزيع الأهداف (يُفحص فقط إن وُجد AO1/AO2 — أي إن رُفع نموذج الإجابة معه)
+  const withAO = items.filter(x => x.ao);
+  if (withAO.length === items.length && items.length) {
+    const a1 = items.filter(x => x.ao === 'AO1').reduce((a, x) => a + (x.marks || 0), 0);
+    const a2 = items.filter(x => x.ao === 'AO2').reduce((a, x) => a + (x.marks || 0), 0);
+    const want = (g >= 11) ? { a1: 3, a2: 7 } : { a1: Math.round(spec.total * 0.4), a2: spec.total - Math.round(spec.total * 0.4) };
+    add('ao', 'توزيع الأهداف: AO1=' + want.a1 + ' · AO2=' + want.a2,
+      (a1 === want.a1 && a2 === want.a2) ? 'pass' : 'fail', 'AO1=' + a1 + ' · AO2=' + a2);
+  } else {
+    add('ao', 'توزيع الأهداف AO1 / AO2', 'skip',
+      withAO.length ? 'قُرئ في ' + withAO.length + ' من ' + items.length + ' مفردات' : withAnswer === false ? 'لم يُفحص: اختر «الملف يحتوي نموذج الإجابة» لفحص التوزيع' : 'لم أجد AO1/AO2 في نموذج الإجابة');
+  }
+  // ⑩ عدد اختيار من متعدد وإجابة طويلة
+  const nMcq = items.filter(x => x.isMcq).length, nLong = items.filter(x => x.marks >= 4 && !x.isMcq).length;
+  if (g >= 10) {
+    add('mcq2', 'مفردتان اختيار من متعدد', nMcq === 2 ? 'pass' : 'fail', nMcq + ' مفردة');
+    add('long1', 'مفردة إجابة طويلة واحدة (4–5)', nLong === 1 ? 'pass' : 'warn', nLong + ' مفردة');
+  }
+  const fails = checks.filter(c => c.status === 'fail').length, warns = checks.filter(c => c.status === 'warn').length;
+  return {
+    ok: fails === 0, summary: { items: cnt, marks: total, expectedMarks: spec.total, range: spec.items, fails, warns },
+    checks, items: items.map(x => ({ n: x.n, marks: x.marks, mcq: x.isMcq, opts: x.opts, start: x.start.slice(0, 90) })),
+  };
+}
+
 async function adminStats(env) {
   const DB = env.DB;
   const users = (await DB.prepare("SELECT id,name,username,role,active,max_devices,created_at,scope FROM users ORDER BY role='admin' DESC, name").all()).results || [];
@@ -702,6 +835,15 @@ export default {
         const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
         const ids = new Set(ls.map(l => l.id));
         return json({ lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, subject: l.subject, grade: l.grade, term: l.term || 1 })), items: itBank(key, QBANK.filter(q => ids.has(q.lesson_id)).concat(finQuizItems(key).filter(q => ids.has(q.lesson_id)))) });
+      }
+      // ---------- مصحّح الاختبار القصير: يفحص ورقة **مرفوعة** (Word/PDF/نصّ) ----------
+      // المتصفح هو من يستخرج النصّ (Word عبر DecompressionStream، وPDF عبر pdf.js)،
+      // ثم يُرسل النصّ وحده هنا. فنبقى داخل حدود الـWorker بلا مكتبات ثقيلة.
+      if (p === '/api/checkquiz' && m === 'POST') {
+        const b = await body(req);
+        const text = String(b.text || '').slice(0, 400000);
+        if (!text.trim()) return json({ error: 'لم يصل نصّ الورقة. جرّب نسخ النصّ ولصقه بدل الرفع.' }, 400);
+        return json(checkQuizText(text, b.grade || '', b.subject || '', b.withAnswer !== false));
       }
       if (p === '/api/export' && m === 'POST') {
         const b = await body(req), id = rand(20), fmt = b.format === 'print' ? 'print' : 'doc';

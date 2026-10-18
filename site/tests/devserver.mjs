@@ -42,6 +42,14 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'application/octet-stream' });
     res.end(readFileSync(f)); return;
   }
+  // pdf.js: يُخدَم محليًّا كما في الإنتاج (/pdf/… → dist/assets/pdf/…)
+  if (req.url.startsWith('/pdf/')) {
+    const rel = decodeURIComponent(req.url.slice(5).split('?')[0]);
+    const f = join(dir, '../dist/assets/pdf', rel);
+    if (!rel || rel.endsWith('/') || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+    res.end(readFileSync(f)); return;
+  }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   headers.set('CF-Connecting-IP', req.headers['x-test-ip'] || '127.0.0.1');

@@ -683,7 +683,48 @@ extra_css += '''
 .study-paper{outline:none;font-size:15px}
 .study-paper:focus{box-shadow:0 0 0 3px #b9d8cf,0 2px 14px rgba(0,0,0,.18)}
 .study-paper .cb{user-select:none;font-size:1.1em}
-@media (max-width:700px){.menu-list{top:auto!important;left:0!important;bottom:0;inset-inline:0;border-radius:18px 18px 0 0;min-width:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}}
+
+/* ===== مصحّح الاختبار القصير (صفحة التقويم) ===== */
+.chkpanel{margin:18px auto 40px;padding:18px 20px;background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 14px rgba(16,40,32,.05)}
+.chk-h{margin:0 0 6px;font-size:1.15rem}
+.chk-p{margin:0 0 14px;color:var(--mute);font-size:.92rem;line-height:1.7}
+.chk-drop{border:2px dashed #9fc6b8;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#f4faf7;transition:.15s}
+.chk-drop:hover,.chk-drop.over,.chk-drop:focus{background:#e8f5ef;border-color:var(--main);outline:none}
+.chk-ic{font-size:1.8rem;line-height:1}
+.chk-link{color:var(--main);font-weight:700;text-decoration:underline}
+.chk-hint{margin-top:4px;font-size:.8rem;color:var(--mute)}
+.chk-grid{display:flex;gap:12px;margin:14px 0;flex-wrap:wrap;align-items:flex-start}
+.chk-lb{display:flex;flex-direction:column;gap:5px;font-size:.86rem;font-weight:700;color:#224}
+.chk-grow{flex:1;min-width:240px}
+.chk-lb select,.chk-lb textarea{font:inherit;font-weight:400;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.chk-lb textarea{resize:vertical;line-height:1.9}
+.chk-cb{display:flex;gap:9px;align-items:flex-start;margin:4px 0 12px;padding:10px 12px;background:#f2f8f5;border:1px solid #cfe5da;border-radius:11px;font-size:.88rem;cursor:pointer;line-height:1.6}
+.chk-cb input{margin-top:3px;width:18px;height:18px;accent-color:var(--main);flex:0 0 auto}
+.chk-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.chk-stat{font-size:.84rem;color:var(--mute)}
+.chk-out{margin-top:14px}
+.chk-err{color:#9b1c1c;background:#fdeaea;border:1px solid #f3c7c7;border-radius:10px;padding:10px 12px;font-size:.9rem}
+.chk-res{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:.9rem}
+.chk-res.ok{background:#e8f6ef;border:1px solid #b9e0cd;color:#0b5c42}
+.chk-res.bad{background:#fdf0e6;border:1px solid #f2cfae;color:#8a4a12}
+.chk-sum{background:#fff;border-radius:9px;padding:6px 12px;font-weight:700}
+.chk-num{font-size:1.15rem;color:var(--main-d)}
+.chk-list{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.chk-it{display:flex;gap:9px;align-items:flex-start;padding:8px 11px;border-radius:10px;background:#fbfbf8;border:1px solid var(--line);font-size:.9rem}
+.chk-ic{flex:0 0 22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:.8rem;color:#fff;background:#7a8}
+.chk-pass .chk-ic{background:#138a63}
+.chk-warn .chk-ic{background:#c98a12}
+.chk-fail .chk-ic{background:#b32d2d}
+.chk-skip .chk-ic{background:#8b98a3}
+.chk-tx{display:flex;flex-direction:column;gap:2px}
+.chk-dt{color:var(--mute);font-size:.82rem}
+.chk-tbl{margin-top:12px}
+.chk-tbl summary{cursor:pointer;font-weight:700;font-size:.88rem;color:var(--main-d);padding:6px 0}
+.chk-tbl table{width:100%;border-collapse:collapse;font-size:.83rem;margin-top:8px}
+.chk-tbl th,.chk-tbl td{border:1px solid var(--line);padding:5px 8px;text-align:right;vertical-align:top}
+.chk-tbl th{background:#eef5f1}
+.chk-q{font-size:.8rem;color:#333;line-height:1.6}
+@media (max-width:700px){.menu-list{top:auto!important;left:0!important;right:0!important;margin:6px!important}}
 '''
 CSS = base_css + extra_css
 
@@ -806,6 +847,31 @@ QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبا
   NAV('quiz')) + '''
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الاختبار"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<section class="wrap chkpanel" id="chkPanel" aria-label="فحص ورقة اختبار جاهزة">
+  <h2 class="chk-h">🔍 افحص ورقة جاهزة</h2>
+  <p class="chk-p">ارفع ملف <b>Word</b> أو <b>PDF</b> لاختبار قصير كتبته خارج المنصة، أو الصق نصّه — وتُفحص الورقة وفق وثيقة تقويم تعلّم الطلبة (الترقيم · العدد · الدرجات · صياغة السؤال · سلامة الخيارات).</p>
+  <div class="chk-drop" id="chkDrop" tabindex="0" role="button" aria-label="اختيار ملف لفحصه">
+    <div class="chk-ic">📄</div>
+    <div><b>اسحب الملف هنا</b> أو <span class="chk-link">اختر ملفًا</span></div>
+    <div class="chk-hint">Word (.docx) · PDF · نصّ (.txt)</div>
+    <input type="file" id="chkFile" accept=".docx,.pdf,.txt" hidden>
+  </div>
+  <div class="chk-grid">
+    <label class="chk-lb">الصف
+      <select id="chkGrade">
+        <option>الحادي عشر</option><option>الثاني عشر</option><option>العاشر</option>
+        <option>التاسع</option><option>الثامن</option><option>السابع</option>
+        <option>السادس</option><option>الخامس</option>
+      </select>
+    </label>
+    <label class="chk-lb chk-grow">أو الصق نصّ الورقة
+      <textarea id="chkText" rows="5" placeholder="مثال:&#10;1) ما المرحلة من دورة الماء … [1]&#10;2) اشرح كيف … [2]"></textarea>
+    </label>
+  </div>
+  <label class="chk-cb"><input type="checkbox" id="chkAns" checked> <span>الملف يحتوي <b>نموذج الإجابة</b> (فيه AO1/AO2) — يُفحص توزيع الأهداف أيضًا</span></label>
+  <div class="chk-row"><button class="btn primary" id="chkRun" type="button">افحص الورقة</button><span id="chkStat" class="chk-stat"></span></div>
+  <div id="chkOut" class="chk-out"></div>
+</section>
 <div id="printArea"></div>'''
 
 GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب التعليمية</span><span class="stat">لكل درس ولكل صف</span></div>').replace('%BTNS%',
@@ -845,7 +911,7 @@ PAGES = {
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
-  'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js')),
+  'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
   'play': page('تحدي الكبسولة', PLAY, rd('client_play.js')),
   'grading': page('تصحيح الواجبات · الكبسولة', GRADING, rd('client_grading.js')),
