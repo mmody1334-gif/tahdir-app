@@ -189,7 +189,9 @@ function itemHtml(it,n,tno,word,ctrl){
   // ولأن .qi عنصر واحد فلا يتقسّم على صفحتين (page-break-inside:avoid في CSS).
   var h='<div class="qi" data-i="'+(n-1)+'" style="margin:0 0 '+(word?'10pt':'16px')+';page-break-inside:avoid;break-inside:avoid">';
   if(ctrl)h+=ctrl;
-  if(it.img){ // سؤال من امتحان الوزارة بصورته الأصلية (فيه الرسم والاختيارات وأسطر الإجابة)
+  // `fig` = صورة توضيحية داخل سؤال نصّي (فيها الشكل فقط).
+  // وبلا `fig` = سؤال وزراي مصوَّر تكون الصورة نفسها نصّ السؤال — يُعرض وحده كما كان.
+  if(it.img&&!it.fig){
     var W=word?Math.min(560,it.iw||560):0;
     // الصورة نفسها تحمل نص السؤال ورسومه. نضع الرقم **ملاصقًا** لأعلى الصورة بلا
     // فراغ (كما في الأسئلة الكتابية: «3) نص السؤال»)، فلا يبدو الرقم منفصلًا عن
@@ -200,6 +202,13 @@ function itemHtml(it,n,tno,word,ctrl){
     return h+'</div>';
   }
   h+='<p style="margin:0 0 4px"><b>'+n+')</b> '+rich(stem)+'</p>';
+  // صورة توضيحية داخل سؤال **نصّي** (شكل/رسم يُقرأ مع النص) — تُعرض بعد السؤال
+  // ولا تُلغي النص. التمييز: وجود نص في stem يعني أن الصورة شكل فقط.
+  if(it.img){
+    var W2=word?Math.min(520,it.iw||520):0;
+    h+='<div style="page-break-inside:avoid;break-inside:avoid;text-align:center;margin:6px 0 8px">'+
+      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="max-width:100%;'+(W2?'width:'+W2+'px;':'')+'"></div>';
+  }
   if(it.table&&it.table.rows){
     h+='<table class="qt" style="border-collapse:collapse;margin:6px auto 6px;min-width:55%">'+(it.table.caption?'<caption style="font-weight:bold;padding:2px">'+esc(relabel(it.table.caption,tno))+'</caption>':'');
     it.table.rows.forEach(function(r,ri){h+='<tr>'+r.map(function(c){return (ri?'<td':'<th')+' style="border:1px solid #000;padding:3px 10px;text-align:center'+(ri?'':';background:#eee')+'">'+rich(c)+(ri?'</td>':'</th>');}).join('')+'</tr>';});

@@ -98,7 +98,7 @@ function finQuizItems(key) {
     else continue;
     const pa = G.papers[q.p] || {};
     out.push({ qid: 'f' + q.id, lesson_id: q.l, type, stem: stripQNo(q.x), img: q.im, iw: q.w, ih: q.h, srcno: String(q.n || ''), src: 'امتحان الوزارة ' + (pa.year || '') + (pa.session ? ' - ' + pa.session : ''),
-      answer: q.a || '', choices: Array.isArray(q.ch) ? q.ch : [], correct: (typeof q.cor === 'number' ? q.cor : 0), marks: m, ao, difficulty: '', outcome: q.c || '', notes: '' });
+      answer: q.a || '', fig: !!q.fig, choices: Array.isArray(q.ch) ? q.ch : [], correct: (typeof q.cor === 'number' ? q.cor : 0), marks: m, ao, difficulty: '', outcome: q.c || '', notes: '' });
   }
   return out;
 }
