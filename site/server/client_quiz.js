@@ -121,6 +121,8 @@ function assemble(pool,sp,lessonIds){
   pool=prepPool(pool,sp);
   var order={};lessonIds.forEach(function(id,i){order[id]=i;});
   var aos=Object.keys(sp.targets),mcqs=pool.filter(function(x){return x.type==='mcq';}),longs=pool.filter(function(x){return x.type==='long';}),shorts=pool.filter(function(x){return x.type==='short';});
+  // أسئلة الأشكال المتاحة في الدروس المختارة — لضمان ظهور شكلين في كل نموذج
+  var imgPool=pool.filter(function(x){return x.img;}),imgMin=imgPool.length>=2?2:(imgPool.length?1:0);
   var best=null,bestScore=-1e9;
   for(var att=0;att<90;att++){
     // اختيار الاختيار من متعدد
@@ -137,6 +139,19 @@ function assemble(pool,sp,lessonIds){
     for(var t=0;t<25;t++){
       var pickd=mc.concat(lg);opts.forEach(function(o){pickd=pickd.concat(pick(o));});
       var nI=pickd.length;if(nI<sp.items[0]||nI>sp.items[1])continue;
+      // **ضمان صورتين على الأقل** في الورقة: نستبدل عنصرًا غير مصوَّر بآخر مصوَّر
+      // من **نفس النوع والدرجات والهدف** — فلا تتغيّر مواصفة الوثيقة إطلاقًا
+      // (المجموع والأهداف كما هي)، ويظهر شكلان في كل نموذج.
+      if(imgMin){
+        var have={};pickd.forEach(function(x){have[x.qid]=1;});
+        var cands=shuffleP(imgPool.filter(function(x){return !have[x.qid];}));
+        for(var ci=0;ci<cands.length;ci++){
+          if(pickd.filter(function(x){return x.img;}).length>=imgMin)break;
+          var rep=cands[ci],vi=-1;
+          for(var vj=0;vj<pickd.length;vj++){var yy=pickd[vj];if(!yy.img&&yy.type===rep.type&&yy.marks===rep.marks&&yy.ao===rep.ao){vi=vj;break;}}
+          if(vi>=0)pickd[vi]=rep;
+        }
+      }
       var cov={};pickd.forEach(function(x){cov[x.lesson_id]=(cov[x.lesson_id]||0)+1;});
       var nImg=pickd.filter(function(x){return x.img;}).length;
       var spread=Object.keys(cov).length*10-Math.max.apply(null,Object.keys(cov).map(function(k){return cov[k];}))+Math.min(nImg,Math.ceil(nI/2))*4+Math.random()*3;
