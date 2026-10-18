@@ -395,41 +395,48 @@ async function coursesList(env) {
 // لأنه غير مطبوع في الورقة — نفحص ما هو مرئي: الترقيم · العدد · الدرجات ·
 // صياغة بداية السؤال · سلامة الخيارات.
 const QSTART = /^(ما|ماذا|كيف|لماذا|لمَ|أي|أيّ|متى|أين|كم|هل|من|مَن|اذكر|اذكري|عدّد|عدد|عدّ|عرّف|عرف|اشرح|فسّر|فسر|وضّح|بيّن|صِف|صف|قارن|احسب|علّل|علل|صنّف|صنف|رتّب|رتب|توقّع|توقع|سمِّ|سمّ|سم|حدّد|حدد|أعط|اعط|اكتب|أكمل|اكمل|استنتج|استخرج|استدل|ميّز|ميز|قدّر|قدر|ناقش|برهن|أثبت|اثبت|أوجد|اوجد|ارسم|ضع|ظلّل|ظلل|اختر|أجب|اجب)(?=\s|$|[\?؟:،\.])/;
+const SHORT_SPECS = (function () {
+  // مواصفات الاختبار القصير لمواد العلوم — مستخرجة من وثيقتي تقويم تعلم الطلبة
+  // (5-10) و(11-12) للعام 2026-2027 (site.moe.gov.om).
+  const ko59 = { total: 15, items: [9, 12], aoMode: 'KO', targets: { 'معرفة': 6, 'تطبيق': 6, 'استدلال': 3 }, mcqCount: 3, long: { count: 0, marks: [] } };
+  const ko9 = { total: 15, items: [9, 12], aoMode: 'KO', targets: { 'معرفة': 6, 'تطبيق': 6, 'استدلال': 3 }, mcqCount: 3, long: { count: 1, marks: [3, 4] } };
+  const ko10 = { total: 10, items: [5, 7], aoMode: 'KO', targets: { 'معرفة': 4, 'تطبيق': 4, 'استدلال': 2 }, mcqCount: 2, long: { count: 1, marks: [3, 4] } };
+  const ao11 = { total: 10, items: [5, 99], aoMode: 'AO', targets: { 'AO1': 3, 'AO2': 7 }, mcqCount: 2, long: { count: 1, marks: [4, 5] } };
+  return { 5: ko59, 6: ko59, 7: ko59, 8: ko59, 9: ko9, 10: ko10, 11: ao11, 12: ao11 };
+})();
+
 function checkQuizText(text, grade, subject, withAnswer) {
   const norm = String(text || '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').replace(/[\u200e\u200f\u202a-\u202e]/g, '')
-    // أرقام عربية-هندية (١٢٣) → لاتينية
     .replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
     .replace(/[\u06f0-\u06f9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06f0 + 48));
   const all = norm.split('\n').map(l => l.trim()).filter(l => l);
-  // **نموذج الإجابة** قد يأتي ملحقًا بالورقة ويعيد الترقيم من 1 — فنفصله قبل التحليل،
-  // ثم نأخذ منه هدف التقويم (AO) لكل سؤال برقمه.
+  const g = FG[grade] || 11;
+  const spec = SHORT_SPECS[g] || SHORT_SPECS[11];
+  // نموذج الإجابة قد يعيد الترقيم من 1 — نعزله قبل التحليل، ونقرأ منه هدف كل سؤال.
   const ANS_MARK = /(نموذج\s*ال[إا]جابة|ال[إا]جابة\s*النموذجية|مفتاح\s*ال[إا]جابة|answer\s*key|marking\s*scheme)/i;
   let ansAt = -1;
-  // المعلّم يحدّد إن كان الملف يحوي نموذج إجابة؛ وإن لم يحوِه لا نبحث عن قسم إجابات
-  // حتى لا يُقتطع من الورقة خطأً.
   if (withAnswer !== false) {
     for (let i = 0; i < all.length; i++) { if (ANS_MARK.test(all[i])) { ansAt = i; break; } }
   }
   const lines = ansAt < 0 ? all : all.slice(0, ansAt);
   const ansLines = ansAt < 0 ? [] : all.slice(ansAt + 1);
-  const aoMap = {};
+  const goalMap = {};
   if (ansLines.length) {
     let cur = null;
     ansLines.forEach(l => {
       const m = /^(\d{1,2})\s*[\)\.\-]/.exec(l);
       if (m) cur = +m[1];
+      if (!cur) return;
       const a = /AO\s*([123])/i.exec(l);
-      if (a && cur) aoMap[cur] = 'AO' + a[1];
-      else if (cur && !aoMap[cur]) {
-        if (/استدلال|تحليل|تقييم|تطبيق/.test(l)) aoMap[cur] = 'AO2';
-        else if (/معرفة|تذكر|فهم/.test(l)) aoMap[cur] = 'AO1';
+      if (a) goalMap[cur] = 'AO' + a[1];
+      else if (!goalMap[cur]) {
+        if (/استدلال|تحليل|تقييم/.test(l)) goalMap[cur] = 'استدلال';
+        else if (/تطبيق/.test(l)) goalMap[cur] = 'تطبيق';
+        else if (/معرفة|تذكر|فهم/.test(l)) goalMap[cur] = 'معرفة';
       }
     });
   }
-  // تقسيم إلى مفردات: سطر يبدأ برقم متبوعًا بـ) أو - أو .
   const starts = [];
-  // رقم المفردة يبدأ السطر بصيغة «1)» أو «1.» أو «1-» — بلا قوس مربّع،
-  // لأن [4] هي الدرجة لا رقم السؤال.
   lines.forEach((l, i) => {
     const m = /^(\d{1,2})\s*[\)\.\-]\s*(.*)$/.exec(l);
     if (m) starts.push({ i, n: +m[1], rest: (m[2] || '').trim() });
@@ -438,26 +445,23 @@ function checkQuizText(text, grade, subject, withAnswer) {
     const end = k + 1 < starts.length ? starts[k + 1].i : lines.length;
     const body = lines.slice(s.i, end).join('\n').trim();
     const bodyNoNum = body.replace(/^[\(\[]?\s*\d{1,2}\s*[\)\]\-\.]\s*/, '').trim();
-    // الدرجة: [4] أو (4) في نهاية المفردة
     let marks = null;
     const mm = /[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum) || /\s[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum);
     if (mm) marks = +mm[1];
-    // الاختيار من متعدد: ثلاث علامات خيارات على الأقل، أو علامات ⬭
     const optMarks = (bodyNoNum.match(/(^|\s)[أبجد]\s*[\)\]]/g) || []).length;
     const bubbled = (bodyNoNum.match(/\u2b2d/g) || []).length;
     const isMcq = optMarks >= 3 || bubbled >= 3;
-    // نصّ السؤال بلا خياراته لفحص البداية
     const firstPart = bodyNoNum.split(/\n/).filter(x => !/^\s*[أبجد]\s*[\)\]]/.test(x)).join(' ').slice(0, 120);
-    // هدف التقويم: من نموذج الإجابة المرفق (AO1/AO2/AO3) أو من وصف المستوى
-    let ao = aoMap[s.n] || null;
-    const aoM = /AO\s*([123])/i.exec(bodyNoNum);
-    if (aoM) ao = 'AO' + aoM[1];
-    else if (/استدلال|تحليل|تقييم|تطبيق/.test(bodyNoNum)) ao = 'AO2';
-    else if (/معرفة|تذكر|فهم/.test(bodyNoNum)) ao = 'AO1';
-    return { n: s.n, marks, isMcq, opts: Math.max(optMarks, bubbled), ao, start: firstPart.trim(), raw: bodyNoNum };
+    let goal = goalMap[s.n] || null;
+    if (!goal) {
+      const aoM = /AO\s*([123])/i.exec(bodyNoNum);
+      if (aoM) goal = 'AO' + aoM[1];
+      else if (/استدلال|تحليل|تقييم/.test(bodyNoNum)) goal = 'استدلال';
+      else if (/تطبيق/.test(bodyNoNum)) goal = 'تطبيق';
+      else if (/معرفة|تذكر|فهم/.test(bodyNoNum)) goal = 'معرفة';
+    }
+    return { n: s.n, marks, isMcq, opts: Math.max(optMarks, bubbled), goal, start: firstPart.trim(), raw: bodyNoNum };
   });
-  const g = FG[grade] || 0;
-  const spec = (g >= 10 || !g) ? { total: 10, items: [5, 7] } : { total: 15, items: [9, 12] };
   const checks = [];
   const add = (id, title, status, detail) => checks.push({ id, title, status, detail });
   // ① الترقيم
@@ -467,9 +471,10 @@ function checkQuizText(text, grade, subject, withAnswer) {
     seqOk ? ' 1 · 2 · … · ' + nums.length : 'التسلسل: ' + nums.join(' · '));
   const dup = nums.filter((n, i) => nums.indexOf(n) !== i);
   add('num-dup', 'لا تكرار في الأرقام', dup.length ? 'fail' : 'pass', dup.length ? 'مكرّر: ' + [...new Set(dup)].join('، ') : 'لا تكرار');
-  // ② العدد
-  const cnt = items.length, [lo, hi] = spec.items;
-  add('count', 'عدد المفردات ' + lo + '–' + hi, (cnt >= lo && cnt <= hi) ? 'pass' : 'fail', cnt + ' مفردة');
+  // ② عدد المفردات
+  const cnt = items.length, lo = spec.items[0], hi = spec.items[1];
+  const cntLabel = hi >= 99 ? 'لا تقل عن ' + lo : lo + '–' + hi;
+  add('count', 'عدد المفردات ' + cntLabel, (cnt >= lo && cnt <= hi) ? 'pass' : 'fail', cnt + ' مفردة');
   // ③ الدرجة الكلية
   const withMarks = items.filter(x => x.marks != null);
   const total = withMarks.reduce((a, x) => a + x.marks, 0);
@@ -498,29 +503,31 @@ function checkQuizText(text, grade, subject, withAnswer) {
   // ⑧ أرقام وزراية متبقّية
   const orig = items.filter(x => /^\s*\(?\s*\d{1,2}\s*\)\s*\d+\s*\)/.test(x.raw));
   add('orig-no', 'لا رقم وزراي متبقٍّ', orig.length ? 'warn' : 'pass', orig.length ? 'في: ' + orig.map(x => 'م' + x.n).join('، ') : 'نظيف');
-
-  // ⑨ توزيع الأهداف (يُفحص فقط إن وُجد AO1/AO2 — أي إن رُفع نموذج الإجابة معه)
-  const withAO = items.filter(x => x.ao);
-  if (withAO.length === items.length && items.length) {
-    const a1 = items.filter(x => x.ao === 'AO1').reduce((a, x) => a + (x.marks || 0), 0);
-    const a2 = items.filter(x => x.ao === 'AO2').reduce((a, x) => a + (x.marks || 0), 0);
-    const want = (g >= 11) ? { a1: 3, a2: 7 } : { a1: Math.round(spec.total * 0.4), a2: spec.total - Math.round(spec.total * 0.4) };
-    add('ao', 'توزيع الأهداف: AO1=' + want.a1 + ' · AO2=' + want.a2,
-      (a1 === want.a1 && a2 === want.a2) ? 'pass' : 'fail', 'AO1=' + a1 + ' · AO2=' + a2);
+  // ⑨ توزيع الأهداف (يُفحص إن وُجد هدف لكل مفردة من نموذج الإجابة)
+  const withGoal = items.filter(x => x.goal);
+  if (withGoal.length === items.length && items.length) {
+    const goals = Object.keys(spec.targets);
+    const got = {}, want = spec.targets;
+    goals.forEach(k => got[k] = items.filter(x => x.goal === k).reduce((a, x) => a + (x.marks || 0), 0));
+    const okD = goals.every(k => got[k] === want[k]);
+    const wantTxt = goals.map(k => k + '=' + want[k]).join(' · ');
+    add('ao', 'توزيع الأهداف: ' + wantTxt, okD ? 'pass' : 'fail', goals.map(k => k + '=' + got[k]).join(' · '));
   } else {
-    add('ao', 'توزيع الأهداف AO1 / AO2', 'skip',
-      withAO.length ? 'قُرئ في ' + withAO.length + ' من ' + items.length + ' مفردات' : withAnswer === false ? 'لم يُفحص: اختر «الملف يحتوي نموذج الإجابة» لفحص التوزيع' : 'لم أجد AO1/AO2 في نموذج الإجابة');
+    add('ao', 'توزيع الأهداف ' + Object.keys(spec.targets).join(' / '), 'skip',
+      withGoal.length ? 'قُرئ في ' + withGoal.length + ' من ' + items.length + ' مفردات' : withAnswer === false ? 'لم يُفحص: علّم «الملف يحتوي نموذج الإجابة»' : 'لم أجد الأهداف في نموذج الإجابة');
   }
-  // ⑩ عدد اختيار من متعدد وإجابة طويلة
-  const nMcq = items.filter(x => x.isMcq).length, nLong = items.filter(x => x.marks >= 4 && !x.isMcq).length;
-  if (g >= 10) {
-    add('mcq2', 'مفردتان اختيار من متعدد', nMcq === 2 ? 'pass' : 'fail', nMcq + ' مفردة');
-    add('long1', 'مفردة إجابة طويلة واحدة (4–5)', nLong === 1 ? 'pass' : 'warn', nLong + ' مفردة');
+  // ⑩ عدد اختيار من متعدد وإجابة طويلة (وفق وثيقة الصف)
+  const nMcq = items.filter(x => x.isMcq).length;
+  add('mcq2', 'مفردات اختيار من متعدد: ' + spec.mcqCount, nMcq === spec.mcqCount ? 'pass' : 'fail', nMcq + ' مفردة');
+  if (spec.long.count) {
+    const loM = Math.min.apply(null, spec.long.marks);
+    const nLong = items.filter(x => !x.isMcq && x.marks >= loM).length;
+    add('long1', 'مفردة إجابة طويلة واحدة (' + spec.long.marks.join('–') + ')', nLong === 1 ? 'pass' : 'warn', nLong + ' مفردة');
   }
   const fails = checks.filter(c => c.status === 'fail').length, warns = checks.filter(c => c.status === 'warn').length;
   return {
-    ok: fails === 0, summary: { items: cnt, marks: total, expectedMarks: spec.total, range: spec.items, fails, warns },
-    checks, items: items.map(x => ({ n: x.n, marks: x.marks, mcq: x.isMcq, opts: x.opts, start: x.start.slice(0, 90) })),
+    ok: fails === 0, summary: { items: cnt, marks: total, expectedMarks: spec.total, grade: g, range: spec.items, fails, warns },
+    checks, items: items.map(x => ({ n: x.n, marks: x.marks, mcq: x.isMcq, opts: x.opts, goal: x.goal, start: x.start.slice(0, 90) })),
   };
 }
 

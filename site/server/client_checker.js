@@ -138,7 +138,8 @@
 
   async function run() {
     var out = $('#chkOut'), stat = $('#chkStat'), btn = $('#chkRun');
-    var grade = ($('#chkGrade') && $('#chkGrade').value) || '';
+    var gEl = document.querySelector('input[name="chkGrade"]:checked');
+    var grade = (gEl && gEl.value) || 'الحادي عشر';
     var withAns = ($('#chkAns') ? !!$('#chkAns').checked : true);
     var txt = ($('#chkText') && $('#chkText').value || '').trim();
     var f = $('#chkFile') && $('#chkFile').files && $('#chkFile').files[0];

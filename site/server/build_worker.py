@@ -698,6 +698,7 @@ extra_css += '''
 .chk-grow{flex:1;min-width:240px}
 .chk-lb select,.chk-lb textarea{font:inherit;font-weight:400;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff}
 .chk-lb textarea{resize:vertical;line-height:1.9}
+.chk-lbl-t{font-size:.84rem;color:#224;font-weight:700}.chk-grades{display:flex;flex-wrap:wrap;gap:6px}.chk-grades label{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;font-size:.84rem;font-weight:600;cursor:pointer;background:#fff}.chk-grades input{margin:0;accent-color:var(--main)}.chk-grades label:has(input:checked){background:var(--main);color:#fff;border-color:var(--main)}
 .chk-cb{display:flex;gap:9px;align-items:flex-start;margin:4px 0 12px;padding:10px 12px;background:#f2f8f5;border:1px solid #cfe5da;border-radius:11px;font-size:.88rem;cursor:pointer;line-height:1.6}
 .chk-cb input{margin-top:3px;width:18px;height:18px;accent-color:var(--main);flex:0 0 auto}
 .chk-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -857,13 +858,19 @@ QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبا
     <input type="file" id="chkFile" accept=".docx,.pdf,.txt" hidden>
   </div>
   <div class="chk-grid">
-    <label class="chk-lb">الصف
-      <select id="chkGrade">
-        <option>الحادي عشر</option><option>الثاني عشر</option><option>العاشر</option>
-        <option>التاسع</option><option>الثامن</option><option>السابع</option>
-        <option>السادس</option><option>الخامس</option>
-      </select>
-    </label>
+    <div class="chk-lb">
+      <span class="chk-lbl-t">اختر الصف (واحد فقط)</span>
+      <div class="chk-grades">
+        <label><input type="radio" name="chkGrade" value="الخامس"> الخامس</label>
+        <label><input type="radio" name="chkGrade" value="السادس"> السادس</label>
+        <label><input type="radio" name="chkGrade" value="السابع"> السابع</label>
+        <label><input type="radio" name="chkGrade" value="الثامن"> الثامن</label>
+        <label><input type="radio" name="chkGrade" value="التاسع"> التاسع</label>
+        <label><input type="radio" name="chkGrade" value="العاشر"> العاشر</label>
+        <label><input type="radio" name="chkGrade" value="الحادي عشر" checked> الحادي عشر</label>
+        <label><input type="radio" name="chkGrade" value="الثاني عشر"> الثاني عشر</label>
+      </div>
+    </div>
     <label class="chk-lb chk-grow">أو الصق نصّ الورقة
       <textarea id="chkText" rows="5" placeholder="مثال:&#10;1) ما المرحلة من دورة الماء … [1]&#10;2) اشرح كيف … [2]"></textarea>
     </label>
