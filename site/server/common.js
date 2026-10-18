@@ -159,6 +159,7 @@ function toolDialog(reason){
         ],'https://apps.apple.com/app/userscripts/id1463298887')+
         step('٢','فعّل الإضافة وامنح الإذن',[
           ['@الإعدادات','Safari','الإضافات'],
+          ['iOS 26+: الإعدادات','@التطبيقات','Safari','الإضافات'],
           ['@Userscripts','شغّل المفتاح','الكل: سماح']
         ])+
         step('٣','ثبّت الأداة في سافاري',[
