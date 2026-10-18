@@ -101,16 +101,30 @@ function toolVersion(){return document.documentElement.getAttribute('data-tahdir
 // وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
 var EXT_STORE={chrome:'',edge:''};
 function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
-function browserKind(){var u=navigator.userAgent;return /Edg\//.test(u)?'edge':(/Firefox/.test(u)?'firefox':(/Chrome/.test(u)?'chrome':''));}
+function browserKind(){var u=navigator.userAgent;
+     if(/Edg\//.test(u))return 'edge';
+     if(/Firefox|FxiOS/.test(u))return 'firefox';
+     if(/Chrome|CriOS/.test(u))return 'chrome';
+     // سافاري: لا يحتوي Chrome/Edg/Firefox — نتحقق من Safari أو جهاز ماك
+     if(/Safari/.test(u)||/Macintosh/.test(u))return 'safari';
+     return '';}
 function extUrl(){return EXT_STORE[browserKind()]||'';}
 function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_FORCE)>=0;}
 // مسار واحد بسيط: Tampermonkey فقط. الإضافة الرسمية تُذكر فقط لو فُعّلت روابطها.
-var BROWSER_NAME={chrome:'Chrome',edge:'Edge',firefox:'Firefox'};
+var BROWSER_NAME={chrome:'Chrome',edge:'Edge',firefox:'Firefox',safari:'Safari'};
 function tmStoreUrl(){var b=browserKind();
   if(b==='firefox')return 'https://addons.mozilla.org/ar/firefox/addon/tampermonkey/';
   if(b==='edge')return 'https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd';
+  // سافاري: Tampermonkey من Mac App Store (مدفوعة رمزية) — نسخة «Legacy» لا تعمل على سافاري الحديث
+  if(b==='safari')return 'https://apps.apple.com/app/tampermonkey/id1482490089';
   return 'https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo';}
 function tmStoreName(){return (BROWSER_NAME[browserKind()]||'متصفحك');}
+// روابط متجر كل متصفح (للتبويبات)
+function tmStoreFor(b){
+  if(b==='firefox')return 'https://addons.mozilla.org/ar/firefox/addon/tampermonkey/';
+  if(b==='edge')return 'https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd';
+  if(b==='safari')return 'https://apps.apple.com/app/tampermonkey/id1482490089';
+  return 'https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo';}
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «الكبسولة»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
   var v=toolVersion(),ok=!!v,eu=extUrl();
@@ -120,14 +134,44 @@ function toolDialog(reason){
     return dialog({title:'أداة نور',html:(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<p class="m-msg"><b>خطوة واحدة:</b> اضغط الزر، وفي صفحة المتجر اضغط <b>«إضافة إلى '+bn+'»</b>. بعدها ارجع وحدّث الصفحة.</p>',okText:'تثبيت الإضافة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(eu,'_blank');});
   }
   if(ok)return dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false});
-  // التثبيت لأول مرة: خطوتان فقط
+  // التثبيت لأول مرة: تبويبات بحسب المتصفح (كروم · فايرفوكس · إيدج · ماك/سافاري)
+  var cur=browserKind()||'chrome';
+  var TABS=[['chrome','Chrome','🌐'],['firefox','Firefox','🦊'],['edge','Edge','🌊'],['safari','ماك / Safari','🧭']];
+  function stepsFor(b){
+    if(b==='safari'){
+      return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+        '<li>ثبّت <b>Tampermonkey</b> من <b>Mac App Store</b>: <a href="'+tmStoreFor('safari')+'" target="_blank" rel="noopener">افتح صفحة التطبيق</a> (مدفوعة رمزية ~$1.99).</li>'+
+        '<li><b>سافاري ← الإعدادات (⌘,) ← الإضافات</b> ← فعّل <b>Tampermonkey</b>.</li>'+
+        '<li><b>الإعدادات ← المواقع الإلكترونية ← Tampermonkey</b> ← اسمح بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
+        '<li>ارجع واضغط <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b> ثم <b>Allow</b> إن سألك سافاري.</li></ol>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ تنبيه:</b> لا تستخدم <b>«Tampermonkey Legacy»</b> — فهي لسافاري 6–11 فقط ولن تُثبَّت على سافاري الحديث. استخدم النسخة من <b>App Store</b>.</p>';
+    }
+    var nm=b==='firefox'?'Firefox':(b==='edge'?'Edge':'Chrome');
+    return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+      '<li>ثبّت <b>Tampermonkey</b> من متجر '+nm+': <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى '+nm+'».</li>'+
+      '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b>.</li></ol>';
+  }
+  var tabbar='<div class="tt-tabs">'+TABS.map(function(t){
+    return '<button type="button" class="tt-tab'+(t[0]===cur?' on':'')+'" data-tab="'+t[0]+'">'+t[2]+' '+esc(t[1])+'</button>';
+  }).join('')+'</div>';
+  var panes=TABS.map(function(t){
+    return '<div class="tt-pane'+(t[0]===cur?' on':'')+'" data-pane="'+t[0]+'">'+stepsFor(t[0])+'</div>';
+  }).join('');
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+
-   '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-   '<li>ثبّت <b>Tampermonkey</b> من متجر '+esc(tmStoreName())+': <a href="'+tmStoreUrl()+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى '+esc(tmStoreName())+'».</li>'+
-   '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b>.</li></ol>'+
+   '<p class="m-msg">اختر متصفحك ثم اتبع الخطوتين:</p>'+
+   tabbar+panes+
    '<p class="m-msg muted small">هذا كل شيء — مرة واحدة للأبد. بعدها تتحدث الأداة تلقائيًا من الموقع.</p>'+
    '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
-  return dialog({title:'تثبيت أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(TOOL_URL,'_blank');});
+  var pr=dialog({title:'تثبيت أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'});
+  // ربط التبويبات داخل النافذة (بعد إدراجها في DOM)
+  Array.prototype.forEach.call(document.querySelectorAll('.tt-tab'),function(b){
+    b.onclick=function(){
+      var k=b.getAttribute('data-tab');
+      Array.prototype.forEach.call(document.querySelectorAll('.tt-tab'),function(x){x.classList.toggle('on',x===b);});
+      Array.prototype.forEach.call(document.querySelectorAll('.tt-pane'),function(x){x.classList.toggle('on',x.getAttribute('data-pane')===k);});
+    };
+  });
+  return pr.then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
 // تنبيه غير حاجب: نُخبر المعلم أن هناك إصدارًا أحدث، ولا نمنعه من العمل.
 // (الحجب كان يسبب تعطّلًا كاملًا لو تعذّر قراءة الإصدار لأي سبب.)

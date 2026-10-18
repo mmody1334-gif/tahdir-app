@@ -630,6 +630,13 @@ extra_css += '''
 .gr-tasks td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .gr-note{font-size:.82rem;background:var(--accent-l,#fff8e6);border-radius:10px;padding:8px 12px}
 .gr-empty{color:var(--mute);text-align:center;padding:18px}
+/* تبويبات تثبيت الأداة حسب المتصفح */
+.tt-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line,#e2e0d6)}
+.tt-tab{font:inherit;font-size:.82rem;font-weight:700;padding:7px 12px;border:1px solid var(--line,#e2e0d6);background:var(--paper,#fff);color:var(--mute,#5b6d67);border-radius:999px;cursor:pointer;transition:all .12s}
+.tt-tab:hover{border-color:var(--main,#1f8a70);color:var(--main,#1f8a70)}
+.tt-tab.on{background:var(--main,#1f8a70);border-color:var(--main,#1f8a70);color:#fff}
+.tt-pane{display:none}
+.tt-pane.on{display:block}
 .lp-l.lp-off{opacity:.45;cursor:not-allowed}
 .lp-l.lp-off .muted{font-size:.72rem;color:#a15c00}
 .g-none{max-width:560px;margin:40px auto;text-align:center;padding:26px 20px;background:var(--paper,#fff);border:1px dashed var(--line,#e2e0d6);border-radius:16px}
