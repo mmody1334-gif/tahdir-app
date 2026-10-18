@@ -143,6 +143,7 @@ function toolDialog(reason){
         '<li>ثبّت <b>Userscripts</b> — <b>مجاني ومفتوح المصدر</b>: <a href="https://apps.apple.com/app/userscripts/id1463298887" target="_blank" rel="noopener">افتح App Store</a>. (يحتاج iOS 15.1 فأحدث)</li>'+
         '<li><b>الإعدادات ← سافاري ← الإضافات</b> ← فعّل <b>Userscripts</b>، ثم اسمح له بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
         '<li>افتح رابط الأداة في سافاري (<b>/tool/tahdir-noor.user.js</b>) ← اضغط أيقونة الإضافة في شريط العنوان ← <b>Install</b>.</li></ol>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ لو ظهرت لك الأداة كـ«كود نصّي» أو نزلت في تطبيق «الملفات» بلا زر Install</b> — فهذا معناه أن <b>Userscripts غير مثبّت أو غير مفعّل في سافاري</b>، وليس عيبًا في الأداة. أكمل الخطوتين 1 و2 ثم أعد فتح الرابط.<br><span class="muted small">وإن كان الملف نزل بالفعل في «الملفات»: افتح تطبيق Userscripts ← «Set Directory» ← ضع مجلد التنزيلات، ثم انقل الملف <code>tahdir-noor.user.js</code> إليه — سيُحمَّل تلقائيًّا.</span></p>'+
         '<p class="m-msg" style="background:var(--main-l,#e3f1eb);border-radius:10px;padding:8px 11px"><b>لماذا يعمل مجانًا؟</b> أضفنا في الأداة طبقة توافق تُكمل واجهات التخزين عبر <code>localStorage</code> — فتعمل مع <b>Userscripts</b> المجاني كما تعمل مع Tampermonkey. <b>لا حاجة للدفع.</b> (من يفضّل Tampermonkey: ~$1.99 مرة واحدة، اختياري).</p>';
     }
     if(b==='safari'){
@@ -164,11 +165,21 @@ function toolDialog(reason){
   var panes=TABS.map(function(t){
     return '<div class="tt-pane'+(t[0]===cur?' on':'')+'" data-pane="'+t[0]+'">'+stepsFor(t[0])+'</div>';
   }).join('');
+  // على أندرويد: متصفحات الجوال لا تدعم إضافات السكربتات (Chrome · Samsung Internet)،
+  // فملف .user.js يُحمَّل كنص ولا يظهر زر «تثبيت». الحل الأسهل هو التطبيق (الأداة مدمجة).
+  var isAndroid=/Android/i.test(navigator.userAgent);
+  var andNote=isAndroid
+    ? '<div class="m-msg" style="background:var(--main-l,#e3f1eb);border:1px solid var(--main,#1f8a70);border-radius:12px;padding:11px 13px">'+
+      '<b>📱 أنت على أندرويد — لا تحتاج تثبيت سكربت.</b><br>'+
+      'تطبيق «الكبسولة» فيه الأداة <b>مدمجة</b> ويعمل مباشرة: <a class="btn primary small" href="'+APK_URL+'" target="_blank" rel="noopener" style="margin-top:6px;display:inline-block">⬇ تحميل التطبيق</a>'+
+      '<div class="muted small" style="margin-top:7px">متصفحات أندرويد (Chrome · Samsung Internet) <b>لا تدعم إضافات السكربتات</b>، ولهذا عند فتح رابط الأداة تظهر لك <b>كنص فقط</b> ولا يظهر «تثبيت». ولو أردت السكربت على الجوال: استخدم <b>Firefox للأندرويد</b> + Tampermonkey.</div></div>'
+    : '';
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+
+   andNote+
    '<p class="m-msg">اختر متصفحك ثم اتبع الخطوتين:</p>'+
    tabbar+panes+
    '<p class="m-msg muted small">هذا كل شيء — مرة واحدة للأبد. بعدها تتحدث الأداة تلقائيًا من الموقع.</p>'+
-   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: افتح الموقع في Safari، ثم «مشاركة» ← «إضافة إلى الشاشة الرئيسية».</p>';
+   '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: ثبّت <b>Userscripts</b> (مجاني) ثم افتح رابط الأداة واضغط Install.</p>';
   var pr=dialog({title:'تثبيت أداة نور',html:h,okText:'تثبيت الأداة',cancelText:'إغلاق'});
   // ربط التبويبات داخل النافذة (بعد إدراجها في DOM)
   Array.prototype.forEach.call(document.querySelectorAll('.tt-tab'),function(b){
