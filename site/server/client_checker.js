@@ -9,9 +9,28 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   };
-  function pageNonce() {
-    var s = document.querySelector('script[nonce]');
-    return s ? (s.nonce || s.getAttribute('nonce') || '') : '';
+  // **الـnonce يُلتقط الآن** وقت تنفيذ هذا السكربت: المحمّل يُنشئ <script nonce> ثم
+  // يحذفه بعد التنفيذ، فلا يبقى في DOM أي script[nonce] — ولهذا كان تحميل pdf.js
+  // يُحجب بـCSP. نقرأه من document.currentScript ونحتفظ به.
+  var NONCE = (function () {
+    try {
+      var cs = document.currentScript;
+      if (cs && cs.nonce) return cs.nonce;
+      if (cs && cs.getAttribute) { var a = cs.getAttribute('nonce'); if (a) return a; }
+    } catch (e) { }
+    var n = document.querySelector('script[nonce]');
+    return n ? (n.nonce || n.getAttribute('nonce') || '') : '';
+  })();
+  // احتياط أخير: نلتقط أي nonce يظهر لاحقًا (لو تأخّر التنفيذ عن إنشاء العنصر).
+  if (!NONCE) {
+    try {
+      var mo = new MutationObserver(function () {
+        var s = document.querySelector('script[nonce]');
+        if (s) { NONCE = s.nonce || s.getAttribute('nonce') || ''; mo.disconnect(); }
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(function () { try { mo.disconnect(); } catch (e) { } }, 8000);
+    } catch (e) { }
   }
 
   // ---------- فكّ ضغط ZIP (DOCX) ----------
@@ -73,7 +92,7 @@
       if (window.pdfjsLib) return res(window.pdfjsLib);
       var s = document.createElement('script');
       s.src = '/pdf/pdf.min.js';
-      var n = pageNonce(); if (n) s.setAttribute('nonce', n);
+      if (NONCE) s.setAttribute('nonce', NONCE); else if (s.nonce !== undefined) s.nonce = NONCE;
       s.async = true;
       s.onload = function () {
         try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf/pdf.worker.min.js'; } catch (e) { }
@@ -142,7 +161,7 @@
     var grade = (gEl && gEl.value) || 'الحادي عشر';
     var withAns = ($('#chkAns') ? !!$('#chkAns').checked : true);
     var txt = ($('#chkText') && $('#chkText').value || '').trim();
-    var f = $('#chkFile') && $('#chkFile').files && $('#chkFile').files[0];
+    var f = droppedFile || ($('#chkFile') && $('#chkFile').files && $('#chkFile').files[0]);
     if (!txt && !f) {
       if (out) out.innerHTML = '<p class="chk-err">اختر ملفًا أو الصق نصّ الورقة أولًا.</p>';
       return;
@@ -180,29 +199,45 @@
     }
   }
 
+  // الملف المسحوب يُحفظ هنا لأن تعيين input.files قد يُرفض في بعض المتصفحات —
+  // فكان السحب يُفتح ويقول «اختر ملفًا» بلا فائدة.
+  var droppedFile = null;
+
   function init() {
-    var drop = $('#chkDrop'), inp = $('#chkFile'), pick = $('#chkRun');
+    var drop = $('#chkDrop'), inp = $('#chkFile'), pick = $('#chkRun'), panel = $('#chkPanel');
     if (!drop || !inp) return;
     drop.addEventListener('click', function () { inp.click(); });
     drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0];
+      droppedFile = null;
       var st = $('#chkStat');
       if (st) st.textContent = f ? ('اخترت: ' + f.name + ' · ' + Math.round(f.size / 1024) + ' KB') : '';
     });
-    ['dragenter', 'dragover'].forEach(function (ev) {
-      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
-    });
-    ['dragleave', 'drop'].forEach(function (ev) {
-      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
-    });
-    drop.addEventListener('drop', function (e) {
+    function takeDrop(e) {
       var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if (!f) return;
+      e.preventDefault();
+      droppedFile = f;
       try { var dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; } catch (err) { }
-      var st = $('#chkStat'); if (st) st.textContent = 'اخترت: ' + f.name;
+      var st = $('#chkStat'); if (st) st.textContent = 'اخترت: ' + f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
       run();
+    }
+    // نستقبل السحب على الصندوق **وعلى القسم كله** حتى لا يفتح المتصفح الملف
+    // إن أفلته المعلّم خارج الصندوق بقليل.
+    [drop, panel].forEach(function (zone) {
+      if (!zone) return;
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
+      });
+      ['dragleave'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { if (zone === drop) drop.classList.remove('over'); });
+      });
+      zone.addEventListener('drop', takeDrop);
     });
+    // منع المتصفح من فتح الملف لو أُفلت في أي مكان آخر من الصفحة
+    window.addEventListener('dragover', function (e) { e.preventDefault(); }, false);
+    window.addEventListener('drop', function (e) { e.preventDefault(); }, false);
     if (pick) pick.addEventListener('click', run);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
