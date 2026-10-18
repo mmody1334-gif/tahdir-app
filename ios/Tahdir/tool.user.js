@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.4
+// @version      3.4.5
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -25,27 +25,62 @@
 (function () {
   'use strict';
   // ===== طبقة توافق لمديري السكربتات الذين لا يوفّرون GM_* المتزامنة =====
-  // Userscripts (مجاني على iOS/macOS) يوفّر GM.setValue/GM.getValue غير المتزامنة
-  // فقط، وTampermonkey يوفّر GM_setValue/GM_getValue المتزامنة. فنُكمل الناقص
-  // بـlocalStorage (متزامن، ونفس الأصل) لتعمل الأداة على كليهما بلا تعديل باقي الكود.
+  // Userscripts (مجاني على iOS/macOS) يوفّر GM.setValue/GM.getValue **غير المتزامنة**
+  // فقط. والمهمة تُحفظ على المنصة وتُقرأ على نور — أي **بين أصلين مختلفين**؛ ولهذا
+  // لا يصلح localStorage (معزول لكل أصل) وإلا فقدها نور.
+  // الحل: نُحمّل قيم التخزين المشترك في الذاكرة عند البدء (await)، ثم نخدم
+  // GM_getValue متزامنةً من الذاكرة، ونكتب في الاتجاهين (ذاكرة + GM.setValue).
   (function gmCompat(){
     try{
       const g = (typeof globalThis!=='undefined')?globalThis:window;
-      const P='tahdir_noor_';
-      if(typeof g.GM_getValue!=='function')g.GM_getValue=function(k,d){try{const v=localStorage.getItem(P+k);return v===null?d:JSON.parse(v);}catch(e){return d;}};
-      if(typeof g.GM_setValue!=='function')g.GM_setValue=function(k,v){try{localStorage.setItem(P+k,JSON.stringify(v));}catch(e){}};
-      if(typeof g.GM_deleteValue!=='function')g.GM_deleteValue=function(k){try{localStorage.removeItem(P+k);}catch(e){}};
-      if(typeof g.GM_registerMenuCommand!=='function')g.GM_registerMenuCommand=function(){};
-      // فتح التبويب: نُفضّل GM.openInTab غير المتزامنة (Userscripts على iOS/سافاري)
-      // لأن سافاري يحجب window.open إذا لم يكن ناتجًا عن لمسة مباشرة، فكانت الأداة
-      // «تعمل على المنصة ولا تفتح نور». ونرجع إلى window.open عند عدم توفرها.
-      if(typeof g.GM_openInTab!=='function')g.GM_openInTab=function(u,o){
-        try{ if(g.GM&&typeof g.GM.openInTab==='function'){ g.GM.openInTab(u,!(o&&o.active)); return; } }catch(e){}
-        try{window.open(u,'_blank');}catch(e){}
+      const P = 'tahdir_noor_';
+      const hasGM = !!(g.GM && typeof g.GM.getValue === 'function');
+      const cache = Object.create(null);
+      // إن كان المدير يوفّر المتزامنة أصلًا (Tampermonkey) فلا حاجة لأي شيء
+      if (typeof g.GM_getValue === 'function') { g.__TAHDIR_READY = Promise.resolve(); return; }
+
+      let ready;
+      if (hasGM) {
+        // تحميل كل مفاتيحنا المشتركة مرة واحدة قبل تشغيل الأداة
+        ready = Promise.resolve()
+          .then(() => (typeof g.GM.listValues === 'function' ? g.GM.listValues() : []))
+          .then(keys => Promise.all((keys || [])
+            .filter(k => /^tahdir/.test(k))
+            .map(k => g.GM.getValue(k).then(v => { if (v !== undefined && v !== null) cache[k] = v; }).catch(() => {}))))
+          .catch(() => {});
+      } else {
+        // لا GM إطلاقًا: أفضل بديل متاح (نفس الأصل فقط)
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.indexOf(P) === 0) { try { cache[k.slice(P.length)] = JSON.parse(localStorage.getItem(k)); } catch (e) {} }
+          }
+        } catch (e) {}
+        ready = Promise.resolve();
+      }
+
+      if (typeof g.GM_getValue !== 'function') g.GM_getValue = function (k, d) {
+        return (k in cache) ? cache[k] : d;
       };
+      if (typeof g.GM_setValue !== 'function') g.GM_setValue = function (k, v) {
+        cache[k] = v;
+        try { if (hasGM) g.GM.setValue(k, v); else localStorage.setItem(P + k, JSON.stringify(v)); } catch (e) {}
+      };
+      if (typeof g.GM_deleteValue !== 'function') g.GM_deleteValue = function (k) {
+        delete cache[k];
+        try { if (hasGM) g.GM.deleteValue(k); else localStorage.removeItem(P + k); } catch (e) {}
+      };
+      if (typeof g.GM_registerMenuCommand !== 'function') g.GM_registerMenuCommand = function () {};
+      // فتح التبويب: نُفضّل GM.openInTab غير المتزامنة (Userscripts على iOS/سافاري)
+      // لأن سافاري يحجب window.open إذا لم يكن ناتجًا عن لمسة مباشرة.
+      if (typeof g.GM_openInTab !== 'function') g.GM_openInTab = function (u, o) {
+        try { if (g.GM && typeof g.GM.openInTab === 'function') { g.GM.openInTab(u, !(o && o.active)); return; } } catch (e) {}
+        try { window.open(u, '_blank'); } catch (e) {}
+      };
+      g.__TAHDIR_READY = ready;
     }catch(e){}
   })();
-  const VERSION = '3.4.4';
+  const VERSION = '3.4.5';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
@@ -825,10 +860,15 @@
   else if (pending) showPendingBar(pending);
   }
 
-  // ننتظر جاهزية المستند: قبلها لا يوجد document.documentElement فيفشل كل شيء.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
-  } else {
-    boot();
-  }
+  // ننتظر **تحميل التخزين المشترك** أولًا (Userscripts على iOS غير متزامن)، ثم
+  // جاهزية المستند: قبلها لا يوجد document.documentElement فيفشل كل شيء.
+  const start = function () {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot, { once: true });
+    } else {
+      boot();
+    }
+  };
+  const rd = (typeof globalThis !== 'undefined' ? globalThis : window).__TAHDIR_READY;
+  if (rd && typeof rd.then === 'function') rd.then(start, start); else start();
 })();
