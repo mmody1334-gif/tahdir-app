@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.6
+// @version      3.4.7
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -80,7 +80,7 @@
       g.__TAHDIR_READY = ready;
     }catch(e){}
   })();
-  const VERSION = '3.4.6';
+  const VERSION = '3.4.7';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
@@ -90,18 +90,25 @@
   // **استقبال المهمة من الرابط**: إن جاء نور برابط يحمل #tahdir=… فكّ الترميز
   // واحفظها كأنها وصلت عبر التخزين، ثم نظّف الرابط. هذا يجعل النقل بين المنصة
   // ونور يعمل بلا اعتماد على تخزين مشترك بين المواقع (شرط عملها على سافاري/iOS).
-  try {
-    const m = /[#&]tahdir=([^&]+)/.exec(location.hash || '');
-    if (m) {
+  // ملاحظة: تغيير الهاش وحده لا يُعيد تحميل الصفحة (same-document navigation)،
+  // فنستمع أيضًا لحدث hashchange لتعمل لو كان نور مفتوحًا بالفعل.
+  function takeJobFromHash() {
+    try {
+      const m = /[#&]tahdir=([^&]+)/.exec(location.hash || '');
+      if (!m) return false;
       const json = decodeURIComponent(escape(atob(decodeURIComponent(m[1]))));
       const data = JSON.parse(json);
       if (data && data.source === 'tahdir-al-aali') {
         const key = data.kind === 'homework' ? PENDING_KEY : PREP_KEY;
         GM_setValue(key, { data: data, ts: Date.now(), routed: true });
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+        return true;
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+    return false;
+  }
+  takeJobFromHash();
+  window.addEventListener('hashchange', function () { takeJobFromHash(); });
   const CID_KEY = 'tahdir_last_cid';
   const GRADES_KEY = 'tahdir_grade_cids';
   const TASKS_KEY = 'tahdir_nour_tasks';   // المهام الإلكترونية التي قرأتها الأداة من نور (لكل صف)
