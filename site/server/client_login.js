@@ -8,7 +8,14 @@ function fingerprint(){
   if(window.crypto&&crypto.subtle){
     return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(function(b){return Array.prototype.map.call(new Uint8Array(b),function(x){return ('0'+x.toString(16)).slice(-2);}).join('').slice(0,40);});
   }
-  return Promise.resolve('');
+  // crypto.subtle غير متاح على اتصال غير آمن (http). وبدونه تُفقد البصمة فيُحسب
+  // كل دخول «جهازًا جديدًا» حتى يُقفل الحساب بحدّ الأجهزة. فنستخدم بصمة بديلة
+  // (FNV-1a على النصّ وعلى معكوسه) فتبقى هوية الجهاز مستقرة في كل الأحوال.
+  var h=0x811c9dc5,h2=0x811c9dc5,rev=str.split('').reverse().join(''),i;
+  for(i=0;i<str.length;i++){h^=str.charCodeAt(i);h=(h*0x01000193)>>>0;}
+  for(i=0;i<rev.length;i++){h2^=rev.charCodeAt(i);h2=(h2*0x01000193)>>>0;}
+  var a=('00000000'+h.toString(16)).slice(-8),c=('00000000'+h2.toString(16)).slice(-8);
+  return Promise.resolve((a+c+a+c+a).slice(0,40));
 }
 var form=$('loginForm');
 if(form){

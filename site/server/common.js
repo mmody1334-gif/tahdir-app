@@ -60,6 +60,7 @@ function dialog(opts){
     if(opts.cancelText!==false)h+='<button type="button" class="btn" id="mCancel">'+esc(opts.cancelText||'إلغاء')+'</button>';
     h+='<button type="button" class="btn '+(opts.danger?'danger-solid':'primary')+'" id="mOk">'+esc(opts.okText||'موافق')+'</button></div>';
     box.innerHTML=h;ov.hidden=false;
+    if(opts.wide)box.classList.add('wide');else box.classList.remove('wide');
     var inp=$('mInput')||$('mText');if(inp&&!opts.readonly)setTimeout(function(){inp.focus();},30);
     var settled=false;
     function close(v){

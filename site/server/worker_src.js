@@ -236,7 +236,7 @@ async function body(req) {
 }
 function sameOrigin(req) {
   const o = req.headers.get('Origin');
-  if (!o) return true; // sendBeacon from same page may omit it in some browsers; cookies are SameSite=Strict
+  if (!o) return true; // sendBeacon from same page may omit it in some browsers; cookies are SameSite=Lax
   try { return new URL(o).host === new URL(req.url).host; } catch { return false; }
 }
 function cleanUser(u) { return String(u || '').trim().toLowerCase().slice(0, 60); }
@@ -569,6 +569,16 @@ async function gamesData(env, me, key) {
 export default {
   async fetch(req, env) {
     try {
+      // **إجبار HTTPS**: كوكي الجلسة موسوم `Secure`، والمتصفح يرفضه على اتصال
+      // غير آمن. فلو فُتح الموقع بـhttp:// (رابط قديم مُشارَك، أو إدخال يدوي)
+      // لنجح الدخول ثم عاد المعلم لصفحة الدخول، وسُجّل جهاز جديد في كل محاولة
+      // حتى يُقفل حسابه بحدّ الأجهزة. فنحوّل أي طلب غير آمن إلى https قبل أي شيء.
+      const u0 = new URL(req.url);
+      const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(u0.host);
+      if (u0.protocol === 'http:' && !isLocal) {
+        u0.protocol = 'https:';
+        return new Response(null, { status: 301, headers: { Location: u0.toString(), 'Cache-Control': 'no-store' } });
+      }
       if (!env.DB) return new Response('اربط قاعدة بيانات D1 بالاسم DB من إعدادات الـ Worker.', { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       await ensureSchema(env.DB);
       const url = new URL(req.url), p = url.pathname, m = req.method;
@@ -638,6 +648,7 @@ export default {
       if (p === '/remedial') return html('remedial');
       if (p === '/summaries') return html('summaries');
       if (p === '/finals') return html('finals');
+      if (p === '/slides') return html('slides');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);

@@ -630,6 +630,25 @@ extra_css += '''
 .gr-tasks td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .gr-note{font-size:.82rem;background:var(--accent-l,#fff8e6);border-radius:10px;padding:8px 12px}
 .gr-empty{color:var(--mute);text-align:center;padding:18px}
+/* ---------- العروض التقديمية ---------- */
+.wrap.sl{max-width:980px;padding:14px 16px 40px}
+.sl-subj{margin-bottom:22px}
+.sl-subj-h{display:flex;align-items:center;gap:8px;font-size:1.18rem;margin:0 0 10px;color:var(--main-d,#0b3b33)}
+.sl-subj-h .mi{font-size:1.3em}
+.sl-grade{margin-bottom:14px}
+.sl-grade-h{font-weight:800;font-size:.95rem;color:var(--main,#1f8a70);margin-bottom:8px;border-inline-start:4px solid var(--main,#1f8a70);padding-inline-start:8px}
+.sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.sl-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:start;font:inherit;background:var(--paper,#fff);border:1px solid var(--line,#e2e0d6);border-radius:12px;padding:12px 13px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+.sl-card:hover{transform:translateY(-2px);border-color:var(--main,#1f8a70);box-shadow:0 6px 18px rgba(11,59,51,.1)}
+.sl-card-ic{font-size:1.5em}
+.sl-card-t{font-weight:700;font-size:.92rem;color:var(--ink,#10261f);line-height:1.5}
+.sl-card-m{font-size:.76rem;color:var(--mute,#5b6d67)}
+.sl-prev-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sl-prev-head b{flex:1;min-width:140px;font-size:1rem}
+.sl-frame{border:1px solid var(--line,#e2e0d6);border-radius:10px;overflow:hidden;background:#f4f4f4}
+.sl-frame iframe{width:100%;height:62vh;border:0;display:block}
+.modal-box.wide{max-width:min(980px,94vw)}
+@media(max-width:640px){.sl-grid{grid-template-columns:1fr 1fr}.sl-frame iframe{height:48vh}}
 /* ---------- study pages ---------- */
 .edit-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fff8e6);border-radius:10px;padding:6px 12px;margin-bottom:8px}
 .study-paper{outline:none;font-size:15px}
@@ -725,6 +744,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+              ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
@@ -778,12 +798,18 @@ FINALS_PAGE = TOP('<div class="stats"><span class="stat">الاختبارات ا
 GRADING = TOP('<div class="stats"><span class="stat">تصحيح الواجبات تلقائيًا</span><span class="stat">تجريبي</span></div>').replace('%BTNS%', NAV('grading')) + '''
 <main class="wrap gr" id="gr"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 PLAY = '<main class="pl" id="pl"></main>'
+SLIDES_PAGE = TOP('<div class="stats"><span class="stat">العروض التقديمية</span><span class="stat">عروض البوربوينت حسب المادة والصف</span></div>').replace('%BTNS%', NAV('slides')) + '''
+<main class="wrap sl" id="sl"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
 
 FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'finals.json')) else {}
+# عروض تقديمية: فهرسها في site/data/slides.json (كل عرض بمعرّف درايف عام) —
+# تُعاين وتُحمَّل بروابط درايف المباشرة، ولا تُخزَّن محليًّا لأن حجمها (2+ GB)
+# أكبر من سعة الاستضافة المجانية.
+SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'slides.json')) else []
 PAGES = {
   'css': CSS,
   'login': page('الكبسولة', LOGIN, rd('client_login.js')),
@@ -797,6 +823,7 @@ PAGES = {
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
+  'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
 }
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))
