@@ -27,10 +27,11 @@ function render(){
       var list=grades[gr];
       h+='<div class="sl-grade"><div class="sl-grade-h">'+esc(gLabel(gr))+' <span class="muted small">('+list.length+')</span></div><div class="sl-grid">'+
         list.map(function(s){
-          return '<button type="button" class="sl-card" data-drive="'+esc(s.drive)+'" data-name="'+esc(s.name)+'" data-unit="'+esc(s.unit||'')+'">'+
-            '<span class="sl-card-ic">🖥️</span>'+
+          return '<button type="button" class="sl-card" data-drive="'+esc(s.drive)+'" data-name="'+esc(s.name)+'" data-unit="'+esc(s.unit||'')+'" title="فتح معاينة العرض">'+
+            '<span class="sl-card-ic">📽️</span>'+
             '<span class="sl-card-t">'+esc(s.name)+'</span>'+
-            '<span class="sl-card-m">'+(s.unit?esc(s.unit)+' · ':'')+'الصف '+esc(gLabel(s.grade))+'</span>'+
+            '<span class="sl-card-m">'+(s.unit?esc(s.unit):'')+'</span>'+
+            '<span class="sl-card-go">فتح ›</span>'+
           '</button>';
         }).join('')+'</div></div>';
     });

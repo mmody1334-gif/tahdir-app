@@ -637,18 +637,18 @@ extra_css += '''
 .sl-subj-h .mi{font-size:1.3em}
 .sl-grade{margin-bottom:14px}
 .sl-grade-h{font-weight:800;font-size:.95rem;color:var(--main,#1f8a70);margin-bottom:8px;border-inline-start:4px solid var(--main,#1f8a70);padding-inline-start:8px}
-.sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.sl-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:start;font:inherit;background:var(--paper,#fff);border:1px solid var(--line,#e2e0d6);border-radius:12px;padding:12px 13px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
-.sl-card:hover{transform:translateY(-2px);border-color:var(--main,#1f8a70);box-shadow:0 6px 18px rgba(11,59,51,.1)}
-.sl-card-ic{font-size:1.5em}
-.sl-card-t{font-weight:700;font-size:.92rem;color:var(--ink,#10261f);line-height:1.5}
-.sl-card-m{font-size:.76rem;color:var(--mute,#5b6d67)}
-.sl-prev-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sl-grid{display:flex;flex-direction:column;gap:5px}
+.sl-card{display:flex;flex-direction:row;align-items:center;gap:9px;text-align:start;font:inherit;background:var(--paper,#fff);border:1px solid var(--line,#e2e0d6);border-radius:9px;padding:8px 11px;cursor:pointer;transition:border-color .12s,background .12s}
+.sl-card:hover{border-color:var(--main,#1f8a70);background:var(--main-l,#e3f1eb)}
+.sl-card-ic{font-size:1.05em;flex:0 0 auto}
+.sl-card-t{font-weight:600;font-size:.87rem;color:var(--ink,#10261f);flex:1 1 auto;line-height:1.4}
+.sl-card-m{font-size:.72rem;color:var(--mute,#5b6d67);flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32%}
+.sl-card-go{font-size:.74rem;color:var(--main,#1f8a70);font-weight:700;flex:0 0 auto}
 .sl-prev-head b{flex:1;min-width:140px;font-size:1rem}
 .sl-frame{border:1px solid var(--line,#e2e0d6);border-radius:10px;overflow:hidden;background:#f4f4f4}
 .sl-frame iframe{width:100%;height:62vh;border:0;display:block}
 .modal-box.wide{max-width:min(980px,94vw)}
-@media(max-width:640px){.sl-grid{grid-template-columns:1fr 1fr}.sl-frame iframe{height:48vh}}
+@media(max-width:640px){.sl-card-m{display:none}.sl-frame iframe{height:48vh}}
 /* ---------- study pages ---------- */
 .edit-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fff8e6);border-radius:10px;padding:6px 12px;margin-bottom:8px}
 .study-paper{outline:none;font-size:15px}
