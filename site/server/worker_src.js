@@ -381,6 +381,12 @@ async function coursesList(env) {
   extra.forEach(c => { if (!m.has(c.key)) m.set(c.key, { key: c.key, subject: c.subject, grade: c.grade, lessons: 0, custom: 0, quiz_items: 0, empty: true }); });
   const byLesson = new Map(all.map(l => [l.id, courseKey(l)]));
   QBANK.forEach(q => { const k = byLesson.get(q.lesson_id); if (k && m.get(k)) m.get(k).quiz_items++; });
+  // **النهائيات تُغذي مولّد الاختبارات القصيرة** (عبر finQuizItems)، وكان العدّاد
+  // يحسب QBANK وحده — فظهرت موادّ نهائياتها كاملة بعبارة «بدون بنك أسئلة» ومنعت
+  // بناء الورقة. نضيف مفردات النهائيات الصالحة إلى عدّاد كل مقرر.
+  m.forEach(c => {
+    try { const f = finQuizItems(c.key).length; if (f) c.quiz_items += f; } catch (e) {}
+  });
   return [...m.values()];
 }
 
@@ -604,7 +610,7 @@ export default {
       if (!env.DB) return new Response('اربط قاعدة بيانات D1 بالاسم DB من إعدادات الـ Worker.', { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       await ensureSchema(env.DB);
       const url = new URL(req.url), p = url.pathname, m = req.method;
-      if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live)/.test(p)) await loadPacks(env, url);
+      if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live|courses)/.test(p)) await loadPacks(env, url);
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 
       let mm0;
