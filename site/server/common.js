@@ -139,12 +139,35 @@ function toolDialog(reason){
   var TABS=[['chrome','Chrome','🌐'],['firefox','Firefox','🦊'],['edge','Edge','🌊'],['safari','ماك / Safari','🧭'],['ios','iPhone','📱']];
   function stepsFor(b){
     if(b==='ios'){
-      return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-        '<li>ثبّت <b>Userscripts</b> — <b>مجاني ومفتوح المصدر</b>: <a href="https://apps.apple.com/app/userscripts/id1463298887" target="_blank" rel="noopener">افتح App Store</a>. (يحتاج iOS 15.1 فأحدث)</li>'+
-        '<li><b>الإعدادات ← سافاري ← الإضافات</b> ← فعّل <b>Userscripts</b>، ثم اسمح له بالوصول إلى <b>lms.moe.gov.om</b> و <b>هذا الموقع</b>.</li>'+
-        '<li>افتح رابط الأداة في سافاري (<b>/tool/tahdir-noor.user.js</b>) ← اضغط أيقونة الإضافة في شريط العنوان ← <b>Install</b>.</li></ol>'+
-        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ لو ظهرت لك الأداة كـ«كود نصّي» أو نزلت في تطبيق «الملفات» بلا زر Install</b> — فهذا معناه أن <b>Userscripts غير مثبّت أو غير مفعّل في سافاري</b>، وليس عيبًا في الأداة. أكمل الخطوتين 1 و2 ثم أعد فتح الرابط.<br><span class="muted small">وإن كان الملف نزل بالفعل في «الملفات»: افتح تطبيق Userscripts ← «Set Directory» ← ضع مجلد التنزيلات، ثم انقل الملف <code>tahdir-noor.user.js</code> إليه — سيُحمَّل تلقائيًّا.</span></p>'+
-        '<p class="m-msg" style="background:var(--main-l,#e3f1eb);border-radius:10px;padding:8px 11px"><b>لماذا يعمل مجانًا؟</b> أضفنا في الأداة طبقة توافق تُكمل واجهات التخزين عبر <code>localStorage</code> — فتعمل مع <b>Userscripts</b> المجاني كما تعمل مع Tampermonkey. <b>لا حاجة للدفع.</b> (من يفضّل Tampermonkey: ~$1.99 مرة واحدة، اختياري).</p>';
+      function step(n,title,rows,link){
+        return '<div class="iosg-step"><span class="iosg-n">'+n+'</span><div class="iosg-b">'+
+          '<div class="iosg-t">'+title+'</div>'+
+          rows.map(function(r){
+            return '<div class="iosg-row">'+r.map(function(x,i){
+              var tap = /^@/.test(x);
+              var txt = tap ? x.slice(1) : x;
+              var el = '<span class="iosg-el'+(tap?' iosg-tap':'')+'">'+esc(txt)+'</span>';
+              return (i ? '<span class="iosg-a">›</span>' : '') + el;
+            }).join('')+'</div>';
+          }).join('')+
+          (link?'<div class="iosg-l"><a href="'+link+'" target="_blank" rel="noopener">افتحه الآن ←</a></div>':'')+
+        '</div></div>';
+      }
+      return '<div class="iosg">'+
+        step('١','ثبّت <b>Userscripts</b> — مجاني',[
+          ['App Store','بحث','@Userscripts','احصل']
+        ],'https://apps.apple.com/app/userscripts/id1463298887')+
+        step('٢','فعّل الإضافة وامنح الإذن',[
+          ['@الإعدادات','Safari','الإضافات'],
+          ['@Userscripts','شغّل المفتاح','الكل: سماح']
+        ])+
+        step('٣','ثبّت الأداة في سافاري',[
+          ['سافاري','@aA','Userscripts'],
+          ['@Install','تم']
+        ])+
+        '</div>'+
+        '<p class="m-msg muted small" style="margin-top:8px">السهم الأخضر يشير إلى ما يجب الضغط عليه. الخطوات مرة واحدة فقط — بعدها تتحدّث الأداة تلقائيًا.</p>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ لو ظهرت الأداة كـ«كود نصّي» أو نزلت في «الملفات» بلا زر Install</b> — فمعناه أن <b>Userscripts غير مثبّت أو غير مفعّل</b>، وليس عيبًا في الأداة. أكمل الخطوتين ١ و٢.<br><span class="muted small">وإن نزل الملف فعلًا في «الملفات»: افتح Userscripts ← «Set Directory» ← اختر مجلد التنزيلات، ثم انقل <code>tahdir-noor.user.js</code> إليه.</span></p>';
     }
     if(b==='safari'){
       return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+

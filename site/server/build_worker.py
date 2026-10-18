@@ -637,6 +637,22 @@ extra_css += '''
 .tt-tab.on{background:var(--main,#1f8a70);border-color:var(--main,#1f8a70);color:#fff}
 .tt-pane{display:none}
 .tt-pane.on{display:block}
+/* دليل آيفون المصوّر: خطوات بأسهم تشير على ما يُضغط */
+.iosg{display:flex;flex-direction:column;gap:9px;margin:10px 0 6px}
+.iosg-step{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line,#e2e0d6);border-radius:13px;padding:10px 12px;background:linear-gradient(180deg,#fbfdfc,#f4faf7)}
+.iosg-n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--main,#1f8a70);color:#fff;font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center}
+.iosg-b{flex:1;min-width:0}
+.iosg-t{font-weight:700;font-size:.85rem;color:var(--main-d,#0b3b33);margin-bottom:7px}
+.iosg-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.iosg-el{font-size:.76rem;padding:5px 9px;border-radius:8px;background:#eef3f1;color:#374b45;border:1px solid #dfe9e5;white-space:nowrap}
+.iosg-a{color:var(--mute,#5b6d67);font-size:.8rem;font-weight:700}
+.iosg-el.iosg-tap{background:var(--main,#1f8a70);border-color:var(--main,#1f8a70);color:#fff;font-weight:800;position:relative;padding-inline-end:22px}
+.iosg-el.iosg-tap:after{content:'←';position:absolute;inset-inline-end:5px;top:50%;transform:translateY(-50%);font-size:.95rem;animation:iosgArrow .9s ease-in-out infinite}
+@keyframes iosgArrow{0%,100%{transform:translateY(-50%) translateX(0);opacity:1}50%{transform:translateY(-50%) translateX(-4px);opacity:.6}}
+.iosg-l{margin-top:4px}
+.iosg-l a{font-size:.78rem;font-weight:700;color:var(--main,#1f8a70)}
+@media(prefers-reduced-motion:reduce){.iosg-el.iosg-tap:after{animation:none}}
+@media(max-width:640px){.iosg-el{font-size:.72rem;padding:4px 7px}.iosg-el.iosg-tap{padding-inline-end:20px}}
 .lp-l.lp-off{opacity:.45;cursor:not-allowed}
 .lp-l.lp-off .muted{font-size:.72rem;color:#a15c00}
 .g-none{max-width:560px;margin:40px auto;text-align:center;padding:26px 20px;background:var(--paper,#fff);border:1px dashed var(--line,#e2e0d6);border-radius:16px}
