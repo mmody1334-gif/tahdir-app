@@ -12,3 +12,13 @@ database_id = "43c1825c-d8d8-401a-a77b-2ec6897f457a"
 [assets]
 directory = "dist/assets"
 binding = "ASSETS"
+
+# ===== النطاق الخاص =====
+# بعد شراء الدومين وإضافته كـ Zone في نفس حساب Cloudflare (وتغيير Name Servers
+# عند المسجّل)، أزل التعليق عن السطرين المناسبين ثم ادفع — سينشئ Cloudflare
+# سجل DNS والشهادة تلقائيًّا (custom_domain = true).
+#
+# routes = [
+#   { pattern = "elkabsula.com", custom_domain = true },
+#   { pattern = "www.elkabsula.com", custom_domain = true },
+# ]
