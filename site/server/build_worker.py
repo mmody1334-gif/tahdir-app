@@ -736,6 +736,14 @@ extra_css += '''
 extra_css += '''
 /* ===== صفحة تقني حذيفة ===== */
 .kb-mark .tq-mark{width:clamp(48px,6vw,68px);height:auto;display:block;border-radius:16px}
+/* تنسيق اسم «تقني حذيفة» وخطه: خط أبسط (Cairo) وأحجام متوازنة مع السطر التحتي */
+.tq-banner .kb-mid{gap:10px}
+.tq-banner .kb-name{align-items:flex-start;line-height:1.15;gap:0}
+.tq-banner .kb-name b{font-family:"Cairo",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:700;
+  font-size:clamp(1.12rem,2.4vw,1.7rem);letter-spacing:.2px;color:#0b3b33}
+.tq-banner .kb-name span{font-family:"Cairo",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:600;
+  font-size:clamp(.7rem,1.35vw,.86rem);color:#b5821c;margin-top:3px;letter-spacing:.1px}
+@media(max-width:520px){.tq-banner .kb-name b{font-size:1.02rem}.tq-banner .kb-name span{font-size:.66rem}}
 .tq-logo .tq-mark{width:100%!important;height:auto!important;display:block;filter:drop-shadow(0 10px 22px rgba(8,80,63,.28))}
 .tq-card .tq-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0 10px}
 .tq-a{display:flex;align-items:center;justify-content:center;text-align:center;padding:11px 10px;border:1px solid #cfe5da;border-radius:12px;background:#f4faf7;color:#0b5c42;text-decoration:none;font-weight:700;font-size:.9rem;transition:.15s}
@@ -942,19 +950,17 @@ SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
 TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb-logo tq-mark">
 <defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#17b48c"/><stop offset="1" stop-color="#075e49"/></linearGradient></defs>
-<rect x="2" y="2" width="124" height="124" rx="32" fill="url(#tqg)"/>
-<g stroke="#bdf0e0" stroke-width="6" stroke-linecap="round" opacity="0.95">
-<path d="M44 14v12M64 14v12M84 14v12M44 102v12M64 102v12M84 102v12"/>
-<path d="M14 44h12M14 64h12M14 84h12M102 44h12M102 64h12M102 84h12"/></g>
-<rect x="32" y="32" width="64" height="64" rx="16" fill="#063c2f" stroke="#8ff0d4" stroke-width="3.5"/>
-<path d="M54 54l-10 10 10 10" fill="none" stroke="#8ff0d4" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M74 54l10 10-10 10" fill="none" stroke="#8ff0d4" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M69 49l-10 30" fill="none" stroke="#ffc65c" stroke-width="6.5" stroke-linecap="round"/>
+<stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
+<rect x="5" y="5" width="118" height="118" rx="30" fill="#ffffff" stroke="url(#tqg)" stroke-width="8"/>
+<g stroke="#0d7f66" stroke-width="4.5" stroke-linecap="round">
+<path d="M41 41L64 64M87 41L64 64M41 87L64 64M87 87L64 64"/></g>
+<g fill="#0d7f66"><circle cx="41" cy="41" r="8.5"/><circle cx="87" cy="41" r="8.5"/>
+<circle cx="41" cy="87" r="8.5"/><circle cx="87" cy="87" r="8.5"/></g>
+<circle cx="64" cy="64" r="11" fill="#e0a93b"/>
 </svg>"""
 
 # بانر «تقني حذيفة»: نفس بنية بانر المنصة، لكن بالشعار والاسم الجديدين.
-BANNER_TQ = f"""<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{TEQANY_LOGO}</div><div class="kb-name"><b>تقني حذيفة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>"""
+BANNER_TQ = f"""<div class="kb-banner tq-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{TEQANY_LOGO}</div><div class="kb-name"><b>تقني حذيفة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>"""
 
 TEQANY = f"""<main class="auth tq">
 <div class="kb-band">{BANNER_TQ}</div>
@@ -1010,6 +1016,7 @@ PAGES = {
 _TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|admin|grading|setup|login|teqany'
 def brand_tq(h):
     h = h.replace(LOGO, TEQANY_LOGO)
+    h = h.replace('class="kb-banner"', 'class="kb-banner tq-banner"')
     h = h.replace('الكبسولة', 'تقني حذيفة')
     # "/app" أو '/quiz' → "/teqany/app"
     h = re.sub(r'(["\'])/(' + _TQ_PAGES + r')(?=["\'?#/])', r'\1/teqany/\2', h)
