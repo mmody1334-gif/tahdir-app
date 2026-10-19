@@ -43,7 +43,7 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
   const srv = await H.boot();
   const B = srv.BASE;
   let browser;
-  try { browser = await pw.webkit.launch(); }
+  try { browser = await (process.env.CHROME_PATH?pw.chromium.launch({executablePath:process.env.CHROME_PATH}):pw.webkit.launch()); }
   catch (e) { console.log('  SKIP  محرّك WebKit غير منزّل'); srv.stop(); process.exit(0); }
 
   const ctx = await browser.newContext({ ...pw.devices['iPhone 13'], locale: 'ar-OM' });
@@ -98,7 +98,8 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
     got ? got.data.title + ' · ' + got.data.grade : '');
   ok('الحقول الستة وصلت', !!got && Object.keys(got.data.fields || {}).length === 6,
     got ? String(Object.keys(got.data.fields || {}).length) : '');
-  ok('موسومة routed=true', !!got && got.routed === true, got ? String(got.routed) : '');
+  // الصفحة هنا ليست «إضافة تحضير»، فلا تُوسم «تم التوجيه» — وإلا توقّف نور على الرئيسية (مشكلة الآيفون)
+  ok('غير موسومة routed (ليست صفحة الهدف)', !!got && got.routed === false, got ? String(got.routed) : '');
   const clean = await p.evaluate(() => location.hash);
   ok('الرابط يُنظَّف بعد القراءة', clean === '' || clean === '#', 'hash="' + clean + '"');
   ok('المهمة باقية للاستخدام', store.has('tahdir_pending_prep'), store.has('tahdir_pending_prep') ? 'باقية' : 'ضاعت');

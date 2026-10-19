@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.4.8
+// @version      3.4.9
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -94,7 +94,7 @@
       g.__TAHDIR_READY = ready;
     }catch(e){}
   })();
-  const VERSION = '3.4.8';
+  const VERSION = '3.4.9';
   const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
@@ -114,7 +114,12 @@
       const data = JSON.parse(json);
       if (data && data.source === 'tahdir-al-aali') {
         const key = data.kind === 'homework' ? PENDING_KEY : PREP_KEY;
-        GM_setValue(key, { data: data, ts: Date.now(), routed: true });
+        // «تم التوجيه» فقط لو الرابط أوصلنا لصفحة الهدف نفسها. أما لو فتح الرئيسية (/teacher) —
+        // وهذا ما يحدث دائمًا على الآيفون لأن الموقع لا يعرف رقم الصف في نور — فنترك التوجيه يكمل.
+        const onTarget = data.kind === 'homework'
+          ? /\/(homeworks\/(create|edit|add)|questions\/add_bulk_questions)\//.test(location.pathname)
+          : /\/courses\/add_preparation\//.test(location.pathname);
+        GM_setValue(key, { data: data, ts: Date.now(), routed: onTarget });
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
         return true;
       }
@@ -122,7 +127,8 @@
     return false;
   }
   takeJobFromHash();
-  window.addEventListener('hashchange', function () { takeJobFromHash(); });
+  // نور مفتوح بالفعل ووصل رابط جديد: نستلم المهمة ونكمل التوجيه
+  window.addEventListener('hashchange', function () { if (takeJobFromHash() && location.hostname === 'lms.moe.gov.om' && typeof routeIfNeeded === 'function') { try { routeIfNeeded(); } catch (e) {} } });
   const CID_KEY = 'tahdir_last_cid';
   const GRADES_KEY = 'tahdir_grade_cids';
   const TASKS_KEY = 'tahdir_nour_tasks';   // المهام الإلكترونية التي قرأتها الأداة من نور (لكل صف)
@@ -289,8 +295,41 @@
       const grade = p.data.grade || '', subject = p.data.subject || '';
       const map = await learnGradesWait(grade, 10000);
       if (cidFor(map, grade, subject)) { location.href = routeUrl(kind, grade, subject); return true; }
-      showToast('لم أتعرف على «' + grade + '» في قائمة صفوفك في نور. افتح صفحة ' + (kind === 'prep' ? '«إضافة تحضير»' : '«إضافة مهمة»') + ' لهذا الصف بنفسك وسأكمل الباقي.', null, null, 9000);
+      // على الجوال قد تكون قائمة الصفوف مخفية فلا نجدها. نطلب من المعلم فتح الصف مرة واحدة،
+      // وعند فتحه نسأله «هل هذا الصف؟» ثم نكمل ونحفظ رقمه للمرات القادمة.
+      p.needCourse = Date.now(); GM_setValue(key, p);
+      showCourseBar(kind, p, null);
       return false;
+    }
+    return false;
+  }
+  // شريط «افتح الصف» / «هل هذا الصف؟» — يظهر فقط والمهمة تنتظر اختيار الصف (خلال 30 دقيقة)
+  function showCourseBar(kind, p, cid) {
+    if (document.getElementById('tahdir-course-bar')) return;
+    const grade = p.data.grade || '', subject = p.data.subject || '', label = (subject ? subject + ' / ' : '') + grade;
+    const bar = document.createElement('div'); bar.id = 'tahdir-course-bar';
+    Object.assign(bar.style, { position: 'fixed', left: '10px', right: '10px', bottom: '14px', zIndex: 999999, background: '#132420', color: '#fff', padding: '12px 14px', borderRadius: '12px', fontFamily: 'Tahoma, sans-serif', fontSize: '14px', direction: 'rtl', lineHeight: '1.8', boxShadow: '0 8px 30px rgba(0,0,0,.35)' });
+    const txt = document.createElement('div');
+    txt.textContent = cid
+      ? 'هل هذا صف «' + label + '»؟ اضغط «متابعة» لأفتح ' + (kind === 'prep' ? '«إضافة تحضير»' : '«إضافة مهمة»') + ' له وأملأ «' + (p.data.title || '') + '».'
+      : 'لم أجد «' + label + '» في قائمة صفوفك هنا. افتح هذا الصف من قائمة نور (☰ ← المقررات)، وأنا أكمل تلقائيًا.';
+    bar.appendChild(txt);
+    const row = document.createElement('div'); Object.assign(row.style, { display: 'flex', gap: '8px', marginTop: '8px' });
+    const mk = (t, primary, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; Object.assign(b.style, { flex: primary ? '1' : '0 0 auto', background: primary ? '#1f8a70' : 'transparent', color: '#fff', border: '1px solid ' + (primary ? '#1f8a70' : '#5d7a72'), borderRadius: '8px', padding: '8px 12px', fontFamily: 'inherit', fontSize: '14px', cursor: 'pointer' }); b.onclick = fn; row.appendChild(b); };
+    if (cid) mk('متابعة ←', true, () => {
+      const map = GM_getValue(GRADES_KEY, {}) || {};
+      if (grade) { map[grade] = cid; if (subject) { map[subjKey(subject, grade)] = cid; map[subjKey2(subject, grade)] = cid; } GM_setValue(GRADES_KEY, map); }
+      delete p.needCourse; p.routed = true; GM_setValue(kind === 'prep' ? PREP_KEY : PENDING_KEY, p);
+      location.href = NOUR + (kind === 'prep' ? '/teacher/courses/add_preparation/cid:' : '/teacher/homeworks/create/cid:') + cid;
+    });
+    mk('إلغاء', false, () => { delete p.needCourse; GM_setValue(kind === 'prep' ? PREP_KEY : PENDING_KEY, p); bar.remove(); });
+    bar.appendChild(row); document.body.appendChild(bar);
+  }
+  function courseBarIfWaiting() {
+    if (!cidMatch) return;
+    for (const [kind, key] of [['prep', PREP_KEY], ['hw', PENDING_KEY]]) {
+      const p = getPending(key);
+      if (p && p.needCourse && Date.now() - p.needCourse < 30 * 60 * 1000) { showCourseBar(kind, p, cidMatch[1]); return true; }
     }
     return false;
   }
@@ -899,7 +938,7 @@
   else if (pending && IS_TASK && !pending.formDone) fillTaskForm();
   else if (!BUSY) {
     learnGradesWait('', 10000); // نحدّث أرقام الصفوف في الخلفية
-    routeIfNeeded().then(moving => { const p = getPending(); if (!moving && p) showPendingBar(p); });
+    if (!courseBarIfWaiting()) routeIfNeeded().then(moving => { const p = getPending(); if (!moving && p) showPendingBar(p); });
   }
   else if (pending) showPendingBar(pending);
   }

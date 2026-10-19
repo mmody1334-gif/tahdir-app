@@ -44,9 +44,9 @@ const ok = (n, c, extra) => { (c ? pass++ : fail++); console.log((c ? '  PASS  '
   ok('المتصفح الحالي محدَّد تلقائيًّا', r.tabs.includes(r.active), 'المحدد: ' + r.active);
   ok('لكل تبويب لوحة مستقلة', r.panes.length === 5, JSON.stringify(r.panes));
 
-  // كل لوحة فيها رابط متجر صحيح
+  // كل لوحة فيها مصدرها الصحيح: كروم وإيدج → إضافة «الكبسولة» (ZIP)، فايرفوكس → Tampermonkey، سافاري → App Store
   const stores = await p.evaluate(() => [...document.querySelectorAll('.tt-pane')].map(x => x.innerHTML));
-  const map = { chrome: 'chromewebstore', firefox: 'addons.mozilla', edge: 'microsoftedge', safari: 'apps.apple.com' };
+  const map = { chrome: '/download/tahdir-ext.zip', firefox: 'addons.mozilla', edge: '/download/tahdir-ext.zip', safari: 'apps.apple.com' };
   let allOk = true, detail = [];
   for (const pn of ['chrome', 'firefox', 'edge', 'safari']) {
     const idx = (await p.evaluate(pn2 => [...document.querySelectorAll('.tt-pane')].findIndex(x => x.getAttribute('data-pane') === pn2), pn));
