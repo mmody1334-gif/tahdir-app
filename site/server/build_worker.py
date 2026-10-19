@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # يبني worker.js واحدًا من مصادر الموقع. يُشغَّل محليًا أو من GitHub Actions.
-import json, os, re, subprocess, datetime
+import json, os, re, subprocess, datetime, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, '..', 'data')
 DIST = os.path.join(HERE, '..', 'dist')
@@ -1304,6 +1304,10 @@ _gm = os.path.join(DATA, 'games_math.json')
 src = src.replace('__GAMESMATH__', json.dumps(json.load(open(_gm, encoding='utf-8')) if os.path.exists(_gm) else [], ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__PRIVACY__', json.dumps(rd('privacy.html'), ensure_ascii=False))
 import base64 as _b64
+# إضافة كروم/إيدج: تُبنى من نفس سكربت الأداة (tools/build_ext.py) وتُخدم على /download/tahdir-ext.zip
+subprocess.run([sys.executable, os.path.join(HERE, '..', 'tools', 'build_ext.py')], check=True, capture_output=True)
+_ext_zip = os.path.join(HERE, '..', 'dist', 'tahdir-ext-' + TOOL_VER + '.zip')
+src = src.replace('__EXTZIP__', json.dumps(_b64.b64encode(open(_ext_zip, 'rb').read()).decode() if os.path.exists(_ext_zip) else ''))
 src = src.replace('__APK__', json.dumps(_b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
 out = os.path.join(DIST, 'worker.js')
 open(out, 'w', encoding='utf-8').write(src)

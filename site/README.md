@@ -95,6 +95,17 @@ node site/tests/run_all.cjs fixes quizcard     # الأسماء: fixes, labels, 
 > «مسح الأجهزة المهملة» و«مسح كل الأجهزة» في تفاصيل المعلم. مدة الإهمال قابلة للضبط من
 > بيئة الـWorker عبر `STALE_SECONDS` (تُستخدم في الاختبار المحلي).
 
+## أداة نور على كروم وإيدج: إضافة «الكبسولة» (بدل Tampermonkey)
+
+كروم وإيدج: الأداة تُوزَّع كإضافة خاصة مبنية من **نفس** `tahdir-noor.user.js` بلا تعديل
+(`tools/build_ext.py`؛ يبنيها `build_worker.py` تلقائيًا وتُخدم على `/download/tahdir-ext.zip`).
+التثبيت: تحميل ZIP ← فك الضغط ← `chrome://extensions` (أو `edge://extensions`) ← وضع المطوّر ← Load unpacked.
+- النطاقات تؤخذ تلقائيًا من سطور `@match` في رأس السكربت (نور + كل نطاقات الموقع).
+- لو Tampermonkey يشغّل الأداة في الصفحة نفسها لا تعمل الإضافة (منعًا للإرسال المكرر).
+- الموقع يقرأ `data-tahdir-ext` (إصدار الإضافة) ويعرض تنبيه تحديث واحدًا عند صدور إصدار أحدث.
+- **فايرفوكس وسافاري والآيفون: بلا أي تغيير** (Tampermonkey / Userscripts كما هي).
+- الاختبار: `python3 site/tools/build_ext.py --test` ثم `node site/tests/ext.cjs`.
+
 ## أداة نور: التثبيت والاستخدام
 
 **خطوتان مرة واحدة للأبد:** ثبّت [Tampermonkey](https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo)

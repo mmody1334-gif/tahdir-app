@@ -13,7 +13,11 @@
   document.addEventListener('tahdir-ext-snap', e => {
     if (S) return;
     try { S = JSON.parse(String(e.detail)) || {}; } catch (x) { S = {}; }
-    if (location.hostname === 'tahdir.hudhaifa-bio.workers.dev') document.documentElement.setAttribute('data-tahdir-ext', '__EXTVER__');
+    const de = document.documentElement;
+    // على صفحات الموقع (غير نور): نُعلن وجود الإضافة وإصدارها ليعرض الموقع «الأداة مثبتة» أو «حدّث الإضافة»
+    if (location.hostname !== 'lms.moe.gov.om') de.setAttribute('data-tahdir-ext', '__EXTVER__');
+    // لو Tampermonkey يشغّل الأداة بالفعل في هذه الصفحة لا نشغّلها مرة ثانية (منعًا لإرسال مكرر)
+    if (de.getAttribute('data-tahdir-tool')) return;
     __RUN__(api.GM_getValue, api.GM_setValue, api.GM_deleteValue, api.GM_openInTab, api.GM_registerMenuCommand, window);
   });
   req({ type: 'hello' });

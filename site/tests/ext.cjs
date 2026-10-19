@@ -1,7 +1,7 @@
 // يختبر إضافة المتصفح الحقيقية (dist/ext_test) في Chromium: الموقع يتعرف عليها والإرسال يفتح نور ويوجّه للصف
 const { chromium } = require('playwright'); const os = require('os'); const fs = require('fs');
 const B = 'http://localhost:8787', EXT = __dirname + '/../dist/ext_test';
-const NOUR_HOME = `<html><body><h1>الرئيسية</h1><nav id=sb></nav><script>setTimeout(()=>{sb.innerHTML='<a href="/teacher/courses/browse_content/cid:111">الاحياء / التاسع</a><a href="/teacher/courses/browse_content/cid:222">الاحياء / العاشر</a>'},800)</script></body></html>`;
+const NOUR_HOME = `<html><body><h1>الرئيسية</h1><nav id=sb></nav><script>setTimeout(()=>{sb.innerHTML='<a href="/teacher/courses/browse_content/cid:111">الاحياء / التاسع</a><a href="/teacher/courses/browse_content/cid:222">الاحياء / العاشر</a><a href="/teacher/courses/browse_content/cid:666">العلوم / السادس</a>'},800)</script></body></html>`;
 (async () => {
   const dir = fs.mkdtempSync(os.tmpdir() + '/ext-');
   const c = await chromium.launchPersistentContext(dir, { channel: 'chromium', headless: true, viewport: { width: 1280, height: 800 }, args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });

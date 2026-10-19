@@ -5,6 +5,7 @@ const PAGES = __PAGES__;
 const TOOL = __TOOL__;
 const ICONS = __ICONS__;
 const APK = __APK__;
+const EXTZIP = __EXTZIP__;
 const PRIVACY = __PRIVACY__;
 const QBANK = __QBANK__;
 let GPACK = {};
@@ -861,6 +862,7 @@ export default {
 
       if (p === '/tool/tahdir-noor.user.js' || p === '/tool/tahdir-noor.meta.js') return new Response(TOOL, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
       if (p === '/privacy' || p === '/support') return new Response(PRIVACY, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'", ...SEC_HEADERS } });
+      if (p === '/download/tahdir-ext.zip' && EXTZIP) return new Response(Uint8Array.from(atob(EXTZIP), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="tahdir-ext.zip"', 'Cache-Control': 'no-cache' } });
       if (p === '/download/tahdir.apk') return new Response(Uint8Array.from(atob(APK), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Disposition': 'attachment; filename="tahdir.apk"', 'Cache-Control': 'no-cache' } });
       if (ICONS[p]) return new Response(Uint8Array.from(atob(ICONS[p]), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' } });
       if (p === '/manifest.webmanifest') return new Response(MANIFEST, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
