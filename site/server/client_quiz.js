@@ -7,7 +7,7 @@ var HI_AO=['AO1','AO2'],LO_AO=['معرفة','تطبيق','استدلال'];
 var AO_TXT={'تذكر وفهم':'تذكر وفهم',AO1:'AO1 · المعرفة والفهم',AO2:'AO2 · التطبيق والتحليل والتقييم','معرفة':'معرفة','تطبيق':'تطبيق','استدلال':'استدلال'};
 var TYPE_TXT={mcq:'اختيار من متعدد',short:'إجابة قصيرة',long:'إجابة طويلة'};
 var QNO=['الأول','الثاني','الثالث','الرابع'];
-var DEF_HDR={dir:'المديرية العامة للتربية والتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
+var DEF_HDR={dir:'المديرية العامة للتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
 var me=null,courses=[],course=null,bank={lessons:[],items:[]},lessonById={},mode='quiz';
 var cfg={quizNo:'الأول',total:10,lessons:{},unit:'',reviewCount:0};
 var hdr=null,doc=null,dirty=false,paperView='quiz';
@@ -559,6 +559,8 @@ window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   me=r[0];initNav(me);
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
+  // ترقية ترويسة محفوظة سابقًا: اسم المديرية صار «للتعليم» بدل «للتربية والتعليم»
+  if(hdr.dir&&/للتربية والتعليم/.test(hdr.dir)){hdr.dir=hdr.dir.replace(/للتربية والتعليم/g,'للتعليم');lsSet(hdrKey(),hdr);}
   courses=(r[1].courses||[]).filter(function(c){return !/انجليز|إنجليز|English/i.test(c.subject);}).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
   var last=lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
