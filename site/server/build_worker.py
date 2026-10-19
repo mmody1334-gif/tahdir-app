@@ -942,24 +942,27 @@ SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
 TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb-logo tq-mark">
 <defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
-<rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tqg)"/>
-<g stroke="#d8f3ea" stroke-width="5" stroke-linecap="round">
-<path d="M44 20v10M64 20v10M84 20v10M44 98v10M64 98v10M84 98v10"/>
-<path d="M20 44h10M20 64h10M20 84h10M98 44h10M98 64h10M98 84h10"/></g>
-<rect x="34" y="34" width="60" height="60" rx="14" fill="#052f24" stroke="#8fe3cb" stroke-width="4"/>
-<path d="M52 58l-9 9 9 9M76 58l9 9-9 9" fill="none" stroke="#8fe3cb" stroke-width="6"
- stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M68 54l-8 26" fill="none" stroke="#ffd08a" stroke-width="6" stroke-linecap="round"/>
+<stop offset="0" stop-color="#17b48c"/><stop offset="1" stop-color="#075e49"/></linearGradient></defs>
+<rect x="2" y="2" width="124" height="124" rx="32" fill="url(#tqg)"/>
+<g stroke="#bdf0e0" stroke-width="6" stroke-linecap="round" opacity="0.95">
+<path d="M44 14v12M64 14v12M84 14v12M44 102v12M64 102v12M84 102v12"/>
+<path d="M14 44h12M14 64h12M14 84h12M102 44h12M102 64h12M102 84h12"/></g>
+<rect x="32" y="32" width="64" height="64" rx="16" fill="#063c2f" stroke="#8ff0d4" stroke-width="3.5"/>
+<path d="M54 54l-10 10 10 10" fill="none" stroke="#8ff0d4" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M74 54l10 10-10 10" fill="none" stroke="#8ff0d4" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M69 49l-10 30" fill="none" stroke="#ffc65c" stroke-width="6.5" stroke-linecap="round"/>
 </svg>"""
 
+# بانر «تقني حذيفة»: نفس بنية بانر المنصة، لكن بالشعار والاسم الجديدين.
+BANNER_TQ = f"""<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{TEQANY_LOGO}</div><div class="kb-name"><b>تقني حذيفة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>"""
+
 TEQANY = f"""<main class="auth tq">
-<div class="kb-band">{BANNER}</div>
+<div class="kb-band">{BANNER_TQ}</div>
 <section class="auth-art">
   <div class="auth-brand">
     <div class="logo tq-logo">{TEQANY_LOGO}</div>
     <h1>تقني حذيفة</h1>
-    <p>مساحة تقنية لمعلّم تقنية المعلومات: تحضير الدروس، والاختبارات القصيرة وفق وثيقة التقويم،
+    <p>مساحة تقنية لمعلّم مدرسة حذيفة بن محصن: تحضير الدروس، والاختبارات القصيرة وفق وثيقة التقويم،
        والعروض التقديمية، والألعاب التعليمية — كلها في مكان واحد.</p>
     <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
   </div>
