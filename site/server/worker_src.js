@@ -506,9 +506,16 @@ function checkQuizText(text, grade, subject, withAnswer) {
     const end = k + 1 < starts.length ? starts[k + 1].i : lines.length;
     const body = lines.slice(s.i, end).join('\n').trim();
     const bodyNoNum = body.replace(/^[\(\[]?\s*\d{1,2}\s*[\)\]\-\.]\s*/, '').trim();
+    // الدرجة تُطبع في **وسط** المفردة لا آخرها، وقد تتعدّد إن كان للسؤال أجزاء
+    // (أ) و(ب) — فنجمع كل [n] في المفردة بدل أخذ الأول.
     let marks = null;
-    const mm = /[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum) || /\s[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum);
-    if (mm) marks = +mm[1];
+    const allM = bodyNoNum.match(/\[\s*(\d{1,2})\s*\]/g) || [];
+    if (allM.length) {
+      marks = allM.reduce((a, x) => a + (+(/\d{1,2}/.exec(x) || [0])[0]), 0);
+    } else {
+      const mm = /[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum) || /\s[\[\(]\s*(\d{1,2})\s*[\]\)]\s*$/.exec(bodyNoNum);
+      if (mm) marks = +mm[1];
+    }
     const optMarks = (bodyNoNum.match(/(^|\s)[أبجد]\s*[\)\]]/g) || []).length;
     const bubbled = (bodyNoNum.match(/\u2b2d/g) || []).length;
     // **خيارات مرقّمة**: كثير من أوراق الوزارة ترقّم الخيارات (1- 2- 3- 4-) بدل الحروف.
@@ -516,7 +523,14 @@ function checkQuizText(text, grade, subject, withAnswer) {
     const numSet = {};
     (bodyNoNum.match(/(?:^|\s)([1-4])\s*[-–\)\.]/g) || []).forEach(s => { const d = (/[1-4]/.exec(s) || [])[0]; if (d) numSet[d] = 1; });
     const numOpts = Object.keys(numSet).length;
-    const isMcq = optMarks >= 3 || bubbled >= 3 || numOpts >= 4;
+    // خيارات بحروف لاتينية مفردة (X W Z Y) — شائعة في أسئلة التوصيل والتظليل
+    const latin = {};
+    (bodyNoNum.match(/(?:^|\s)([A-Za-z])(?=\s|$)/g) || []).forEach(s => { const c = s.trim(); if (c) latin[c.toUpperCase()] = 1; });
+    const latinOpts = Object.keys(latin).length;
+    // عبارات التعليم على الاختيار («ظلل الشكل ()») علامة قاطعة على سؤال اختيار
+    // حتى لو جاءت خياراته كلماتٍ عادية لا حروفًا.
+    const tickHint = /ظل+ل\s*الشكل|ظل+ل\s*\(|ضع\s*دائرة|اختر\s*الإجابة|ضع\s*علامة/i.test(bodyNoNum);
+    const isMcq = optMarks >= 3 || bubbled >= 3 || numOpts >= 4 || latinOpts >= 4 || tickHint;
     const firstPart = bodyNoNum.split(/\n/).filter(x => !/^\s*[أبجد]\s*[\)\]]/.test(x)).join(' ').slice(0, 120);
     let goal = goalMap[s.n] || null;
     if (!goal) {
@@ -526,7 +540,9 @@ function checkQuizText(text, grade, subject, withAnswer) {
       else if (/تطبيق/.test(bodyNoNum)) goal = 'تطبيق';
       else if (/معرفة|تذكر|فهم/.test(bodyNoNum)) goal = 'معرفة';
     }
-    return { n: s.n, marks, isMcq, opts: Math.max(optMarks, bubbled), goal, start: firstPart.trim(), raw: bodyNoNum };
+    // عدد الخيارات: -1 تعني «اختيار مؤكَّد لكن الخيارات نصّية لا تُعدّ» فلا نحكم عليها
+    const optCount = Math.max(optMarks, bubbled, numOpts, latinOpts);
+    return { n: s.n, marks, isMcq, opts: optCount ? optCount : (tickHint ? -1 : 0), goal, start: firstPart.trim(), raw: bodyNoNum };
   });
   const checks = [];
   const add = (id, title, status, detail) => checks.push({ id, title, status, detail });
@@ -559,9 +575,13 @@ function checkQuizText(text, grade, subject, withAnswer) {
     badStart.length ? 'تحتاج مراجعة: ' + badStart.map(x => 'م' + x.n).join('، ') : (textItems.length ? 'كل المفردات سليمة' : 'لا مفردات كتابية'));
   // ⑤ الخيارات
   const mcqs = items.filter(x => x.isMcq);
-  const badOpt = mcqs.filter(x => x.opts !== 4);
+  const badOpt = mcqs.filter(x => x.opts > 0 && x.opts !== 4);
+  const unknownOpt = mcqs.filter(x => x.opts < 0);
   add('opts', 'كل اختيار من متعدد له 4 خيارات', badOpt.length ? 'fail' : 'pass',
-    mcqs.length ? (badOpt.length ? 'عدد خاطئ في: ' + badOpt.map(x => 'م' + x.n + '(' + x.opts + ')').join('، ') : mcqs.length + ' سؤالًا بخيارات سليمة') : 'لا أسئلة اختيار');
+    mcqs.length
+      ? (badOpt.length ? 'عدد خاطئ في: ' + badOpt.map(x => 'م' + x.n + '(' + x.opts + ')').join('، ')
+        : (unknownOpt.length ? 'صحيح في ' + (mcqs.length - unknownOpt.length) + ' · خيارات نصّية لا تُعدّ في ' + unknownOpt.map(x => 'م' + x.n).join('، ') : mcqs.length + ' سؤالًا بخيارات سليمة'))
+      : 'لا أسئلة اختيار');
   // ⑥ خيارات مكرّرة
   const dupOpt = [];
   items.forEach(x => {

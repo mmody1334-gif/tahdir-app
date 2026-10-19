@@ -109,19 +109,39 @@
     for (var p = 1; p <= doc.numPages; p++) {
       var pg = await doc.getPage(p);
       var tc = await pg.getTextContent();
-      var rows = [];
+      var items = [];
       tc.items.forEach(function (it) {
-        var y = it.transform ? it.transform[5] : 0, x = it.transform ? it.transform[4] : 0;
-        rows.push({ s: it.str || '', x: x, y: y });
+        var s = it.str || '';
+        if (!s.trim()) return;                       // الفراغات لا تحمل معلومة
+        var tr = it.transform || [1, 0, 0, 1, 0, 0];
+        items.push({ s: s, x: tr[4], y: tr[5], w: it.width || 0, h: it.height || 8 });
       });
-      rows.sort(function (a, b) { return (Math.abs(a.y - b.y) > 3) ? (b.y - a.y) : (a.x - b.x); });
-      var lines = [], cur = '', lastY = null;
-      rows.forEach(function (r) {
-        if (lastY !== null && Math.abs(r.y - lastY) > 3) { lines.push(cur); cur = ''; }
-        cur += r.s; lastY = r.y;
+      // **بناء الأسطر من المواضع**: كثير من ملفات PDF العربية لا تحوي محارف مسافات،
+      // فتخرج الكلمات ملتصقة («ملادةاالختبار»). نُدرج مسافة كلّما اتّسعت الفجوة
+      // الأفقية بين قطعتين — وهو ما يعيد حدود الكلمات.
+      items.sort(function (a, b) { return (Math.abs(b.y - a.y) > Math.max(3, a.h * 0.5)) ? (b.y - a.y) : (a.x - b.x); });
+      var groups = [], cur = [], lastY = null;
+      items.forEach(function (it) {
+        if (lastY !== null && Math.abs(it.y - lastY) > Math.max(3, it.h * 0.5)) { groups.push(cur); cur = []; }
+        cur.push(it); lastY = it.y;
       });
-      if (cur) lines.push(cur);
-      pages.push(lines.join('\n'));
+      if (cur.length) groups.push(cur);
+      var lines = groups.map(function (line) {
+        line.sort(function (a, b) { return a.x - b.x; });
+        var out = '';
+        for (var k = 0; k < line.length; k++) {
+          if (k > 0) {
+            var prev = line[k - 1];
+            var gap = line[k].x - (prev.x + prev.w);
+            var spaceAt = Math.max(0.8, (line[k].h || 8) * 0.16);
+            var endsSpace = /\s$/.test(prev.s), startsSpace = /^\s/.test(line[k].s);
+            if (!endsSpace && !startsSpace && gap > spaceAt) out += ' ';
+          }
+          out += line[k].s;
+        }
+        return out.replace(/\s{2,}/g, ' ').trim();
+      });
+      pages.push(lines.filter(Boolean).join('\n'));
     }
     return pages.join('\n');
   }
