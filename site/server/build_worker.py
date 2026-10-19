@@ -909,26 +909,86 @@ extra_css += '''
 @media (max-width:700px){.menu-list{top:auto!important;left:0!important;right:0!important;margin:6px!important}}
 '''
 extra_css += '''
-/* ===== صفحة تقني حذيفة ===== */
-.kb-mark .tq-mark{width:clamp(48px,6vw,68px);height:auto;display:block;border-radius:16px}
-/* تنسيق اسم «تقني حذيفة» وخطه: خط أبسط (Cairo) وأحجام متوازنة مع السطر التحتي */
-.tq-banner .kb-mid{gap:10px}
-.tq-banner .kb-name{align-items:flex-start;line-height:1.15;gap:0}
-.tq-banner .kb-name b{font-family:"Cairo",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:700;
-  font-size:clamp(1.12rem,2.4vw,1.7rem);letter-spacing:.2px;color:#0b3b33}
-.tq-banner .kb-name span{font-family:"Cairo",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:600;
-  font-size:clamp(.7rem,1.35vw,.86rem);color:#b5821c;margin-top:3px;letter-spacing:.1px}
-@media(max-width:520px){.tq-banner .kb-name b{font-size:1.02rem}.tq-banner .kb-name span{font-size:.66rem}}
-.tq-logo .tq-mark{width:100%!important;height:auto!important;display:block;filter:drop-shadow(0 10px 22px rgba(8,80,63,.28))}
-.tq-card .tq-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0 10px}
-.tq-a{display:flex;align-items:center;justify-content:center;text-align:center;padding:11px 10px;border:1px solid #cfe5da;border-radius:12px;background:#f4faf7;color:#0b5c42;text-decoration:none;font-weight:700;font-size:.9rem;transition:.15s}
-.tq-a:hover{background:#e6f6ee;border-color:#1e8a63;transform:translateY(-1px)}
-.tq-primary{grid-column:1 / -1;background:linear-gradient(135deg,#12a884,#08503f);color:#fff;border-color:#08503f;font-size:1rem;padding:13px}
-.tq-primary:hover{background:linear-gradient(135deg,#0f9a7a,#063d30);color:#fff}
-.tq-note{font-size:.82rem;color:#6a7a74;background:#f2f8f5;border-radius:10px;padding:9px 11px;margin:8px 0 0;line-height:1.7}
-.tq-back{margin:10px 0 0;font-size:.84rem;text-align:center}
-.tq-back a{color:#0b5c42}
-@media(max-width:520px){.tq-card .tq-grid{grid-template-columns:1fr}}
+/* ===== «تقني حذيفة»: هوية تقنية مستقلة (كحلي + سماوي + ذهبي) ===== */
+.tq-word{font-family:"Cairo",system-ui,sans-serif;font-weight:800;letter-spacing:.2px;white-space:nowrap}
+.tq-word b{color:#0891b2;font-weight:900}.tq-word i{font-style:normal;color:#0b2545}
+.tq-mark{display:block;border-radius:26%}
+/* --- صفحات الهبوط والدخول --- */
+body:has(.tq-land){background:#071426!important;background-image:none!important}
+.tq-land{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:26px;padding:16px 16px 28px;color:#e6f6fb;font-family:"Cairo",system-ui,sans-serif;overflow:hidden;isolation:isolate}
+.tq-bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(1200px 700px at 50% -10%,#0e3a5c 0%,#0a1f3a 45%,#071426 100%)}
+.tq-bgsvg{position:absolute;inset:0;width:100%;height:100%}
+.tq-tr{fill:none;stroke:#22d3ee;stroke-width:2.2;stroke-opacity:.5;stroke-dasharray:60 900;animation:tqPulse linear infinite}
+@keyframes tqPulse{from{stroke-dashoffset:960}to{stroke-dashoffset:0}}
+.tq-dots circle{fill:#fbbf24;opacity:.55;animation:tqBlink 2.4s ease-in-out infinite alternate}.tq-dots circle:nth-child(3n){animation-delay:.8s}.tq-dots circle:nth-child(3n+1){animation-delay:1.6s}
+@keyframes tqBlink{to{opacity:.12}}
+.tq-glow{position:absolute;left:50%;top:22%;width:640px;height:640px;margin-left:-320px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.18),transparent 65%);animation:tqBreath 6s ease-in-out infinite alternate}
+@keyframes tqBreath{to{transform:scale(1.15);opacity:.7}}
+.tq-hd{width:100%;max-width:1180px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tq-off{height:clamp(40px,7vw,64px);width:auto;background:#fff;border-radius:14px;padding:5px 10px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.tq-lock{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.tq-lock .tq-mark{width:clamp(44px,6vw,58px);height:auto;filter:drop-shadow(0 0 14px rgba(34,211,238,.35))}
+.tq-lock>span{display:flex;flex-direction:column;line-height:1.15}
+.tq-land .tq-word{font-size:clamp(1.15rem,2.6vw,1.6rem)}.tq-land .tq-word b{color:#22d3ee}.tq-land .tq-word i{color:#fff}
+.tq-lock small{font-size:.74rem;color:#fbbf24;font-weight:700}
+.tq-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;max-width:760px;margin-top:2vh}
+.tq-orb{position:relative;width:clamp(120px,18vw,170px);animation:tqFloat 4s ease-in-out infinite alternate}
+.tq-orb .tq-mark{width:100%;height:auto;filter:drop-shadow(0 0 30px rgba(34,211,238,.45)) drop-shadow(0 18px 30px rgba(0,0,0,.4))}
+.tq-orb::after{content:"";position:absolute;inset:-14%;border-radius:50%;border:2px dashed rgba(34,211,238,.35);animation:fxSpin 22s linear infinite}
+@keyframes tqFloat{to{transform:translateY(-10px)}}
+.tq-h1{margin:6px 0 0;font-size:clamp(2.6rem,7vw,4.4rem);line-height:1.05;font-weight:900;color:#fff;text-shadow:0 0 30px rgba(34,211,238,.35)}
+.tq-h1 b{color:#22d3ee}
+.tq-lead{margin:0;font-size:clamp(1rem,2.1vw,1.2rem);line-height:1.9;color:#b9d7e6;max-width:620px}
+.tq-cta{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
+.tq-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:800;font-size:1.05rem;padding:12px 26px;border-radius:14px;border:0;cursor:pointer;text-decoration:none;color:#06243a;background:linear-gradient(135deg,#67e8f9,#22d3ee 45%,#0ea5e9);box-shadow:0 10px 30px rgba(34,211,238,.35),inset 0 1px 0 rgba(255,255,255,.5);transition:transform .15s,box-shadow .15s}
+.tq-btn:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(34,211,238,.45)}
+.tq-btn.ghost{background:rgba(255,255,255,.06);color:#e6f6fb;border:1px solid rgba(103,232,249,.45);box-shadow:none}
+.tq-btn.wide{width:100%;margin-top:6px}.tq-btn:disabled{opacity:.6;cursor:default;transform:none}
+.tq-cards{width:100%;max-width:1060px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.tq-c{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;padding:14px 16px;border-radius:18px;text-decoration:none;color:#e6f6fb;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border:1px solid rgba(103,232,249,.18);backdrop-filter:blur(6px);transition:transform .18s,border-color .18s,background .18s;animation:fxCardIn .55s cubic-bezier(.2,1.4,.4,1) both}
+.tq-c:hover{transform:translateY(-3px);border-color:rgba(103,232,249,.6);background:linear-gradient(160deg,rgba(34,211,238,.16),rgba(255,255,255,.03))}
+.tq-ci{grid-row:1/3;width:48px;height:48px;display:grid;place-items:center;font-size:1.5rem;border-radius:14px;background:rgba(34,211,238,.12);border:1px solid rgba(103,232,249,.3)}
+.tq-c b{font-size:1.02rem}.tq-c small{color:#93b7c9;font-size:.8rem}
+.tq-ft{margin-top:auto;font-size:.8rem;color:#7fa3b6;text-align:center}
+.tq-auth{width:100%;display:flex;justify-content:center;margin-top:3vh}
+.tq-card{width:min(420px,100%);padding:26px 24px 20px;border-radius:24px;background:linear-gradient(170deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border:1px solid rgba(103,232,249,.25);backdrop-filter:blur(10px);box-shadow:0 30px 70px rgba(0,0,0,.4);animation:fxWin .5s cubic-bezier(.2,1.4,.4,1)}
+.tq-card.shake{animation:fxShake .45s}
+.tq-card-mark{width:74px;margin:0 auto 6px}.tq-card-mark .tq-mark{width:100%;height:auto;filter:drop-shadow(0 0 18px rgba(34,211,238,.4))}
+.tq-card h2{text-align:center;margin:4px 0 0;font-size:1.5rem;color:#fff}.tq-sub{text-align:center;margin:2px 0 16px;color:#93b7c9;font-size:.92rem}
+.tq-f{display:grid;gap:5px;margin-bottom:12px;font-weight:700;font-size:.9rem;color:#cde9f5}
+.tq-f input{font:inherit;font-size:1rem;color:#fff;background:rgba(7,20,38,.65);border:1px solid rgba(103,232,249,.3);border-radius:12px;padding:11px 12px;width:100%;box-sizing:border-box;outline:none;transition:border-color .15s,box-shadow .15s}
+.tq-f input:focus{border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.2)}
+.tq-pw{position:relative;display:block}.tq-pw input{padding-inline-end:76px}
+.tq-pw button{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);font:inherit;font-size:.8rem;font-weight:700;color:#67e8f9;background:rgba(34,211,238,.1);border:1px solid rgba(103,232,249,.3);border-radius:8px;padding:4px 10px;cursor:pointer}
+.tq-note2{text-align:center;color:#7fa3b6;font-size:.8rem;margin:10px 0 0}
+.tq-land .err{background:rgba(226,27,60,.15);color:#ffb3c0;border-color:rgba(226,27,60,.4)}
+body.leaving .tq-card{opacity:0;transform:scale(.96);transition:.4s}
+@media (max-width:620px){.tq-hd{justify-content:center;flex-wrap:wrap}.tq-off{height:38px}.tq-lock{order:-1;width:100%;justify-content:center}.tq-cards{grid-template-columns:1fr 1fr}.tq-c{grid-template-columns:1fr;grid-template-rows:auto;text-align:center;justify-items:center;row-gap:4px}.tq-ci{grid-row:auto}}
+@media (prefers-reduced-motion:reduce){.tq-land *{animation:none!important}}
+/* --- الصفحات الداخلية تحت /teqany --- */
+body.tqb{--bg:#eef4f9;--paper:#ffffff;--ink:#0b1f33;--mute:#56708a;--line:#d6e2ec;--main:#0891b2;--main-d:#0b2545;--main-l:#e0f6fb;--leaf:#22d3ee;--accent:#f59e0b;--accent-l:#fef3dc;
+  background-color:#eef4f9!important;background-image:linear-gradient(rgba(8,145,178,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(8,145,178,.05) 1px,transparent 1px)!important;background-size:32px 32px!important}
+body.tqb .top{background:linear-gradient(120deg,#071426 0%,#0b2545 55%,#0e4a6b 100%)!important;color:#e6f6fb!important;border-bottom:3px solid #22d3ee!important}
+body.tqb .top .top-in{border-top:1px solid rgba(103,232,249,.18)!important}
+body.tqb .top .by{color:#a9c8d8!important}body.tqb .top .by b{color:#fff}
+body.tqb .top .stat{background:rgba(255,255,255,.07)!important;border-color:rgba(103,232,249,.25)!important;color:#d9f4fb!important}
+body.tqb .top .btn.ghost{background:rgba(255,255,255,.07)!important;border-color:rgba(103,232,249,.3)!important;color:#e6f6fb!important}
+body.tqb .top .btn.ghost:hover,body.tqb .whobar .btn[aria-current]{background:rgba(34,211,238,.18)!important;border-color:#22d3ee!important;color:#fff!important}
+body.tqb .top .menu-btn{background:linear-gradient(135deg,#67e8f9,#22d3ee)!important;color:#06243a!important;border-color:#22d3ee!important}
+body.tqb .top .who{color:#cde9f5}
+body.tqb .tq-banner .kb-name b{color:inherit}
+body.tqb .tq-banner .kb-name .tq-word b{color:#22d3ee}body.tqb .tq-banner .kb-name .tq-word i{color:#fff}
+body.tqb .tq-banner .kb-name{align-items:flex-start;line-height:1.15}
+body.tqb .tq-banner .kb-name .tq-word{font-size:clamp(1.2rem,3vw,1.9rem)}
+body.tqb .tq-banner .kb-name>span:last-child{color:#fbbf24;font-size:clamp(.7rem,1.4vw,.88rem);font-weight:700;margin-top:3px}
+body.tqb .tq-banner .kb-mark .tq-mark{width:clamp(48px,6vw,66px);height:auto;filter:drop-shadow(0 0 14px rgba(34,211,238,.35))}
+body.tqb .kb-banner img.kb-moe,body.tqb .kb-banner img.kb-vis{background:#fff;border-radius:12px;padding:4px 8px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+body.tqb .btn.primary{background:linear-gradient(135deg,#0ea5e9,#0891b2)!important;border-color:#0891b2!important;color:#fff!important}
+body.tqb .panel,body.tqb .tree,body.tqb .qside .qcard,body.tqb .g-stage{border-color:#d6e2ec}
+body.tqb .g-intro{background:linear-gradient(120deg,#0b2545,#0e7490)!important}
+body.tqb .foot{color:#56708a}
+body.tqb .get-app{background:linear-gradient(120deg,#0b2545,#0e4a6b)!important;color:#e6f6fb!important;border-color:#22d3ee!important}
+body.tqb .get-app h3{color:#fff!important}body.tqb .get-app p{color:#b9d7e6!important}
 '''
 CSS = base_css + extra_css
 
@@ -1131,50 +1191,65 @@ CANDO = json.load(open(os.path.join(DATA, 'cando.json'), encoding='utf-8')) if o
 # رابط خاص (/teqany) يعرض هوية مختلفة (الشعار والاسم) ويدخل إلى المنصة نفسها
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
 TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb-logo tq-mark">
-<defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
-<rect x="5" y="5" width="118" height="118" rx="30" fill="#ffffff" stroke="url(#tqg)" stroke-width="8"/>
-<g stroke="#0d7f66" stroke-width="4.5" stroke-linecap="round">
-<path d="M41 41L64 64M87 41L64 64M41 87L64 64M87 87L64 64"/></g>
-<g fill="#0d7f66"><circle cx="41" cy="41" r="8.5"/><circle cx="87" cy="41" r="8.5"/>
-<circle cx="41" cy="87" r="8.5"/><circle cx="87" cy="87" r="8.5"/></g>
-<circle cx="64" cy="64" r="11" fill="#e0a93b"/>
+<defs><linearGradient id="tqBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b2545"/><stop offset="1" stop-color="#0e7490"/></linearGradient>
+<linearGradient id="tqLn" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs>
+<rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tqBg)"/>
+<rect x="4" y="4" width="120" height="120" rx="30" fill="none" stroke="#22d3ee" stroke-opacity=".35" stroke-width="2"/>
+<g stroke="#22d3ee" stroke-opacity=".28" stroke-width="2" fill="none"><path d="M4 92h14l8-8M124 36h-14l-8 8M40 124v-12l6-6M88 4v12l-6 6"/></g>
+<g fill="#22d3ee" fill-opacity=".45"><circle cx="26" cy="84" r="2.6"/><circle cx="102" cy="44" r="2.6"/><circle cx="46" cy="106" r="2.6"/><circle cx="82" cy="22" r="2.6"/></g>
+<path d="M20 60 C22 92 106 92 108 60" fill="none" stroke="url(#tqLn)" stroke-width="12" stroke-linecap="round"/>
+<path d="M20 60 V44 H12 M108 60 V44 H116" fill="none" stroke="#22d3ee" stroke-opacity=".55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="12" cy="44" r="3.5" fill="#22d3ee"/><circle cx="116" cy="44" r="3.5" fill="#22d3ee"/>
+<path d="M53 31 L62 40 L53 49 L44 40Z M75 31 L84 40 L75 49 L66 40Z" fill="#fbbf24"/>
+<path d="M53 31 L62 40 L53 49 L44 40Z M75 31 L84 40 L75 49 L66 40Z" fill="none" stroke="#fde68a" stroke-width="1.5" stroke-linejoin="round" opacity=".7"/>
 </svg>"""
-
-# بانر «تقني حذيفة»: نفس بنية بانر المنصة، لكن بالشعار والاسم الجديدين.
-BANNER_TQ = f"""<div class="kb-banner tq-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{TEQANY_LOGO}</div><div class="kb-name"><b>تقني حذيفة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>"""
-
-TEQANY = f"""<main class="auth tq">
-<div class="kb-band">{BANNER_TQ}</div>
-<section class="auth-art">
-  <div class="auth-brand">
-    <div class="logo tq-logo">{TEQANY_LOGO}</div>
-    <h1>تقني حذيفة</h1>
-    <p>مساحة تقنية لمعلّم مدرسة حذيفة بن محصن: تحضير الدروس، والاختبارات القصيرة وفق وثيقة التقويم،
-       والعروض التقديمية، والألعاب التعليمية — كلها في مكان واحد.</p>
-    <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
-  </div>
-  <div class="auth-facts"><span>هوية خاصة</span><span>نفس المنصة</span><span>دخول بضغطة</span></div>
-</section>
-<section class="auth-panel">
-  <div class="auth-card tq-card">
-    <h2>ادخل إلى المنصة</h2>
-    <p class="lead">هذه واجهة «تقني حذيفة». المحتوى نفسه بكل أقسامه — اضغط أي قسم للانتقال إليه.</p>
-    <div class="tq-grid">
-      <a class="tq-a tq-primary" href="/teqany/login"> دخول المنصة</a>
-      <a class="tq-a" href="/teqany/tahdir">التحضير</a>
-      <a class="tq-a" href="/teqany/quiz">التقويم والاختبارات</a>
-      <a class="tq-a" href="/teqany/games">الألعاب التعليمية</a>
-      <a class="tq-a" href="/teqany/slides">العروض التقديمية</a>
-      <a class="tq-a" href="/teqany/finals">الاختبارات النهائية</a>
-      <a class="tq-a" href="/teqany/remedial">الخطط العلاجية</a>
-      <a class="tq-a" href="/teqany/summaries">ملخصات الدروس</a>
-      <a class="tq-a" href="/teqany/cando">أستطيع أن ✓</a>
-    </div>
-    <p class="tq-note">داخل المنصة يظهر شعارها الأصلي، و«المزيد» يفتح بقية الأقسام كالمعتاد.</p>
-    <p class="tq-back"><a href="/">← العودة إلى واجهة الكبسولة</a></p>
-  </div>
-</section></main>"""
+TQ_NAME = '<span class="tq-word"><b>تقني</b> <i>حذيفة</i></span>'
+# بانر الصفحات الداخلية: الشعاران الرسميان على بطاقتين بيضاوين وبينهما هوية «تقني حذيفة»
+BANNER_TQ = f"""<div class="kb-banner tq-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{TEQANY_LOGO}</div><div class="kb-name">{TQ_NAME}<span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>"""
+# خلفية متحركة: مسارات دوائر إلكترونية تسري فيها نبضات ضوء
+def _tq_bg():
+    import random as _r
+    _r.seed(7); paths = []; dots = []
+    for i in range(16):
+        x = _r.randint(0, 1600); y = _r.randint(0, 1000); d = f'M{x} {y}'
+        for k in range(4):
+            if k % 2 == 0: x += _r.choice([-1, 1]) * _r.randint(80, 260)
+            else: y += _r.choice([-1, 1]) * _r.randint(60, 200)
+            d += f' L{x} {y}'
+        paths.append(f'<path class="tq-tr" d="{d}" style="animation-delay:-{_r.random()*6:.2f}s;animation-duration:{5+_r.random()*5:.1f}s"/>')
+        dots.append(f'<circle cx="{x}" cy="{y}" r="4"/>')
+    return ('<svg class="tq-bgsvg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'
+            '<defs><pattern id="tqGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#22d3ee" stroke-opacity=".07"/></pattern></defs>'
+            '<rect width="1600" height="1000" fill="url(#tqGrid)"/><g class="tq-trs">' + ''.join(paths) + '</g><g class="tq-dots">' + ''.join(dots) + '</g></svg>')
+TQ_BG = _tq_bg()
+def tq_shell(inner, cls=''):
+    return (f'<main class="tq-land {cls}"><div class="tq-bg">{TQ_BG}<div class="tq-glow"></div></div>'
+            f'<header class="tq-hd"><img class="tq-off" src="{_img("moe.png")}" alt="وزارة التعليم"><a class="tq-lock" href="/teqany">{TEQANY_LOGO}<span>{TQ_NAME}<small>مدرسة حذيفة بن محصن</small></span></a><img class="tq-off" src="{_img("vision.png")}" alt="رؤية عُمان 2040"></header>'
+            + inner +
+            '<footer class="tq-ft">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</footer></main>')
+TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة للإرسال إلى نور'), ('/teqany/quiz', '✅', 'التقويم والاختبارات', 'اختبارات قصيرة وفق الوثيقة'),
+  ('/teqany/games', '🎮', 'الألعاب التعليمية', 'شدّ الحبل، العدّاء، كرة القدم…'), ('/teqany/slides', '📽️', 'العروض التقديمية', 'عروض كل مادة وصف'),
+  ('/teqany/finals', '🗂', 'الاختبارات النهائية', 'أسئلة الوزارة حسب الدرس'), ('/teqany/remedial', '🩹', 'الخطط العلاجية', 'للطلاب دون المستوى'),
+  ('/teqany/summaries', '📚', 'ملخصات الدروس', 'وفق مخرجات التعلم'), ('/teqany/cando', '☑️', 'أستطيع أن ✓', 'قوائم التقييم الذاتي')]
+TEQANY = tq_shell('<section class="tq-hero"><div class="tq-orb">' + TEQANY_LOGO + '</div>'
+  '<h1 class="tq-h1"><b>تقني</b> حذيفة</h1>'
+  '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
+  '<div class="tq-cta"><a class="tq-btn" href="/teqany/login">دخول المنصة <span aria-hidden="true">←</span></a><a class="tq-btn ghost" href="/teqany/tahdir">التحضير مباشرة</a></div></section>'
+  '<section class="tq-cards" aria-label="الأقسام">' + ''.join(f'<a class="tq-c" href="{h}" style="animation-delay:{i*.06:.2f}s"><span class="tq-ci">{ic}</span><b>{t}</b><small>{d}</small></a>' for i, (h, ic, t, d) in enumerate(TQ_SECTIONS)) + '</section>')
+TQ_LOGIN = tq_shell('<section class="tq-auth"><form class="tq-card" id="loginForm" novalidate>'
+  '<div class="tq-card-mark">' + TEQANY_LOGO + '</div><h2>تسجيل الدخول</h2><p class="tq-sub">ادخل بحسابك في المنصة.</p>'
+  '<div class="err" id="loginErr" role="alert" hidden></div>'
+  '<label class="tq-f"><span>اسم المستخدم</span><input id="username" name="username" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>'
+  '<label class="tq-f"><span>كلمة المرور</span><span class="tq-pw"><input id="password" name="password" type="password" class="ltr" autocomplete="current-password" required><button type="button" id="togglePass" aria-pressed="false">إظهار</button></span></label>'
+  '<button class="tq-btn wide" id="loginBtn" type="submit">دخول</button><p class="tq-note2">الحساب يعمل على جهازين فقط.</p></form></section>', 'tq-login')
+TQ_SETUP = tq_shell('<section class="tq-auth"><form class="tq-card" id="setupForm" novalidate>'
+  '<div class="tq-card-mark">' + TEQANY_LOGO + '</div><h2>إنشاء حساب المدير</h2><p class="tq-sub">تظهر هذه الصفحة مرة واحدة فقط.</p>'
+  '<div class="err" id="loginErr" role="alert" hidden></div>'
+  '<label class="tq-f"><span>الاسم</span><input id="name" value="أ. محمد مجدي" required></label>'
+  '<label class="tq-f"><span>اسم المستخدم (إنجليزي)</span><input id="username" class="ltr" autocomplete="username" autocapitalize="none" required></label>'
+  '<label class="tq-f"><span>كلمة المرور</span><input id="password" type="password" class="ltr" autocomplete="new-password" required></label>'
+  '<label class="tq-f"><span>تأكيد كلمة المرور</span><input id="password2" type="password" class="ltr" autocomplete="new-password" required></label>'
+  '<button class="tq-btn wide" type="submit">إنشاء الحساب</button></form></section>', 'tq-login')
 
 PAGES = {
   'css': CSS,
@@ -1199,8 +1274,10 @@ PAGES = {
 # الروابط الخارجية (/api · /fin · /pdf · /tool) تبقى بلا بادئة لأنها موارد لا صفحات.
 _TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|cando|admin|grading|setup|login|teqany'
 def brand_tq(h):
+    h = h.replace(BANNER, BANNER_TQ)
     h = h.replace(LOGO, TEQANY_LOGO)
-    h = h.replace('class="kb-banner"', 'class="kb-banner tq-banner"')
+    h = h.replace('<body>', '<body class="tqb">', 1)
+    h = h.replace('content="#f6f4ee"', 'content="#0b2545"')
     h = h.replace('الكبسولة', 'تقني حذيفة')
     # "/app" أو '/quiz' → "/teqany/app"
     h = re.sub(r'(["\'])/(' + _TQ_PAGES + r')(?=["\'?#/])', r'\1/teqany/\2', h)
@@ -1208,8 +1285,9 @@ def brand_tq(h):
     h = h.replace('href="/"', 'href="/teqany"')
     return h
 
-PAGES_TQ = {k: (brand_tq(v) if k != 'css' else v) for k, v in PAGES.items()}
-PAGES_TQ['teqany/tahdir'] = brand_tq(PAGES['app'])
+PAGES_TQ = {k: (brand_tq(v) if k != 'css' else v) for k, v in PAGES.items() if k != 'teqany'}
+PAGES_TQ['login'] = page('تقني حذيفة · الدخول', TQ_LOGIN, rd('client_login.js'))
+PAGES_TQ['setup'] = page('تقني حذيفة · الإعداد', TQ_SETUP, rd('client_login.js'))
 
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))

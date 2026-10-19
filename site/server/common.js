@@ -3,6 +3,26 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 // داخل مساحة «تقني حذيفة» (/teqany/…) نُبقي كل انتقال تحت البادئة نفسها،
 // فيبقى الشعار والاسم مختلفين في كل الصفحات. خارجها يعمل كما هو.
 function tqUrl(u){return (location.pathname.indexOf('/teqany')===0?'/teqany':'')+u;}
+// داخل «تقني حذيفة»: أي رابط أو نص يُنشأ بالسكربت لاحقًا (القوائم، النوافذ، الإعلانات) يُعاد إلى الهوية نفسها:
+// روابط الأقسام تأخذ البادئة /teqany، واسم «الكبسولة» يُستبدل بـ«تقني حذيفة»، فلا يخرج المستخدم للواجهة الأصلية.
+(function(){
+  if(location.pathname.indexOf('/teqany')!==0)return;
+  var PG=/^\/(app|tahdir|quiz|games|slides|finals|remedial|summaries|cando|admin|grading|login|setup)(?=$|[?#\/])/;
+  var fixA=function(a){var h=a.getAttribute('href');if(!h)return;if(PG.test(h))a.setAttribute('href','/teqany'+h);else if(h==='/')a.setAttribute('href','/teqany');};
+  var fixTxt=function(t){if(t.nodeValue&&t.nodeValue.indexOf('الكبسولة')>=0)t.nodeValue=t.nodeValue.replace(/الكبسولة/g,'تقني حذيفة');};
+  var fix=function(n){
+    if(n.nodeType===3){fixTxt(n);return;}
+    if(n.nodeType!==1||/^(SCRIPT|STYLE|TEXTAREA)$/.test(n.nodeName))return;
+    if(n.tagName==='A')fixA(n);
+    Array.prototype.forEach.call(n.querySelectorAll('a[href]'),fixA);
+    var w=document.createTreeWalker(n,NodeFilter.SHOW_TEXT,null),t;while((t=w.nextNode()))fixTxt(t);
+  };
+  var titleFix=function(){if(document.title.indexOf('الكبسولة')>=0)document.title=document.title.replace(/الكبسولة/g,'تقني حذيفة');};
+  var start=function(){fix(document.body);titleFix();
+    new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==='characterData')fixTxt(m.target);else Array.prototype.forEach.call(m.addedNodes,fix);});titleFix();})
+      .observe(document.documentElement,{childList:true,subtree:true,characterData:true});};
+  if(document.body)start();else document.addEventListener('DOMContentLoaded',start);
+})();
 var toastTimer=null;
 function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg||'تم';t.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('on');},1800);}
 // رمز الجلسة الاحتياطي: بعض المتصفحات (متصفح واتساب/إنستقرام المدمج، أو إعداد
@@ -24,7 +44,7 @@ function api(path,data,method){
     if(r.status===401&&path!=='/api/login'){
       // الرمز الاحتياطي لم يعد صالحًا: نمسحه ونعيد للدخول
       sidSet('');
-      location.href='/';return Promise.reject(new Error('انتهت الجلسة'));
+      location.href=tqUrl('/');return Promise.reject(new Error('انتهت الجلسة'));
     }
     return r.json().catch(function(){return {};}).then(function(j){
       if(!r.ok)throw new Error(j.error||'حدث خطأ');
