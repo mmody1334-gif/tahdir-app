@@ -17,9 +17,8 @@ function stopAll(){stopFns.forEach(function(f){try{f();}catch(e){}});stopFns=[];
 function every(ms,fn){var id=setInterval(fn,ms);stopFns.push(function(){clearInterval(id);});return id;}
 // ---------- صوت بسيط ----------
 var actx=null;
-function beep(kind){if(!sound)return;try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();var o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);
-  var f={ok:[660,880],bad:[220,160],tick:[1200,1200],win:[523,1046]}[kind]||[440,440];o.frequency.setValueAtTime(f[0],actx.currentTime);o.frequency.linearRampToValueAtTime(f[1],actx.currentTime+.18);
-  g.gain.setValueAtTime(kind==='tick'?.04:.12,actx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+(kind==='tick'?.05:.35));o.start();o.stop(actx.currentTime+.4);}catch(e){}}
+function beep(kind){juice(kind);}
+// @@FX@@
 
 // ---------- مصادر الأسئلة ----------
 function selIds(){var ids=data.lessons.map(function(l){return l.id;}).filter(function(id){return sel[id];});return ids.length?ids:[];}
@@ -41,7 +40,11 @@ var SHAPES=['▲','◆','●','■'];
 // ---------- كتالوج الألعاب ----------
 var GAMES=[
  {id:'live',icon:'📱',name:'تحدي مباشر بالجوالات',desc:'كل طالب يدخل من جواله بالرمز أو QR، يجاوب، وتظهر لوحة الصدارة على السبورة.',grades:[5,12],need:'mcq',min:4},
- {id:'tug',icon:'🪢',name:'شدّ الحبل',desc:'لاعبان على شاشة واحدة: كل إجابة صحيحة تشدّ الحبل نحوك، والخطأ يجمّدك. ثلاث صحيحة متتالية = شدّة مضاعفة 🔥',grades:[5,12],best:[5,12],need:'mcq',min:6},
+ {id:'tug',hot:1,icon:'🪢',name:'شدّ الحبل',desc:'لاعبان على شاشة واحدة: كل إجابة صحيحة تشدّ الحبل نحوك، والخطأ يجمّدك. ثلاث صحيحة متتالية = شدّة مضاعفة 🔥',grades:[5,12],best:[5,12],need:'mcq',min:6},
+ {id:'runner',hot:1,icon:'🏃',name:'العدّاء',desc:'جرْي لا ينتهي على طريقة Subway Surfers: عند كل حاجز يتباطأ الزمن ويظهر سؤال، والإجابة الصحيحة تحدد الاتجاه الآمن ⬅️ ⬆️ ➡️. الخطأ = اصطدام!',grades:[5,12],best:[5,12],need:'mcq',min:6},
+ {id:'ball',hot:1,icon:'⚽',name:'مباراة كرة القدم',desc:'فريقان على شاشة واحدة: كل إجابة صحيحة تدحرج الكرة نحو مرمى الخصم… هدددف! أكثر الفريقين أهدافًا يفوز.',grades:[5,12],best:[5,10],need:'mcq',min:6},
+ {id:'rocket',hot:1,icon:'🚀',name:'سباق الصواريخ',desc:'من 2 إلى 4 لاعبين، كل إجابة صحيحة تدفع صاروخك نحو القمر. أول صاروخ يصل يفوز!',grades:[5,12],best:[5,12],need:'mcq',min:6},
+ {id:'balloon',hot:1,icon:'🎈',name:'فرقعة البالونات',desc:'السؤال يظهر والبالونات تطير بالخيارات: فرقِع الصحيح قبل أن يهرب! الأسرع يكسب نقاطًا أكثر.',grades:[5,12],best:[5,9],need:'mcq',min:6},
  {id:'jeopardy',icon:'🏆',name:'تحدي الفرق',desc:'لوحة أسئلة بالدروس والدرجات (100–400). الأصعب بدرجة أعلى، والفرق تتنافس.',grades:[5,12],best:[9,12],need:'any',min:6},
  {id:'millionaire',icon:'💰',name:'سلّم المليون',desc:'10 أسئلة تتدرج من السهل للصعب، مع وسائل مساعدة: حذف إجابتين، وقت إضافي، رأي الفصل.',grades:[5,12],need:'mcq',min:6},
  {id:'escape',icon:'🔐',name:'غرفة الهروب',desc:'خمسة أقفال، كل قفل سؤال يكشف رقمًا من الرمز. الخطأ يكلّف دقيقة. اهربوا قبل انتهاء الوقت!',grades:[7,12],best:[9,12],need:'mcq',min:5},
@@ -120,11 +123,14 @@ function renderHome(){
   }
   var h='<div class="g-home"><div class="g-intro"><h2>🎲 ركن الألعاب التعليمية</h2><p>اختر الدروس من القائمة، ثم اللعبة. الأسئلة تُسحب من بنك الأسئلة وواجبات الدروس'+(isEn()?' والمفردات':' والمصطلحات')+'، ومستواها يناسب الصف. اعرضها على السبورة بملء الشاشة.</p></div><div class="g-cards">';
   var list=gnum()>=10?GAMES.filter(function(g){return g.teen;}).concat(GAMES.filter(function(g){return !g.teen;})):GAMES.filter(function(g){return !g.teen;});
+  // ألعاب الحركة الجديدة أولًا في كل الصفوف
+  list=list.filter(function(g){return g.hot;}).concat(list.filter(function(g){return !g.hot;}));
   list.forEach(function(g,gi){
-    if(gnum()>=10&&gi===0)h+='<h3 class="g-sec">🎓 ألعاب للمرحلة الثانوية (10–12): تفكير وتحليل ومنافسة</h3>';
-    if(gnum()>=10&&!g.teen&&list[gi-1]&&list[gi-1].teen)h+='<h3 class="g-sec">ألعاب لكل الصفوف</h3>';
+    if(gi===0&&g.hot)h+='<h3 class="g-sec">🎮 ألعاب الحركة والحماس: مؤثرات وأصوات وأنيميشن</h3>';
+    if(gnum()>=10&&g.teen&&(!list[gi-1]||!list[gi-1].teen))h+='<h3 class="g-sec">🎓 ألعاب للمرحلة الثانوية (10–12): تفكير وتحليل ومنافسة</h3>';
+    if(!g.hot&&!g.teen&&list[gi-1]&&(list[gi-1].teen||list[gi-1].hot))h+='<h3 class="g-sec">ألعاب لكل الصفوف</h3>';
     var ok=enough(g),f=fits(g),b=bestFor(g);
-    h+='<button type="button" class="g-card'+(ok?'':' off')+'" data-game="'+g.id+'"'+(ok?'':' aria-disabled="true"')+'><span class="g-ic">'+g.icon+'</span><b>'+esc(g.name)+'</b><span class="g-desc">'+esc(g.desc)+'</span>'+
+    h+='<button type="button" class="g-card'+(ok?'':' off')+(g.hot?' hot':'')+'" data-game="'+g.id+'"'+(ok?'':' aria-disabled="true"')+'><span class="g-ic">'+g.icon+'</span><b>'+esc(g.name)+'</b><span class="g-desc">'+esc(g.desc)+'</span>'+
       '<span class="g-tags">'+(b?'<span class="tag good">مقترحة لصفك</span>':f?'<span class="tag">تناسب صفك</span>':'<span class="tag warn">الأنسب للصفوف '+g.grades[0]+'–'+g.grades[1]+'</span>')+(ok?'':'<span class="tag warn">'+(selIds().length?'تحتاج دروسًا أكثر':'اختر الدروس')+'</span>')+'</span></button>';
   });
   h+='</div></div>';
@@ -135,15 +141,19 @@ function stage(title,inner){
   return '<div class="g-stage" id="stage"><div class="g-bar"><button type="button" class="btn small" id="gBack">→ الألعاب</button><b class="g-title">'+esc(title)+'</b><span class="g-bar-r"><button type="button" class="btn small" id="gFull">⛶ ملء الشاشة</button></span></div><div class="g-score" id="gScore"></div><div class="gm-body" id="gBody">'+inner+'</div></div>';
 }
 function bindStage(){$('gBack').onclick=renderHome;$('gFull').onclick=function(){toggleFull($('stage'));};}
+var prevSc={};
 function renderScore(showButtons,val){
   var el=$('gScore');if(!el)return;
+  // الفريق الذي تغيّرت نقاطه: تقفز بطاقته ويتطاير شرر من رقمه
+  var bumped=[];teams.forEach(function(t,i){if(prevSc[i]!=null&&prevSc[i]!==t.score)bumped.push(i);prevSc[i]=t.score;});
+  setTimeout(function(){bumped.forEach(function(i){var c=el.querySelectorAll('.sc')[i];if(!c)return;c.classList.add('bump');var r=c.getBoundingClientRect();if(teams[i].score>0)fxBurst(r.left+r.width/2,r.top+r.height/2,[TEAM_COLORS[i],'#ffd400','#fff'],18);});},0);
   el.innerHTML=teams.map(function(t,i){return '<div class="sc" style="--tc:'+TEAM_COLORS[i]+'"><span class="sc-n">'+esc(t.name)+'</span><span class="sc-v">'+t.score+'</span>'+(showButtons?'<span class="sc-b"><button type="button" data-plus="'+i+'">+'+val+'</button><button type="button" data-minus="'+i+'">−'+val+'</button></span>':'')+'</div>';}).join('');
 }
 function resetScores(){teams.forEach(function(t){t.score=0;});}
 // @@TUG@@
 function startGame(g){
   stopAll();game=g.id;track('game_play',g.id);
-  ({tug:gTug,live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
+  ({tug:gTug,runner:gRunner,ball:gBall,rocket:gRocket,balloon:gBalloon,live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
 }
 function timerHtml(id){return '<div class="g-timer" id="'+id+'"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" class="tr-bg"/><circle cx="18" cy="18" r="16" class="tr-fg" id="'+id+'C" stroke-dasharray="100 100"/></svg><span id="'+id+'T"></span></div>';}
 function runTimer(id,secs,onEnd){
