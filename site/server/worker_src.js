@@ -240,6 +240,16 @@ function jsonETag(req, data) {
   }
   return new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-cache', ETag: etag, ...SEC_HEADERS } });
 }
+const PAGES_TQ = __PAGES_TQ__;
+// عرض صفحة بهوية «تقني حذيفة» (نسخة جاهزة من البناء) — نفس المحتوى والشعار مختلف
+function htmlTq(name, extra = {}) {
+  if (!PAGES_TQ[name]) return html(name, extra);
+  const nonce = rand(16);
+  const src = PAGES_TQ[name].replace(/%CSS%/, () => PAGES.css);
+  const body = src.replace(/%NONCE%/g, nonce);
+  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp, ...SEC_HEADERS, ...extra } });
+}
 function html(name, extra = {}) {
   const nonce = rand(16);
   const body = PAGES[name].replace(/%NONCE%/g, nonce).replace('%CSS%', () => PAGES.css);
@@ -865,7 +875,14 @@ export default {
         return json({ ok: true });
       }
       if (p === '/api/login' && m === 'POST') return login(req, env);
-      // **صفحة تقني حذيفة**: واجهة بديلة عامة (قبل الدخول) — هوية مختلفة، ونفس المنصة
+      // ===== مساحة «تقني حذيفة»: نفس المنصة بهوية مختلفة تحت /teqany =====
+      // تجهيز الحالة قبل التحقق من الدخول حتى نوجّه الزائر إلى صفحة دخول مُعلَّمة.
+      const TQ_MAP = {
+        '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz',
+        '/teqany/games': 'games', '/teqany/play': 'play', '/teqany/slides': 'slides',
+        '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries',
+        '/teqany/admin': 'admin', '/teqany/grading': 'grading', '/teqany/login': 'login', '/teqany/setup': 'setup',
+      };
       if (p === '/teqany' || p === '/teqany/') return html('teqany');
       if (p === '/play') return html('play');
       if (p.startsWith('/api/play/')) { const r = await playApi(req, env, p, m, url); if (r) return r; }
@@ -877,12 +894,17 @@ export default {
         if (tk) { try { await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(tk).run(); } catch (e) {} }
         return json({ ok: true }, 200, { 'Set-Cookie': setCookie('sid', '', 0, req) });
       }
+      // صفحة دخول «تقني» عامة
+      if (p === '/teqany/login') return me ? redirect(me.role === 'admin' ? '/teqany/admin' : '/teqany/tahdir') : htmlTq('login');
+      if (p === '/teqany/setup') return (await adminCount()) ? redirect('/teqany') : htmlTq('setup');
       if (p === '/') {
         if (!(await adminCount())) return redirect('/setup');
         return me ? redirect(me.role === 'admin' ? '/admin' : '/app') : html('login');
       }
-      if (!me) return p.startsWith('/api/') ? json({ error: 'سجّل الدخول أولًا.' }, 401) : redirect('/');
+      if (!me) return p.startsWith('/api/') ? json({ error: 'سجّل الدخول أولًا.' }, 401) : (p.startsWith('/teqany') ? redirect('/teqany/login') : redirect('/'));
 
+      // بقية صفحات «تقني» (بعد التحقق من الدخول)
+      if (TQ_MAP[p]) return htmlTq(TQ_MAP[p]);
       if (p === '/app') return html('app');
       if (p === '/api/me') {
         // «first»: أول دخول لهذا الحساب — يُستخدم لإظهار دليل الاستخدام مرة واحدة

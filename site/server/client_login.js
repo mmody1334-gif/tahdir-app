@@ -26,7 +26,7 @@ if(form){
       return api('/api/login',{username:$('username').value,password:$('password').value,fp:fp,screen:screen.width+'×'+screen.height});
     }).then(function(r){
       btn.textContent='أهلًا '+(r.name||'');document.body.classList.add('leaving');
-      setTimeout(function(){location.href=r.role==='admin'?'/admin':'/app';},420);
+      setTimeout(function(){location.href=tqUrl(r.role==='admin'?'/admin':'/app');},420);
     },function(ex){
       err.textContent=ex.message;err.hidden=false;btn.disabled=false;btn.textContent='دخول';
       form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');
@@ -41,7 +41,7 @@ if(setup){
     e.preventDefault();var err=$('loginErr');err.hidden=true;
     if($('password').value!==$('password2').value){err.textContent='كلمتا المرور غير متطابقتين.';err.hidden=false;return;}
     api('/api/setup',{name:$('name').value,username:$('username').value,password:$('password').value}).then(function(){
-      location.href='/';
+      location.href=tqUrl('/');
     },function(ex){err.textContent=ex.message;err.hidden=false;});
   });
 }

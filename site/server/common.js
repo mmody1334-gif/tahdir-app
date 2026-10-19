@@ -1,5 +1,8 @@
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// داخل مساحة «تقني حذيفة» (/teqany/…) نُبقي كل انتقال تحت البادئة نفسها،
+// فيبقى الشعار والاسم مختلفين في كل الصفحات. خارجها يعمل كما هو.
+function tqUrl(u){return (location.pathname.indexOf('/teqany')===0?'/teqany':'')+u;}
 var toastTimer=null;
 function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg||'تم';t.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('on');},1800);}
 // رمز الجلسة الاحتياطي: بعض المتصفحات (متصفح واتساب/إنستقرام المدمج، أو إعداد
@@ -90,7 +93,7 @@ function guard(){
   },true);
   document.addEventListener('dragstart',function(e){e.preventDefault();});
 }
-function logout(){api('/api/logout',{}).then(function(){sidSet('');didSet('');location.href='/';},function(){sidSet('');didSet('');location.href='/';});}
+function logout(){api('/api/logout',{}).then(function(){sidSet('');didSet('');location.href=tqUrl('/');},function(){sidSet('');didSet('');location.href=tqUrl('/');});}
 function fmtDate(t){if(!t)return '—';var d=new Date(t);return d.toLocaleDateString('ar-OM',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('ar-OM',{hour:'2-digit',minute:'2-digit'});}
 function ago(t){if(!t)return 'لم يدخل بعد';var s=(Date.now()-t)/1000;if(s<60)return 'الآن';if(s<3600)return 'منذ '+Math.floor(s/60)+' دقيقة';if(s<86400)return 'منذ '+Math.floor(s/3600)+' ساعة';var d=Math.floor(s/86400);return d===1?'أمس':'منذ '+d+' يوم';}
 // ---------- أداة نور (مشتركة لكل الصفحات) ----------

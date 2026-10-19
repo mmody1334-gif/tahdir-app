@@ -939,7 +939,7 @@ SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if
 # ===== صفحة «تقني حذيفة» — واجهة بديلة بنفس المنصة =====
 # رابط خاص (/teqany) يعرض هوية مختلفة (الشعار والاسم) ويدخل إلى المنصة نفسها
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
-TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="tq-mark">
+TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb tq-mark">
 <defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
 <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tqg)"/>
@@ -999,9 +999,27 @@ PAGES = {
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
 }
+
+# ===== هوية «تقني حذيفة» لكل صفحة تحت /teqany =====
+# نأخذ HTML الصفحة كما هو ونستبدل: الشعار · الاسم · بادئة روابط الأقسام.
+# الروابط الخارجية (/api · /fin · /pdf · /tool) تبقى بلا بادئة لأنها موارد لا صفحات.
+_TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|admin|grading|setup|login|teqany'
+def brand_tq(h):
+    h = h.replace(LOGO, TEQANY_LOGO)
+    h = h.replace('الكبسولة', 'تقني حذيفة')
+    # "/app" أو '/quiz' → "/teqany/app"
+    h = re.sub(r'(["\'])/(' + _TQ_PAGES + r')(?=["\'?#/])', r'\1/teqany/\2', h)
+    # جذر الموقع → واجهة تقني
+    h = h.replace('href="/"', 'href="/teqany"')
+    return h
+
+PAGES_TQ = {k: (brand_tq(v) if k != 'css' else v) for k, v in PAGES.items()}
+PAGES_TQ['teqany/tahdir'] = brand_tq(PAGES['app'])
+
 src = rd('worker_src.js')
 src = src.replace('__LESSONS__', json.dumps(lessons, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__PAGES__', json.dumps(PAGES, ensure_ascii=False, separators=(',', ':')))
+src = src.replace('__PAGES_TQ__', json.dumps(PAGES_TQ, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__TOOL__', json.dumps(rd('tahdir-noor.user.js'), ensure_ascii=False))
 src = src.replace('__ICONS__', json.dumps({**json.loads(rd('icons.json')), **BRAND_ICONS}))
 # الحزم الكبيرة (الملخصات والألعاب والاختبارات النهائية) تُنشر ملفات ثابتة باسم مشتق من محتواها، ويحمّلها العامل عند الحاجة
