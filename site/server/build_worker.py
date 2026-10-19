@@ -606,6 +606,25 @@ button.lv-opt{cursor:pointer}
   .no-print{display:none!important}
 }
 @media (max-width:900px){.qlayout{grid-template-columns:1fr}.qside{position:static;max-height:none}.paper{padding:18px 14px;font-size:15px}}
+/* ---------- «أستطيع أن ✓» ---------- */
+.cd-layout .u-btn.cd-u{width:100%;margin:2px 0}
+.cd-layout .u-btn.cd-u.active{background:var(--main-l,#e3f1eb);border-color:var(--main,#1f8a70);color:var(--main-d,#0b3b33)}
+.cd-all{display:block;width:calc(100% - 8px);margin:8px 4px 4px;font:inherit;font-size:.82rem;font-weight:700;color:var(--main-d,#0b3b33);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:8px;cursor:pointer}
+.cd-all:hover{border-color:var(--main,#1f8a70);background:var(--main-l,#e3f1eb)}
+.cd-welcome{text-align:center}.cd-big{font-size:3rem;line-height:1;color:#1b8f9a;font-weight:900;margin-bottom:6px}
+.cd-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:6px}
+.cd-head h2{margin:2px 0 0;font-size:1.25rem}.cd-crumb{font-size:.8rem;color:var(--mute);font-weight:700}
+.cd-tools{display:flex;flex-wrap:wrap;gap:6px}
+.cd-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fbf0db);border-radius:10px;padding:6px 10px;margin:6px 0 12px}
+.cd-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cd-wrap .cd-t{min-width:640px}
+.cd-c{cursor:pointer;user-select:none;transition:background .12s}
+.cd-c:hover{background:#eaf6f7!important}.cd-c.on{background:#d9f0f2!important}
+.cd-c:focus-visible{outline:3px solid #e0a93b;outline-offset:-3px}
+.cd-nav{display:flex;justify-content:space-between;gap:8px;margin-top:14px}
+#printArea .cd-sheet{font-size:12pt}
+#printArea .cd-sheet tr{page-break-inside:avoid}
+@media print{body.printing #printArea .cd-sheet td,body.printing #printArea .cd-sheet th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 '''
 extra_css += '''
 /* ---------- header nav: essentials + menu ---------- */
@@ -850,7 +869,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -942,6 +961,11 @@ PLAY = '<main class="pl" id="pl"></main>'
 SLIDES_PAGE = TOP('<div class="stats"><span class="stat">العروض التقديمية</span><span class="stat">عروض البوربوينت حسب المادة والصف</span></div>').replace('%BTNS%', NAV('slides')) + '''
 <main class="wrap sl" id="sl"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 
+CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
+<div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
+<main class="panel" id="panel"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<div id="printArea"></div>'''
+
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
@@ -951,6 +975,8 @@ FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os
 # تُعاين وتُحمَّل بروابط درايف المباشرة، ولا تُخزَّن محليًّا لأن حجمها (2+ GB)
 # أكبر من سعة الاستضافة المجانية.
 SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'slides.json')) else []
+# «أستطيع أن ✓»: قوائم التقييم الذاتي لكل وحدة — data/cando.json (يُبنى من data/cando_src بأداة tools/build_cando.py)
+CANDO = json.load(open(os.path.join(DATA, 'cando.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'cando.json')) else {}
 # ===== صفحة «تقني حذيفة» — واجهة بديلة بنفس المنصة =====
 # رابط خاص (/teqany) يعرض هوية مختلفة (الشعار والاسم) ويدخل إلى المنصة نفسها
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
@@ -993,6 +1019,7 @@ TEQANY = f"""<main class="auth tq">
       <a class="tq-a" href="/teqany/finals">الاختبارات النهائية</a>
       <a class="tq-a" href="/teqany/remedial">الخطط العلاجية</a>
       <a class="tq-a" href="/teqany/summaries">ملخصات الدروس</a>
+      <a class="tq-a" href="/teqany/cando">أستطيع أن ✓</a>
     </div>
     <p class="tq-note">داخل المنصة يظهر شعارها الأصلي، و«المزيد» يفتح بقية الأقسام كالمعتاد.</p>
     <p class="tq-back"><a href="/">← العودة إلى واجهة الكبسولة</a></p>
@@ -1013,13 +1040,14 @@ PAGES = {
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
+  'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
 }
 
 # ===== هوية «تقني حذيفة» لكل صفحة تحت /teqany =====
 # نأخذ HTML الصفحة كما هو ونستبدل: الشعار · الاسم · بادئة روابط الأقسام.
 # الروابط الخارجية (/api · /fin · /pdf · /tool) تبقى بلا بادئة لأنها موارد لا صفحات.
-_TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|admin|grading|setup|login|teqany'
+_TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|cando|admin|grading|setup|login|teqany'
 def brand_tq(h):
     h = h.replace(LOGO, TEQANY_LOGO)
     h = h.replace('class="kb-banner"', 'class="kb-banner tq-banner"')

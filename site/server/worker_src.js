@@ -880,7 +880,7 @@ export default {
       const TQ_MAP = {
         '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz',
         '/teqany/games': 'games', '/teqany/play': 'play', '/teqany/slides': 'slides',
-        '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries',
+        '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries', '/teqany/cando': 'cando',
         '/teqany/admin': 'admin', '/teqany/grading': 'grading', '/teqany/login': 'login', '/teqany/setup': 'setup',
       };
       if (p === '/teqany' || p === '/teqany/') return html('teqany');
@@ -934,6 +934,7 @@ export default {
       if (p === '/summaries') return html('summaries');
       if (p === '/finals') return html('finals');
       if (p === '/slides') return html('slides');
+      if (p === '/cando') return html('cando');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
