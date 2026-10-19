@@ -735,7 +735,8 @@ extra_css += '''
 '''
 extra_css += '''
 /* ===== صفحة تقني حذيفة ===== */
-.tq-logo .tq-mark{width:100%;height:100%;display:block;filter:drop-shadow(0 10px 22px rgba(8,80,63,.28))}
+.kb-mark .tq-mark{width:clamp(48px,6vw,68px);height:auto;display:block;border-radius:16px}
+.tq-logo .tq-mark{width:100%!important;height:auto!important;display:block;filter:drop-shadow(0 10px 22px rgba(8,80,63,.28))}
 .tq-card .tq-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0 10px}
 .tq-a{display:flex;align-items:center;justify-content:center;text-align:center;padding:11px 10px;border:1px solid #cfe5da;border-radius:12px;background:#f4faf7;color:#0b5c42;text-decoration:none;font-weight:700;font-size:.9rem;transition:.15s}
 .tq-a:hover{background:#e6f6ee;border-color:#1e8a63;transform:translateY(-1px)}
@@ -939,7 +940,7 @@ SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if
 # ===== صفحة «تقني حذيفة» — واجهة بديلة بنفس المنصة =====
 # رابط خاص (/teqany) يعرض هوية مختلفة (الشعار والاسم) ويدخل إلى المنصة نفسها
 # بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
-TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb tq-mark">
+TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="kb-logo tq-mark">
 <defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
 <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tqg)"/>
