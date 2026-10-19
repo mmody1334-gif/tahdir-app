@@ -606,6 +606,63 @@ button.lv-opt{cursor:pointer}
   .no-print{display:none!important}
 }
 @media (max-width:900px){.qlayout{grid-template-columns:1fr}.qside{position:static;max-height:none}.paper{padding:18px 14px;font-size:15px}}
+/* ---------- لعبة شدّ الحبل ---------- */
+.tug-setup{text-align:center;max-width:760px;margin:0 auto}
+.tug-hero{border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-bottom:8px}
+.tug-hero .tug-team .tf{animation:tugIdle 1.1s ease-in-out infinite alternate}.tug-hero .tug-move{animation:tugSway 2.4s ease-in-out infinite alternate}
+@keyframes tugSway{from{transform:translateX(-40px)}to{transform:translateX(40px)}}
+@keyframes tugIdle{from{transform:translateX(0)}to{transform:translateX(calc(var(--d)*4px))}}
+.tug-names{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.tug-names label{display:grid;gap:4px;font-weight:800;color:var(--tc);text-align:start}
+.tug-names input{font:inherit;font-size:1.05rem;padding:10px 12px;border:2px solid var(--tc);border-radius:12px;color:var(--ink)}
+.tug-opts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:6px 0 14px}
+.tug-opts label{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92rem}.tug-opts select{font:inherit;padding:6px 8px;border-radius:10px;border:1px solid var(--line)}
+.tug{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:stretch;padding:4px 0 8px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.tug-p{position:relative;display:flex;flex-direction:column;gap:10px;border-radius:18px;padding:12px;background:color-mix(in srgb,var(--tc) 9%,#fff);border:3px solid var(--tc);min-height:420px;overflow:hidden}
+.tug-p header{display:flex;justify-content:space-between;align-items:center;gap:6px;background:var(--tc);color:#fff;border-radius:12px;padding:8px 12px;font-size:1.1rem}
+.tug-st{font-size:.9rem;font-weight:700;white-space:nowrap}.tug-fire{display:inline-block;animation:tugFire .6s ease-in-out infinite alternate}
+@keyframes tugFire{to{transform:scale(1.25) rotate(-6deg)}}
+.tug-q{background:#fff;border-radius:12px;padding:12px 14px;font-size:1.12rem;font-weight:700;line-height:1.7;min-height:96px;box-shadow:0 2px 0 rgba(0,0,0,.06)}
+.tug-q img{display:block;max-width:100%;max-height:150px;margin:0 auto 6px}
+.tug-p.in .tug-q{animation:tugIn .35s ease}@keyframes tugIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.tug-ch{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;align-content:start}
+.tug-b{position:relative;display:flex;align-items:center;gap:8px;min-height:64px;font:inherit;font-size:1rem;font-weight:700;text-align:start;color:var(--ink);background:#fff;border:2px solid color-mix(in srgb,var(--tc) 45%,#fff);border-radius:14px;padding:10px 10px;cursor:pointer;transition:transform .08s,background .15s;box-shadow:0 3px 0 color-mix(in srgb,var(--tc) 40%,#fff)}
+.tug-b:active{transform:translateY(2px);box-shadow:none}.tug-b kbd{flex:none;font:inherit;font-size:.7rem;background:var(--tc);color:#fff;border-radius:6px;padding:1px 6px;opacity:.75}
+.tug-b.ok{background:#26890c;border-color:#26890c;color:#fff;animation:tugOk .4s}.tug-b.no{background:#e21b3c;border-color:#e21b3c;color:#fff}
+@keyframes tugOk{50%{transform:scale(1.06)}}
+.tug-p.shake{animation:tugShake .45s}@keyframes tugShake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.tug-ice{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:4rem;background:rgba(200,235,255,.82);backdrop-filter:blur(2px);color:#0b5e8a;font-weight:900;animation:tugIce .25s ease}
+.tug-ice span{font-size:1.4rem}.tug-ice[hidden]{display:none}@keyframes tugIce{from{opacity:0;transform:scale(1.15)}}
+.tug-pop{position:absolute;top:40%;inset-inline:0;text-align:center;font-size:1.8rem;font-weight:900;text-shadow:0 2px 0 #fff;animation:tugPop 1.3s ease forwards;pointer-events:none}
+@keyframes tugPop{0%{opacity:0;transform:scale(.6)}20%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:translateY(-60px)}}
+.tug-mid{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.tug-top{display:flex;justify-content:center;gap:10px;align-items:center;flex-wrap:wrap}
+.tug-lead{font-weight:900;font-size:1.05rem;transition:color .2s}
+.tug-time{font-variant-numeric:tabular-nums;font-weight:900;font-size:1.3rem;background:#0b3b33;color:#fff;border-radius:999px;padding:3px 14px}.tug-time.low{background:#e21b3c;animation:tugFire .5s infinite alternate}
+.tug-svg{width:100%;height:auto;display:block;border-radius:16px;border:1px solid var(--line)}
+.tug-move{transition:transform .45s cubic-bezier(.3,1.6,.5,1)}
+.tug-move.jerk .tug-flag{animation:tugFlag .45s}@keyframes tugFlag{40%{transform:translateY(-6px)}}
+.tug-team .tf{transform-box:fill-box;transform-origin:50% 100%}
+.tug-team.heave .tf{animation:tugHeave .45s ease}.tug-team.heave .tf1{animation-delay:.06s}
+@keyframes tugHeave{40%{transform:rotate(calc(var(--d)*12deg)) translateX(calc(var(--d)*6px))}}
+.tug-team.fall .tf{animation:tugFall .9s ease forwards}@keyframes tugFall{to{transform:rotate(calc(var(--d)*-75deg)) translateY(10px)}}
+.tug-team.cheer .tf{animation:tugJump .5s ease-in-out infinite alternate}.tug-team.cheer .tf1{animation-delay:.15s}@keyframes tugJump{to{transform:translateY(-22px)}}
+.tug-puff{fill:#b9a27c;opacity:.75;animation:tugPuff .7s ease-out forwards}@keyframes tugPuff{to{opacity:0;transform:translate(var(--dx),-22px) scale(1.8)}}
+.tug-crowd{display:flex;justify-content:space-around;font-size:1.5rem}.tug-crowd span{animation:tugJump .7s ease-in-out infinite alternate}.tug-crowd span:nth-child(2n){animation-delay:.35s}
+.tug-meter{position:relative;display:flex;height:12px;border-radius:999px;overflow:hidden}.tug-meter span{flex:1;background:var(--tc);opacity:.8}
+.tug-meter i{position:absolute;top:-2px;width:16px;height:16px;margin-inline-start:-8px;border-radius:50%;background:#ffd400;border:3px solid #24323a;transition:inset-inline-start .45s}
+.tug-fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.tug-cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:6;background:rgba(255,255,255,.55);backdrop-filter:blur(2px);border-radius:18px}
+.tug-cd.on{display:flex}.tug-n{font-size:9rem;font-weight:900;color:#0b3b33;animation:tugCount .8s ease}.tug-n.go{font-size:5rem;color:#26890c}
+@keyframes tugCount{from{transform:scale(2.2);opacity:0}to{transform:scale(1);opacity:1}}
+.tug-res{background:#fff;border-radius:22px;padding:22px 28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:tugCount .5s ease;max-width:92%}
+.tug-res h2{font-size:2.2rem;margin:4px 0 12px}.tug-trophy{font-size:4.5rem;animation:tugJump .6s ease-in-out infinite alternate}
+.tug-sums{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}.tug-sum{display:grid;gap:2px;border:2px solid var(--tc);border-radius:14px;padding:8px 16px}.tug-sum b{color:var(--tc)}
+.tug-again{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.g-stage:fullscreen .tug-p{min-height:calc(100vh - 160px)}.g-stage:fullscreen .tug-q{font-size:1.35rem}.g-stage:fullscreen .tug-b{font-size:1.2rem;min-height:84px}
+@media (max-width:900px){.tug{grid-template-columns:1fr 1fr}.tug-mid{grid-column:1/-1;order:-1}.tug-p{min-height:0}.tug-ch{grid-template-columns:1fr}}
+@media (max-width:520px){.tug-names{grid-template-columns:1fr}.tug-b{min-height:52px;font-size:.92rem}.tug-q{font-size:1rem}}
+@media (prefers-reduced-motion:reduce){.tug *{animation:none!important;transition:none!important}}
 /* ---------- «أستطيع أن ✓» ---------- */
 .cd-layout .u-btn.cd-u{width:100%;margin:2px 0}
 .cd-layout .u-btn.cd-u.active{background:var(--main-l,#e3f1eb);border-color:var(--main,#1f8a70);color:var(--main-d,#0b3b33)}
@@ -1034,7 +1091,7 @@ PAGES = {
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
-  'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js')),
+  'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@TUG@@', rd('client_tug.js'))),
   'play': page('تحدي الكبسولة', PLAY, rd('client_play.js')),
   'grading': page('تصحيح الواجبات · الكبسولة', GRADING, rd('client_grading.js')),
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),

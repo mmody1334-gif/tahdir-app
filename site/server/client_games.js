@@ -41,6 +41,7 @@ var SHAPES=['▲','◆','●','■'];
 // ---------- كتالوج الألعاب ----------
 var GAMES=[
  {id:'live',icon:'📱',name:'تحدي مباشر بالجوالات',desc:'كل طالب يدخل من جواله بالرمز أو QR، يجاوب، وتظهر لوحة الصدارة على السبورة.',grades:[5,12],need:'mcq',min:4},
+ {id:'tug',icon:'🪢',name:'شدّ الحبل',desc:'لاعبان على شاشة واحدة: كل إجابة صحيحة تشدّ الحبل نحوك، والخطأ يجمّدك. ثلاث صحيحة متتالية = شدّة مضاعفة 🔥',grades:[5,12],best:[5,12],need:'mcq',min:6},
  {id:'jeopardy',icon:'🏆',name:'تحدي الفرق',desc:'لوحة أسئلة بالدروس والدرجات (100–400). الأصعب بدرجة أعلى، والفرق تتنافس.',grades:[5,12],best:[9,12],need:'any',min:6},
  {id:'millionaire',icon:'💰',name:'سلّم المليون',desc:'10 أسئلة تتدرج من السهل للصعب، مع وسائل مساعدة: حذف إجابتين، وقت إضافي، رأي الفصل.',grades:[5,12],need:'mcq',min:6},
  {id:'escape',icon:'🔐',name:'غرفة الهروب',desc:'خمسة أقفال، كل قفل سؤال يكشف رقمًا من الرمز. الخطأ يكلّف دقيقة. اهربوا قبل انتهاء الوقت!',grades:[7,12],best:[9,12],need:'mcq',min:5},
@@ -139,9 +140,10 @@ function renderScore(showButtons,val){
   el.innerHTML=teams.map(function(t,i){return '<div class="sc" style="--tc:'+TEAM_COLORS[i]+'"><span class="sc-n">'+esc(t.name)+'</span><span class="sc-v">'+t.score+'</span>'+(showButtons?'<span class="sc-b"><button type="button" data-plus="'+i+'">+'+val+'</button><button type="button" data-minus="'+i+'">−'+val+'</button></span>':'')+'</div>';}).join('');
 }
 function resetScores(){teams.forEach(function(t){t.score=0;});}
+// @@TUG@@
 function startGame(g){
   stopAll();game=g.id;track('game_play',g.id);
-  ({live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
+  ({tug:gTug,live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
 }
 function timerHtml(id){return '<div class="g-timer" id="'+id+'"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" class="tr-bg"/><circle cx="18" cy="18" r="16" class="tr-fg" id="'+id+'C" stroke-dasharray="100 100"/></svg><span id="'+id+'T"></span></div>';}
 function runTimer(id,secs,onEnd){
