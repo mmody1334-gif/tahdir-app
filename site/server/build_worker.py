@@ -969,14 +969,14 @@ TEQANY = f"""<main class="auth tq">
     <h2>ادخل إلى المنصة</h2>
     <p class="lead">هذه واجهة «تقني حذيفة». المحتوى نفسه بكل أقسامه — اضغط أي قسم للانتقال إليه.</p>
     <div class="tq-grid">
-      <a class="tq-a tq-primary" href="/"> دخول المنصة</a>
-      <a class="tq-a" href="/app">التحضير</a>
-      <a class="tq-a" href="/quiz">التقويم والاختبارات</a>
-      <a class="tq-a" href="/games">الألعاب التعليمية</a>
-      <a class="tq-a" href="/slides">العروض التقديمية</a>
-      <a class="tq-a" href="/finals">الاختبارات النهائية</a>
-      <a class="tq-a" href="/remedial">الخطط العلاجية</a>
-      <a class="tq-a" href="/summaries">ملخصات الدروس</a>
+      <a class="tq-a tq-primary" href="/teqany/login"> دخول المنصة</a>
+      <a class="tq-a" href="/teqany/tahdir">التحضير</a>
+      <a class="tq-a" href="/teqany/quiz">التقويم والاختبارات</a>
+      <a class="tq-a" href="/teqany/games">الألعاب التعليمية</a>
+      <a class="tq-a" href="/teqany/slides">العروض التقديمية</a>
+      <a class="tq-a" href="/teqany/finals">الاختبارات النهائية</a>
+      <a class="tq-a" href="/teqany/remedial">الخطط العلاجية</a>
+      <a class="tq-a" href="/teqany/summaries">ملخصات الدروس</a>
     </div>
     <p class="tq-note">داخل المنصة يظهر شعارها الأصلي، و«المزيد» يفتح بقية الأقسام كالمعتاد.</p>
     <p class="tq-back"><a href="/">← العودة إلى واجهة الكبسولة</a></p>
