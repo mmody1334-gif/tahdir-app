@@ -733,6 +733,19 @@ extra_css += '''
 .chk-q{font-size:.8rem;color:#333;line-height:1.6}
 @media (max-width:700px){.menu-list{top:auto!important;left:0!important;right:0!important;margin:6px!important}}
 '''
+extra_css += '''
+/* ===== صفحة تقني حذيفة ===== */
+.tq-logo .tq-mark{width:100%;height:100%;display:block;filter:drop-shadow(0 10px 22px rgba(8,80,63,.28))}
+.tq-card .tq-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0 10px}
+.tq-a{display:flex;align-items:center;justify-content:center;text-align:center;padding:11px 10px;border:1px solid #cfe5da;border-radius:12px;background:#f4faf7;color:#0b5c42;text-decoration:none;font-weight:700;font-size:.9rem;transition:.15s}
+.tq-a:hover{background:#e6f6ee;border-color:#1e8a63;transform:translateY(-1px)}
+.tq-primary{grid-column:1 / -1;background:linear-gradient(135deg,#12a884,#08503f);color:#fff;border-color:#08503f;font-size:1rem;padding:13px}
+.tq-primary:hover{background:linear-gradient(135deg,#0f9a7a,#063d30);color:#fff}
+.tq-note{font-size:.82rem;color:#6a7a74;background:#f2f8f5;border-radius:10px;padding:9px 11px;margin:8px 0 0;line-height:1.7}
+.tq-back{margin:10px 0 0;font-size:.84rem;text-align:center}
+.tq-back a{color:#0b5c42}
+@media(max-width:520px){.tq-card .tq-grid{grid-template-columns:1fr}}
+'''
 CSS = base_css + extra_css
 
 FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">'
@@ -923,8 +936,56 @@ FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os
 # تُعاين وتُحمَّل بروابط درايف المباشرة، ولا تُخزَّن محليًّا لأن حجمها (2+ GB)
 # أكبر من سعة الاستضافة المجانية.
 SLIDES = json.load(open(os.path.join(DATA, 'slides.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'slides.json')) else []
+# ===== صفحة «تقني حذيفة» — واجهة بديلة بنفس المنصة =====
+# رابط خاص (/teqany) يعرض هوية مختلفة (الشعار والاسم) ويدخل إلى المنصة نفسها
+# بكل محتواها. لا يغيّر أي شيء داخل المنصة: التغيير في هذه الصفحة وحدها.
+TEQANY_LOGO = """<svg viewBox="0 0 128 128" role="img" aria-label="تقني حذيفة" class="tq-mark">
+<defs><linearGradient id="tqg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#12a884"/><stop offset="1" stop-color="#08503f"/></linearGradient></defs>
+<rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tqg)"/>
+<g stroke="#d8f3ea" stroke-width="5" stroke-linecap="round">
+<path d="M44 20v10M64 20v10M84 20v10M44 98v10M64 98v10M84 98v10"/>
+<path d="M20 44h10M20 64h10M20 84h10M98 44h10M98 64h10M98 84h10"/></g>
+<rect x="34" y="34" width="60" height="60" rx="14" fill="#052f24" stroke="#8fe3cb" stroke-width="4"/>
+<path d="M52 58l-9 9 9 9M76 58l9 9-9 9" fill="none" stroke="#8fe3cb" stroke-width="6"
+ stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M68 54l-8 26" fill="none" stroke="#ffd08a" stroke-width="6" stroke-linecap="round"/>
+</svg>"""
+
+TEQANY = f"""<main class="auth tq">
+<div class="kb-band">{BANNER}</div>
+<section class="auth-art">
+  <div class="auth-brand">
+    <div class="logo tq-logo">{TEQANY_LOGO}</div>
+    <h1>تقني حذيفة</h1>
+    <p>مساحة تقنية لمعلّم تقنية المعلومات: تحضير الدروس، والاختبارات القصيرة وفق وثيقة التقويم،
+       والعروض التقديمية، والألعاب التعليمية — كلها في مكان واحد.</p>
+    <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
+  </div>
+  <div class="auth-facts"><span>هوية خاصة</span><span>نفس المنصة</span><span>دخول بضغطة</span></div>
+</section>
+<section class="auth-panel">
+  <div class="auth-card tq-card">
+    <h2>ادخل إلى المنصة</h2>
+    <p class="lead">هذه واجهة «تقني حذيفة». المحتوى نفسه بكل أقسامه — اضغط أي قسم للانتقال إليه.</p>
+    <div class="tq-grid">
+      <a class="tq-a tq-primary" href="/"> دخول المنصة</a>
+      <a class="tq-a" href="/app">التحضير</a>
+      <a class="tq-a" href="/quiz">التقويم والاختبارات</a>
+      <a class="tq-a" href="/games">الألعاب التعليمية</a>
+      <a class="tq-a" href="/slides">العروض التقديمية</a>
+      <a class="tq-a" href="/finals">الاختبارات النهائية</a>
+      <a class="tq-a" href="/remedial">الخطط العلاجية</a>
+      <a class="tq-a" href="/summaries">ملخصات الدروس</a>
+    </div>
+    <p class="tq-note">داخل المنصة يظهر شعارها الأصلي، و«المزيد» يفتح بقية الأقسام كالمعتاد.</p>
+    <p class="tq-back"><a href="/">← العودة إلى واجهة الكبسولة</a></p>
+  </div>
+</section></main>"""
+
 PAGES = {
   'css': CSS,
+  'teqany': page('تقني حذيفة', TEQANY, rd('client_login.js')),
   'login': page('الكبسولة', LOGIN, rd('client_login.js')),
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),

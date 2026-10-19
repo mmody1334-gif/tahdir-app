@@ -865,6 +865,8 @@ export default {
         return json({ ok: true });
       }
       if (p === '/api/login' && m === 'POST') return login(req, env);
+      // **صفحة تقني حذيفة**: واجهة بديلة عامة (قبل الدخول) — هوية مختلفة، ونفس المنصة
+      if (p === '/teqany' || p === '/teqany/') return html('teqany');
       if (p === '/play') return html('play');
       if (p.startsWith('/api/play/')) { const r = await playApi(req, env, p, m, url); if (r) return r; }
 
