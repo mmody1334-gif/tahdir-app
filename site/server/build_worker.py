@@ -592,7 +592,13 @@ button.lv-opt{cursor:pointer}
 #printArea .fin-pq{page-break-inside:avoid;margin:0 0 10px}#printArea .fin-pq img{max-width:100%}#printArea .fin-pn{font-weight:bold;font-size:12pt}#printArea .fin-pn small{font-weight:normal;font-size:9pt;color:#555}
 @media print{
   @page{size:A4;margin:0}
-  #printArea .prw{width:100%;border-collapse:collapse}#printArea .prw>thead>tr>td,#printArea .prw>tfoot>tr>td,#printArea .prw>tbody>tr>td{padding:0 12mm;border:0}#printArea .prsp{height:11mm}
+  /* ترويسة الشعارين: وزارة التعليم يمينًا · رؤية عُمان يسارًا · تتكرّر كل صفحة */
+  #printArea .plogo-row{display:flex;justify-content:space-between;align-items:center;gap:8mm;padding:0 0 2mm}
+  #printArea .plogo-row img{height:13mm;width:auto;display:block}
+  #printArea .plogo-vis{height:12mm}
+  /* جودة الطباعة: ألوان الشعارات والتظليل تُطبع كما هي */
+  body.printing,#printArea{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printArea .prw{width:100%;border-collapse:collapse}#printArea .prw>thead>tr>td,#printArea .prw>tfoot>tr>td,#printArea .prw>tbody>tr>td{padding:0 12mm;border:0}#printArea .prsp{height:8mm}
   body.printing>*:not(#printArea){display:none!important}
   body.printing #printArea{display:block!important;color:#000;font-family:"Simplified Arabic","Traditional Arabic","Cairo",Tahoma,serif;font-size:14pt;line-height:1.6}
   body.printing{background:#fff!important}

@@ -318,7 +318,10 @@ function bindCoursePick(cs,id,onPick,extra){
 // الطباعة المباشرة باسم ملف واضح (اسم PDF = عنوان الصفحة)
 function doPrint(name){var a=$('printArea'),t=document.title;document.title=String(name||t).replace(/[\\/:*?"<>|]+/g,'-').slice(0,100);supifyIn(a);a.innerHTML=PR_WRAP(a.innerHTML);document.body.classList.add('printing');setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';document.title=t;},800);},60);}
 // هوامش الصفحة داخل جدول (thead/tfoot تتكرر في كل صفحة) حتى نلغي هوامش المتصفح التي يطبع فيها الرابط والتاريخ
-function PR_WRAP(h){return '<table class="prw"><thead><tr><td><div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+h+'</td></tr></tbody></table>';}
+// ترويسة الطباعة: شعار وزارة التعليم أعلى اليمين وشعار رؤية عُمان أعلى اليسار.
+// توضع في <thead> فيتكرّر الشعاران في **كل صفحة** من الورقة المطبوعة.
+function PR_LOGOS(){return '<div class="plogo-row"><img class="plogo-moe" src="/brand/moe.png" alt="وزارة التعليم"><img class="plogo-vis" src="/brand/vision.png" alt="رؤية عُمان 2040"></div>';}
+function PR_WRAP(h){return '<table class="prw"><thead><tr><td>'+PR_LOGOS()+'<div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+h+'</td></tr></tbody></table>';}
 // الأسس والأيونات: X^2 أو 10^-3 أو Mg^2+ أو ^{...} تُعرض أسًا مرفوعًا
 var SUP_RE=/\^\{([^}]{1,14})\}|\^([+\-−]?(?:[0-9]{1,3}|[A-Za-z])[+\-−]?)/g;
 function supify(s){return String(s).replace(SUP_RE,function(m,a,b){return '<sup>'+(a||b)+'</sup>';});}
