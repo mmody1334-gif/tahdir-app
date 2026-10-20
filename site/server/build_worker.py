@@ -38,7 +38,23 @@ for _ar_f in ('arabic_lessons_g5_to_g12.json', 'lessons_ar.json'):
                 raise SystemExit('صف غير معروف في %s: %r' % (_ar_f, _l.get('grade')))
         lessons = [l for l in lessons if l.get('subject') != 'اللغة العربية'] + _ar
 
-qbank = json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8'))
+
+# ===== إزالة التطويل (الكشيدة «ـ») من كل النصوص =====
+# ملفات التحضير المنسوخة من Word فيها «المـــــيل» و«حـــل» و«صـ 24»: تظهر ممطوطة في الموقع وفي نور.
+# بين حرفين: تُحذف (المـــيل ← الميل). وبعد حرف في آخر الكلمة تبقى واحدة فقط (بـ 25، جـ، هـ متغيّرات).
+# ومنفردة مكرّرة (فاصل ـــــ): تصير «-».
+_AR = '\u0621-\u063A\u0641-\u064A\u0671-\u06D3'
+_TW_IN = re.compile('(?<=[' + _AR + '\u064B-\u065F])\u0640+(?=[\u064B-\u065F]*[' + _AR + '])')
+_TW_END = re.compile('(?<=[' + _AR + '\u064B-\u065F])\u0640{2,}')
+_TW_RUN = re.compile('\u0640{2,}')
+def _untat(o):
+    if isinstance(o, str):
+        return _TW_RUN.sub('-', _TW_END.sub('\u0640', _TW_IN.sub('', o))) if '\u0640' in o else o
+    if isinstance(o, list): return [_untat(x) for x in o]
+    if isinstance(o, dict): return {k: _untat(v) for k, v in o.items()}
+    return o
+lessons = _untat(lessons)
+qbank = _untat(json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8')))
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
 def fin_items():
     p = os.path.join(DATA, 'finals.json')
@@ -1289,7 +1305,7 @@ def _study_with_mm():
         for k, v in json.load(open(mp, encoding='utf-8')).items():
             st['lessons'].setdefault(str(k), {})['mm'] = v
     return st
-_PK = {'study': _study_with_mm(), 'games': json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8')), 'finals': FIN}
+_PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN)}
 _PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
 _PH = _hl.sha256(b''.join(_PB.values())).hexdigest()[:24]
 import shutil as _sh

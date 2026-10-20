@@ -372,14 +372,21 @@ function scopeOf(me) {
   if (!me || me.role === 'admin' || !me.scope) return null;
   try { const a = JSON.parse(me.scope); return Array.isArray(a) && a.length ? new Set(a) : null; } catch { return null; }
 }
+// إزالة التطويل «ـ» من نصوص الدروس المعدّلة/المضافة من لوحة التحكم (كما يُطبَّق على البيانات عند البناء)
+function untat(o) {
+  if (typeof o === 'string') return o.indexOf('\u0640') < 0 ? o : o.replace(/(?<=[\u0621-\u063A\u0641-\u064A\u0671-\u06D3\u064B-\u065F])\u0640+(?=[\u064B-\u065F]*[\u0621-\u063A\u0641-\u064A\u0671-\u06D3])/g, '').replace(/(?<=[\u0621-\u063A\u0641-\u064A\u0671-\u06D3\u064B-\u065F])\u0640{2,}/g, '\u0640').replace(/\u0640{2,}/g, '-');
+  if (Array.isArray(o)) return o.map(untat);
+  if (o && typeof o === 'object') { const r = {}; for (const k in o) r[k] = untat(o[k]); return r; }
+  return o;
+}
 async function customLessons(env) {
   const rows = (await env.DB.prepare('SELECT id, data FROM custom_lessons ORDER BY id').all()).results || [];
-  const out = []; rows.forEach(r => { try { out.push({ ...JSON.parse(r.data), id: r.id, custom: true, ai_filled: [] }); } catch {} });
+  const out = []; rows.forEach(r => { try { out.push({ ...untat(JSON.parse(r.data)), id: r.id, custom: true, ai_filled: [] }); } catch {} });
   return out;
 }
 async function allLessons(env) {
   const rows = (await env.DB.prepare('SELECT lesson_id, data FROM lesson_overrides').all()).results || [];
-  const ov = {}; rows.forEach(r => { try { ov[r.lesson_id] = JSON.parse(r.data); } catch {} });
+  const ov = {}; rows.forEach(r => { try { ov[r.lesson_id] = untat(JSON.parse(r.data)); } catch {} });
   const base = LESSONS.map(l => ov[l.id] ? { ...l, ...ov[l.id], ai_filled: (l.ai_filled || []).filter(k => !(k in ov[l.id])) } : l);
   return base.concat(await customLessons(env));
 }
