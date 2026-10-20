@@ -767,12 +767,14 @@ button.lv-opt{cursor:pointer}
 .cd-tools{display:flex;flex-wrap:wrap;gap:6px}
 .cd-hint{font-size:.82rem;color:var(--mute);background:var(--accent-l,#fbf0db);border-radius:10px;padding:6px 10px;margin:6px 0 12px}
 .cd-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.cd-wrap .cd-t{min-width:640px}
+.cd-wrap{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.cd-wrap .cd-sheet{min-width:660px}
 .cd-c{cursor:pointer;user-select:none;transition:background .12s}
 .cd-c:hover{background:#eaf6f7!important}.cd-c.on{background:#d9f0f2!important}
 .cd-c:focus-visible{outline:3px solid #e0a93b;outline-offset:-3px}
 .cd-nav{display:flex;justify-content:space-between;gap:8px;margin-top:14px}
-#printArea .cd-sheet{font-size:12pt}
+#printArea .cd-sheet{font-size:12pt;font-family:"Cairo","Simplified Arabic",Tahoma,sans-serif}
+#printArea .ppage{page-break-after:always}#printArea .ppage:last-child{page-break-after:auto}
 #printArea .cd-sheet tr{page-break-inside:avoid}
 @media print{body.printing #printArea .cd-sheet td,body.printing #printArea .cd-sheet th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 '''

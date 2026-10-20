@@ -55,28 +55,73 @@ function renderTree(){
   });
 }
 
-// ورقة الوحدة: بتنسيق مضمَّن حتى تبقى كما هي في الطباعة وملف Word وصفحة التصدير
-var TEAL='#1b8f9a',TEAL_L='#7fc4cc',TEAL_D='#0e6f78';
+// ===== ورقة «أستطيع أن» بتصميم المنصة (لا تصميم الكتاب) =====
+// الترويسة: شعار المنصة + شعار وزارة التعليم + شعار رؤية عُمان 2040 + المديرية + المدرسة + «مبادرة أستطيع أن».
+// التنسيق كله مضمَّن (inline) لتبقى الورقة كما هي في الطباعة وPDF وWord وصفحة التصدير على الجوال.
+var INK='#0b3b33',INK2='#1f8a70',GOLD='#e0a93b',PAPER='#fbfaf6',LINE='#c9d8d2';
+var RATE=[{t:'أحتاج إلى بذل المزيد من الجهد',bg:'#fdecec',fg:'#b42318',dot:'#e5484d'},{t:'متمكّن إلى حدٍّ ما',bg:'#fff4dc',fg:'#9a6700',dot:'#f5a524'},{t:'مستعدّ للمضيّ قدمًا',bg:'#e5f6ec',fg:'#11703c',dot:'#22a35a'}];
+var PCA='-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+// شعار المنصة من ترويسة الصفحة نفسها (الكبسولة أو تقني حذيفة)
+function brandEls(){var b=document.querySelector('.kb-banner');if(!b)return {svgs:[],name:'الكبسولة'};
+  var tq=b.querySelector('.tq-logo');if(tq)return {svgs:[].slice.call(tq.querySelectorAll('svg')),name:''};
+  var s=b.querySelector('.kb-mark svg');return {svgs:s?[s]:[],name:'الكبسولة'};}
+function svgMarkup(el,h){var c=el.cloneNode(true);c.removeAttribute('class');c.setAttribute('xmlns','http://www.w3.org/2000/svg');c.setAttribute('height',h);c.style.cssText='height:'+h+'px;width:auto;vertical-align:middle';return c.outerHTML;}
+// للمعاينة والطباعة: الصور برابطها والشعار SVG مضمَّن. لملف Word: كلها صور PNG (Word لا يعرض SVG)
+var ASSETS_WORD=null;
+function liveAssets(){var be=brandEls();return {moe:'/brand/moe.png',vis:'/brand/vision.png',logo:be.svgs.map(function(s){return svgMarkup(s,46);}).join(''),name:be.name};}
+function toDataUrl(src){return fetch(src).then(function(r){return r.blob();}).then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});});}
+function svgToPng(el,h){return new Promise(function(res){var c=el.cloneNode(true);c.setAttribute('xmlns','http://www.w3.org/2000/svg');var vb=(c.getAttribute('viewBox')||'0 0 100 100').split(/[\s,]+/).map(Number),w=Math.round(h*vb[2]/vb[3]);c.setAttribute('width',w*3);c.setAttribute('height',h*3);
+  var img=new Image();img.onload=function(){var cv=document.createElement('canvas');cv.width=w*3;cv.height=h*3;cv.getContext('2d').drawImage(img,0,0,w*3,h*3);res('<img src="'+cv.toDataURL('image/png')+'" width="'+w+'" height="'+h+'" style="vertical-align:middle">');};
+  img.onerror=function(){res('');};img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(c));});}
+function wordAssets(){
+  if(ASSETS_WORD)return Promise.resolve(ASSETS_WORD);
+  var be=brandEls();
+  return Promise.all([toDataUrl('/brand/moe.png'),toDataUrl('/brand/vision.png'),Promise.all(be.svgs.map(function(s){return svgToPng(s,46);}))]).then(function(r){
+    ASSETS_WORD={moe:r[0],vis:r[1],logo:r[2].join(' '),name:be.name,word:true};return ASSETS_WORD;
+  },function(){var a=liveAssets();a.logo='';return a;});
+}
+function sheetHeader(A,C,live){
+  var fs=function(pt,rem){return live?rem+'rem':pt+'pt';};
+  var img=function(src,h,alt){return '<img src="'+src+'" alt="'+alt+'" height="'+h+'" style="height:'+h+'px;width:auto;display:inline-block;vertical-align:middle">';};
+  return '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><tr>'+
+    '<td style="width:24%;text-align:right;vertical-align:middle;border:0;padding:0">'+img(A.moe,62,'وزارة التعليم')+'</td>'+
+    '<td style="text-align:center;vertical-align:middle;border:0;padding:0">'+
+      '<div style="line-height:1">'+A.logo+(A.name?'<span style="font-weight:800;color:'+INK+';font-size:'+fs(20,1.5)+';vertical-align:middle;margin-inline-start:6px">'+A.name+'</span>':'')+'</div>'+
+      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11.5,.86)+';margin-top:4px">المديرية العامة للتعليم بمحافظة البريمي</div>'+
+      '<div style="font-weight:800;color:'+INK2+';font-size:'+fs(12.5,.95)+'">مدرسة حذيفة بن محصن</div></td>'+
+    '<td style="width:24%;text-align:left;vertical-align:middle;border:0;padding:0">'+img(A.vis,58,'رؤية عُمان 2040')+'</td></tr></table>'+
+    '<div style="'+PCA+'background:'+INK+';color:#fff;border-radius:14px;padding:8px 14px;display:block;border-bottom:4px solid '+GOLD+'">'+
+      '<table style="width:100%;border-collapse:collapse"><tr>'+
+      '<td style="border:0;padding:0;color:#fff;font-weight:800;font-size:'+fs(17,1.25)+'">✓ مبادرة «أستطيع أن»</td>'+
+      '<td style="border:0;padding:0;text-align:left;color:'+GOLD+';font-weight:700;font-size:'+fs(11,.85)+'">قائمة التقييم الذاتي · الفصل الدراسي الأول</td></tr></table></div>'+
+    '<table style="width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:'+fs(11.5,.88)+'"><tr>'+
+      [['اسم الطالب',38],['الصف / الشعبة',14],['التاريخ',14]].map(function(l,i){return '<td style="border:0;padding:4px 0;white-space:nowrap;'+(i?'width:25%':'')+'"><b style="color:'+INK+'">'+l[0]+':</b> <span style="color:#7a8f88;letter-spacing:1px">'+new Array(l[1]+1).join('.')+'</span></td>';}).join('')+
+    '</tr></table>';
+}
 function sheetHtml(k,i,opts){
-  opts=opts||{};var C=CD[k],u=C.units[i],live=!!opts.live;
-  var th='background:'+TEAL+';color:#fff;border:1.5px solid #10464c;padding:6px 6px;font-weight:700;text-align:center;vertical-align:middle;font-size:'+(live?'.86rem':'11pt')+';line-height:1.35';
-  var td='border:1.5px solid #10464c;padding:6px 10px;vertical-align:top;background:#fff;color:#111;line-height:1.75;font-size:'+(live?'.98rem':'12.5pt');
-  var tdc='border:1.5px solid #10464c;background:#fff;text-align:center;vertical-align:middle;width:12%;font-size:'+(live?'1.3rem':'16pt')+';color:'+TEAL_D+';font-weight:700';
-  var h='<div class="cd-sheet" style="direction:rtl;font-family:inherit">'+
-    '<div style="font-weight:700;color:#c2185b;font-size:'+(live?'.92rem':'11pt')+';border-bottom:2px solid '+TEAL+';padding-bottom:4px;margin-bottom:8px">'+esc(unitTitle(u))+'</div>'+
-    '<div style="background:'+TEAL_L+';border:1px solid '+TEAL+';padding:0 0 10px">'+
-    '<div style="background:'+TEAL+';color:#fff;font-weight:800;padding:6px 12px;font-size:'+(live?'1.12rem':'14pt')+'">قائمة تقييم ذاتي</div>'+
-    '<div style="padding:6px 14px;font-size:'+(live?'.9rem':'11pt')+';color:#0b2b2e">بعد دراسة الوحدة، أكمل الجدول كالآتي:</div>'+
-    '<div style="padding:0 12px"><table class="cd-t" style="width:100%;border-collapse:collapse;table-layout:fixed">'+
-    '<colgroup><col style="width:'+(live?'46%':'48%')+'"><col style="width:'+(live?'12%':'10%')+'"><col><col><col></colgroup>'+
-    '<thead><tr><th style="'+th+'">أستطيع أن</th><th style="'+th+'">أراجع الموضوع</th>'+COLS.map(function(c){return '<th style="'+th+'">'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
+  opts=opts||{};var C=CD[k],u=C.units[i],live=!!opts.live,A=opts.assets||liveAssets();
+  var fs=function(pt,rem){return live?rem+'rem':pt+'pt';};
+  var th='border:1px solid '+INK+';padding:7px 6px;font-weight:800;text-align:center;vertical-align:middle;font-size:'+fs(10.5,.82)+';line-height:1.35;'+PCA;
+  var td='border:1px solid '+LINE+';padding:5px 9px;vertical-align:middle;color:#10261f;line-height:1.6;font-size:'+fs(11.5,.97)+';'+PCA;
+  var h='<div class="cd-sheet" style="direction:rtl;font-family:inherit;color:#10261f">'+sheetHeader(A,C,live)+
+    '<table style="width:100%;border-collapse:collapse;margin:6px 0"><tr>'+
+      '<td style="border:0;padding:0"><span style="'+PCA+'display:inline-block;background:#e3f1eb;color:'+INK+';border:1px solid #b9d9cc;border-radius:999px;padding:3px 14px;font-weight:800;font-size:'+fs(12.5,.98)+'">'+esc(C.subject)+' · الصف '+esc(C.grade)+' · '+esc(unitTitle(u))+'</span></td></tr></table>'+
+    '<div style="font-size:'+fs(11,.86)+';color:#3d554e;margin:2px 0 6px">بعد دراسة الوحدة، ضع علامة <b>✓</b> في الخانة التي تعبّر عن مستواك في كل هدف:</div>'+
+    '<table class="cd-t" style="width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid '+INK+'">'+
+    '<colgroup><col style="width:'+(live?'45%':'47%')+'"><col style="width:'+(live?'10%':'9%')+'"><col><col><col></colgroup>'+
+    '<thead><tr><th style="'+th+'background:'+INK+';color:#fff">أستطيع أن…</th><th style="'+th+'background:'+INK+';color:#fff">أراجع الموضوع</th>'+
+      RATE.map(function(r){return '<th style="'+th+'background:'+r.bg+';color:'+r.fg+'"><span style="'+PCA+'display:inline-block;width:10px;height:10px;border-radius:50%;background:'+r.dot+';margin-inline-end:4px;vertical-align:middle"></span>'+esc(r.t)+'</th>';}).join('')+'</tr></thead><tbody>';
   u.rows.forEach(function(r,ri){
-    var mk=marks[k+'|'+i+'|'+ri];
-    h+='<tr><td style="'+td+'">'+esc(r.t)+(r.b&&r.b.length?'<ul style="margin:4px 0 0;padding-inline-start:22px">'+r.b.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>':'')+'</td>'+
-      '<td style="'+td+';text-align:center;vertical-align:middle;white-space:nowrap">'+refHtml(r.r)+'</td>'+
-      COLS.map(function(c,ci){return '<td style="'+tdc+'"'+(live?' class="cd-c'+(mk===ci?' on':'')+'" data-r="'+ri+'" data-c="'+ci+'" role="button" tabindex="0" aria-label="'+esc(c)+'"':'')+'>'+(live&&mk===ci?'✓':'')+'</td>';}).join('')+'</tr>';
+    var mk=marks[k+'|'+i+'|'+ri],z=ri%2?PAPER:'#ffffff';
+    h+='<tr style="page-break-inside:avoid"><td style="'+td+'background:'+z+'"><span style="color:'+GOLD+';font-weight:900;margin-inline-end:4px">'+(ri+1)+'.</span>'+esc(r.t)+(r.b&&r.b.length?'<ul style="margin:4px 0 0;padding-inline-start:22px">'+r.b.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>':'')+'</td>'+
+      '<td style="'+td+'background:'+z+';text-align:center;white-space:nowrap"><span style="'+PCA+'display:inline-block;background:#e3f1eb;color:'+INK+';border-radius:8px;padding:1px 8px;font-weight:800">'+refHtml(r.r)+'</span></td>'+
+      RATE.map(function(c,ci){var on=live&&mk===ci;return '<td style="'+td+'background:'+(on?c.bg:z)+';text-align:center;font-size:'+fs(16,1.35)+';color:'+c.fg+';font-weight:900"'+(live?' class="cd-c'+(on?' on':'')+'" data-r="'+ri+'" data-c="'+ci+'" role="button" tabindex="0" aria-label="'+esc(c.t)+'"':'')+'>'+(on?'✓':'')+'</td>';}).join('')+'</tr>';
   });
-  h+='</tbody></table></div></div></div>';
+  h+='</tbody></table>'+
+    '<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:'+fs(10.5,.82)+';color:#3d554e"><tr>'+
+    '<td style="border:0;padding:0;white-space:nowrap"><b style="color:'+INK+'">ملاحظات المعلم:</b> <span style="color:#7a8f88;letter-spacing:1px">'+new Array(46).join('.')+'</span></td>'+
+    '<td style="border:0;padding:0;text-align:left;width:32%;white-space:nowrap"><b style="color:'+INK+'">توقيع ولي الأمر:</b> <span style="color:#7a8f88;letter-spacing:1px">'+new Array(18).join('.')+'</span></td></tr></table>'+
+    '<div style="'+PCA+'margin-top:10px;border-top:2px solid '+GOLD+';padding-top:4px;text-align:center;font-size:'+fs(9,.72)+';color:#5b6d67">مبادرة «أستطيع أن» · مدرسة حذيفة بن محصن · إعداد أ. محمد مجدي</div></div>';
   return h;
 }
 function show(){
@@ -111,19 +156,28 @@ function serverFile(format,html,win,name){
     var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
   },function(e){if(win)try{win.close();}catch(x){}toast(e.message);});
 }
+// طباعة محلية بلا ترويسة الموقع العامة (الورقة فيها شعاراتها)، بهوامش تتكرر في كل صفحة
+function printLocal(html,name){
+  var a=$('printArea'),t=document.title;document.title=String(name||t).slice(0,100);
+  a.innerHTML='<table class="prw"><thead><tr><td><div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+html+'</td></tr></tbody></table>';
+  document.body.classList.add('printing');
+  setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove('printing');a.innerHTML='';document.title=t;},800);},120);
+}
 function printUnits(k,ids){
   track('cando_print',CD[k].subject+'|'+CD[k].grade+'|'+ids.length,fname(k,ids));
-  if(!IN_APP_&&!MOBILE){$('printArea').innerHTML=pagesHtml(k,ids,'ppage');doPrint(fname(k,ids));return;}
+  if(!IN_APP_&&!MOBILE){printLocal(pagesHtml(k,ids,'ppage'),fname(k,ids));return;}
   var w=null;if(!IN_APP_){try{w=window.open('','_blank');}catch(e){w=null;}}
   serverFile('print',pagesHtml(k,ids,'pg'),w,fname(k,ids)).then(function(){if(IN_APP_)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');});
 }
 function wordUnits(k,ids){
-  track('cando_word',CD[k].subject+'|'+CD[k].grade,fname(k,ids));
+  track('cando_word',CD[k].subject+'|'+CD[k].grade,fname(k,ids));toast('جارٍ التجهيز…');
+  wordAssets().then(function(A){
   var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(fname(k,ids))+'</title>'+
     '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
-    '<style>@page WordSection1{size:595.3pt 841.9pt;margin:30pt 30pt 30pt 30pt}div.WordSection1{page:WordSection1}body{font-family:"Simplified Arabic","Traditional Arabic",Arial;font-size:12.5pt}</style></head>'+
-    '<body dir="rtl"><div class="WordSection1">'+ids.map(function(i){return sheetHtml(k,i);}).join('<br clear="all" style="page-break-before:always">')+'</div></body></html>';
+    '<style>@page WordSection1{size:595.3pt 841.9pt;margin:24pt 26pt 24pt 26pt}div.WordSection1{page:WordSection1}body{font-family:"Simplified Arabic","Traditional Arabic",Arial;font-size:12.5pt}</style></head>'+
+    '<body dir="rtl"><div class="WordSection1">'+ids.map(function(i){return sheetHtml(k,i,{assets:A});}).join('<br clear="all" style="page-break-before:always">')+'</div></body></html>';
   serverFile('doc',html,null,fname(k,ids)).then(function(){toast(IN_APP_?'يُحمَّل ملف Word عبر المتصفح، ستجده في «التنزيلات»':'تم تحميل ملف Word');});
+  });
 }
 function copySheet(){
   var C=CD[cur.k],u=C.units[cur.i],html=sheetHtml(cur.k,cur.i);
