@@ -418,7 +418,7 @@ async function coursesList(env) {
 // المتصفح يستخرج النصّ من Word/PDF ثم يُرسله هنا. لذا لا نعرف توزيع الأهداف (AO)
 // لأنه غير مطبوع في الورقة — نفحص ما هو مرئي: الترقيم · العدد · الدرجات ·
 // صياغة بداية السؤال · سلامة الخيارات.
-const QSTART = /^(ما|ماذا|كيف|لماذا|لمَ|أي|أيّ|متى|أين|كم|هل|من|مَن|اذكر|اذكري|عدّد|عدد|عدّ|عرّف|عرف|اشرح|فسّر|فسر|وضّح|بيّن|صِف|صف|قارن|احسب|علّل|علل|صنّف|صنف|رتّب|رتب|توقّع|توقع|سمِّ|سمّ|سم|حدّد|حدد|أعط|اعط|اكتب|أكمل|اكمل|استنتج|استخرج|استدل|ميّز|ميز|قدّر|قدر|ناقش|برهن|أثبت|اثبت|أوجد|اوجد|ارسم|ضع|ظلّل|ظلل|اختر|أجب|اجب|ادرس|تأمّل|تأمل|لاحظ|انظر|استعن|استخدم|املأ|صل|طابق|حلّل|حلل|اقترح|صحّح|صحح|سجّل|سجل|قيّم|قيم|بين|ارسمي|اقرأ|تتبّع|تتبع)(?=\s|$|[\?؟:،\.])/;
+const QSTART = /^(ما|ماذا|كيف|لماذا|لمَ|أي|أيّ|متى|أين|كم|هل|من|مَن|اذكر|اذكري|عدّد|عدد|عدّ|عرّف|عرف|اشرح|فسّر|فسر|وضّح|بيّن|صِف|صف|قارن|احسب|علّل|علل|صنّف|صنف|رتّب|رتب|توقّع|توقع|سمِّ|سمّ|سم|حدّد|حدد|أعط|اعط|اكتب|أكمل|اكمل|استنتج|استخرج|استدل|ميّز|ميز|قدّر|قدر|ناقش|برهن|أثبت|اثبت|أوجد|اوجد|ارسم|ضع|ظلّل|ظلل|اختر|أجب|اجب|ادرس|تأمّل|تأمل|لاحظ|انظر|استعن|استخدم|املأ|صل|طابق|حلّل|حلل|اقترح|صحّح|صحح|سجّل|سجل|قيّم|قيم|بين|ارسمي|اقرأ|تتبّع|تتبع|تنبأ|تنبّأ|توقع|تنبا)(?=\s|$|[\?؟:،\.])/;
 const SHORT_SPECS = (function () {
   // مواصفات الاختبار القصير لمواد العلوم — مستخرجة من وثيقتي تقويم تعلم الطلبة
   // (5-10) و(11-12) للعام 2026-2027 (site.moe.gov.om).
@@ -500,24 +500,50 @@ function checkQuizText(text, grade, subject, withAnswer) {
       checks: [], items: [],
     };
   }
+  // **تشوّه خطوط Word عند التصدير إلى PDF**: حروف متصلة تُخزَّن مقلوبة («عىل» = على،
+  // «يف» = في، «منوذج» = نموذج، «املحلول» = المحلول، «استدالل» = استدلال، «فرس» = فسّر).
+  // نصلح الأشيع منها لأن عليها تقوم قراءة نموذج الإجابة وأهداف التقويم وصياغة الأسئلة.
+  norm = norm
+    .replace(/(^|[^\u0621-\u064A])عىل(?=[^\u0621-\u064A]|$)/g, '$1على')
+    .replace(/(^|[^\u0621-\u064A])([إا])ىل(?=[^\u0621-\u064A]|$)/g, '$1إلى')
+    .replace(/(^|[^\u0621-\u064A])يف(?=[^\u0621-\u064A]|$)/g, '$1في')
+    .replace(/(^|[^\u0621-\u064A])فرس(?=[^\u0621-\u064A]|$)/g, '$1فسر')
+    .replace(/منوذج/g, 'نموذج')
+    .replace(/استد(?:الل|اللل)/g, 'استدلال')
+    .replace(/(^|[^\u0621-\u064A])([وفبك]?)امل(?!أ)(?=[\u0621-\u064A]{2})/g, '$1$2الم');
   const all = norm.split('\n').map(l => l.trim()).filter(l => l);
   const g = FG[grade] || 11;
   const spec = SHORT_SPECS[g] || SHORT_SPECS[11];
   // نموذج الإجابة قد يعيد الترقيم من 1 — نعزله قبل التحليل، ونقرأ منه هدف كل سؤال.
-  const ANS_MARK = /(نموذج\s*ال[إا]جابة|ال[إا]جابة\s*النموذجية|مفتاح\s*ال[إا]جابة|answer\s*key|marking\s*scheme)/i;
+  const ANS_MARK = /(نموذج\s*(?:ال)?[إا]جابة|نموذج\s*الحل|ال[إا]جابة\s*النموذجية|مفتاح\s*ال[إا]جابة|answer\s*key|marking\s*scheme)/i;
   let ansAt = -1;
   if (withAnswer !== false) {
     for (let i = 0; i < all.length; i++) { if (ANS_MARK.test(all[i])) { ansAt = i; break; } }
   }
   const lines = ansAt < 0 ? all : all.slice(0, ansAt);
   const ansLines = ansAt < 0 ? [] : all.slice(ansAt + 1);
-  const goalMap = {};
+  const goalMap = {}, goalList = {}, keyMarks = {};
+  // هدف التقويم كلمة مستقلة في عمود «هدف التقويم» («والتطبيق بدرجة» في الملاحظات ليست هدفًا)
+  const GW = /(?:^|\s)(معرفة|تطبيق|استدلال|تذكر|فهم|AO\s*[123])(?=\s|$|[\.،])/gi;
   if (ansLines.length) {
     let cur = null;
     ansLines.forEach(l => {
-      const m = /^(\d{1,2})\s*[\)\.\-]/.exec(l);
-      if (m) cur = +m[1];
+      // في جدول نموذج الإجابة يبدأ السطر برقم المفردة (1 أو «2 (أ)»)؛ ونقبل الرقم فقط إن
+      // كان استمرارًا للمفردة الحالية أو التي تليها، حتى لا تُحسب الدرجة «2» رقمَ مفردة.
+      const m = /^(\d{1,2})(?=\s|[\)\.\-]|$)/.exec(l);
+      if (m && (cur == null ? +m[1] === 1 : (+m[1] === cur || +m[1] === cur + 1))) cur = +m[1];
       if (!cur) return;
+      let gm; GW.lastIndex = 0;
+      while ((gm = GW.exec(l))) {
+        let gg = gm[1].replace(/\s/g, '');
+        gg = /^AO/i.test(gg) ? gg.toUpperCase() : (gg === 'تذكر' || gg === 'فهم') ? 'معرفة' : gg;
+        (goalList[cur] = goalList[cur] || []).push(gg);
+      }
+      if (keyMarks[cur] == null) {
+        const rest = l.replace(/^\d{1,2}\s*/, '').replace(/\d{1,2}\s*-\s*\d{1,2}/g, ' ');
+        const km = /(?:^|\s)([1-6])(?=\s|$)/.exec(rest);
+        if (km) keyMarks[cur] = +km[1];
+      }
       const a = /AO\s*([123])/i.exec(l);
       if (a) goalMap[cur] = 'AO' + a[1];
       else if (!goalMap[cur]) {
@@ -560,9 +586,19 @@ function checkQuizText(text, grade, subject, withAnswer) {
     // عبارات التعليم على الاختيار («ظلل الشكل ()») علامة قاطعة على سؤال اختيار
     // حتى لو جاءت خياراته كلماتٍ عادية لا حروفًا.
     const tickHint = /ظل+ل\s*الشكل|ظل+ل\s*\(|ضع\s*دائرة|اختر\s*الإجابة|ضع\s*علامة/i.test(bodyNoNum);
-    const isMcq = optMarks >= 3 || bubbled >= 3 || numOpts >= 4 || latinOpts >= 4 || tickHint;
+    // سؤال فيه أسطر إجابة (____) أو «فسّر إجابتك» سؤال كتابي وإن طُلب فيه تظليل اختيار
+    const writes = /_{5,}/.test(bodyNoNum) || /فس+ر\s*[إا]جابتك|علل\s*[إا]جابتك/.test(bodyNoNum);
+    const isMcq = !writes && (optMarks >= 3 || bubbled >= 3 || numOpts >= 4 || latinOpts >= 4 || tickHint);
+    // الفروع (أ. ب. ج.) تُحسب مفردات في جدول المواصفات
+    const parts = isMcq ? 0 : (bodyNoNum.match(/(?:^|\n)\s*[أبجده]\s*[\.\)]\s*\S/g) || []).length;
+    const partMarks = allM.map(x => +(/\d{1,2}/.exec(x) || [0])[0]);
+    if (marks == null && keyMarks[s.n] != null) marks = keyMarks[s.n];
     const firstPart = bodyNoNum.split(/\n/).filter(x => !/^\s*[أبجد]\s*[\)\]]/.test(x)).join(' ').slice(0, 120);
-    let goal = goalMap[s.n] || null;
+    const gl = goalList[s.n] || [];
+    // توزيع درجات المفردة على أهدافها: إن تعددت الأهداف بعدد فروع الدرجات نوزّعها بالترتيب
+    let goalMarks = null;
+    if (gl.length > 1 && partMarks.length === gl.length) { goalMarks = {}; gl.forEach((k, j) => { goalMarks[k] = (goalMarks[k] || 0) + partMarks[j]; }); }
+    let goal = gl[0] || goalMap[s.n] || null;
     if (!goal) {
       const aoM = /AO\s*([123])/i.exec(bodyNoNum);
       if (aoM) goal = 'AO' + aoM[1];
@@ -572,7 +608,10 @@ function checkQuizText(text, grade, subject, withAnswer) {
     }
     // عدد الخيارات: -1 تعني «اختيار مؤكَّد لكن الخيارات نصّية لا تُعدّ» فلا نحكم عليها
     const optCount = Math.max(optMarks, bubbled, numOpts, latinOpts);
-    return { n: s.n, marks, isMcq, opts: optCount ? optCount : (tickHint ? -1 : 0), goal, start: firstPart.trim(), raw: bodyNoNum };
+    // بداية السؤال: إن بدأت المفردة بسياق («يوضح الشكل…») نقبلها إذا جاء بعده سؤال صحيح
+    const segs = bodyNoNum.replace(/_{3,}/g, ' ').split(/\n|[\.؟:]\s+|\s-\s/).map(x => x.replace(/^[\s\-–•]*([أبجده]\s*[\.\)])?\s*/, '').trim()).filter(Boolean);
+    const qOk = segs.some(x => QSTART.test(x));
+    return { n: s.n, marks, isMcq, parts, goalMarks, qOk, partMax: partMarks.length > 1 ? Math.max.apply(null, partMarks) : null, opts: optCount ? optCount : (tickHint ? -1 : 0), goal, start: firstPart.trim(), raw: bodyNoNum };
   });
   const checks = [];
   const add = (id, title, status, detail) => checks.push({ id, title, status, detail });
@@ -585,8 +624,9 @@ function checkQuizText(text, grade, subject, withAnswer) {
   add('num-dup', 'لا تكرار في الأرقام', dup.length ? 'fail' : 'pass', dup.length ? 'مكرّر: ' + [...new Set(dup)].join('، ') : 'لا تكرار');
   // ② عدد المفردات
   const cnt = items.length, lo = spec.items[0], hi = spec.items[1];
+  const cntP = items.reduce((a, x) => a + Math.max(1, x.parts || 0), 0);
   const cntLabel = hi >= 99 ? 'لا تقل عن ' + lo : lo + '–' + hi;
-  add('count', 'عدد المفردات ' + cntLabel, (cnt >= lo && cnt <= hi) ? 'pass' : 'fail', cnt + ' مفردة');
+  add('count', 'عدد المفردات ' + cntLabel, (cntP >= lo && cntP <= hi) ? 'pass' : 'fail', cntP === cnt ? cnt + ' مفردة' : cntP + ' مفردة (' + cnt + ' أسئلة بفروعها)');
   // ③ الدرجة الكلية
   const withMarks = items.filter(x => x.marks != null);
   const total = withMarks.reduce((a, x) => a + x.marks, 0);
@@ -600,7 +640,7 @@ function checkQuizText(text, grade, subject, withAnswer) {
   // قاعدة الصياغة تُطبَّق على المفردات **الكتابية** فقط؛ سؤال الاختيار نصّه غالبًا
   // عبارة يكملها الخيار («جميع ما يلي… ما عدا») فهو سليم وإن لم يبدأ باستفهام.
   const textItems = items.filter(x => !x.isMcq);
-  const badStart = textItems.filter(x => x.start && !QSTART.test(x.start));
+  const badStart = textItems.filter(x => x.start && !QSTART.test(x.start) && !x.qOk);
   add('qstart', 'المفردات الكتابية تبدأ بأداة استفهام أو فعل أمر', badStart.length ? 'warn' : 'pass',
     badStart.length ? 'تحتاج مراجعة: ' + badStart.map(x => 'م' + x.n).join('، ') : (textItems.length ? 'كل المفردات سليمة' : 'لا مفردات كتابية'));
   // ⑤ الخيارات
@@ -610,7 +650,7 @@ function checkQuizText(text, grade, subject, withAnswer) {
   add('opts', 'كل اختيار من متعدد له 4 خيارات', badOpt.length ? 'fail' : 'pass',
     mcqs.length
       ? (badOpt.length ? 'عدد خاطئ في: ' + badOpt.map(x => 'م' + x.n + '(' + x.opts + ')').join('، ')
-        : (unknownOpt.length ? 'صحيح في ' + (mcqs.length - unknownOpt.length) + ' · خيارات نصّية لا تُعدّ في ' + unknownOpt.map(x => 'م' + x.n).join('، ') : mcqs.length + ' سؤالًا بخيارات سليمة'))
+        : (unknownOpt.length ? ((mcqs.length - unknownOpt.length) ? 'صحيح في ' + (mcqs.length - unknownOpt.length) + ' · ' : '') + 'خيارات مرسومة أو نصّية لا تُعدّ آليًّا في ' + unknownOpt.map(x => 'م' + x.n).join('، ') : mcqs.length + ' سؤالًا بخيارات سليمة'))
       : 'لا أسئلة اختيار');
   // ⑥ خيارات مكرّرة
   const dupOpt = [];
@@ -631,7 +671,8 @@ function checkQuizText(text, grade, subject, withAnswer) {
   if (withGoal.length === items.length && items.length) {
     const goals = Object.keys(spec.targets);
     const got = {}, want = spec.targets;
-    goals.forEach(k => got[k] = items.filter(x => x.goal === k).reduce((a, x) => a + (x.marks || 0), 0));
+    goals.forEach(k => got[k] = 0);
+    items.forEach(x => { if (x.goalMarks) Object.keys(x.goalMarks).forEach(k => { got[k] = (got[k] || 0) + x.goalMarks[k]; }); else got[x.goal] = (got[x.goal] || 0) + (x.marks || 0); });
     const okD = goals.every(k => got[k] === want[k]);
     const wantTxt = goals.map(k => k + '=' + want[k]).join(' · ');
     add('ao', 'توزيع الأهداف: ' + wantTxt, okD ? 'pass' : 'fail', goals.map(k => k + '=' + got[k]).join(' · '));
@@ -644,7 +685,7 @@ function checkQuizText(text, grade, subject, withAnswer) {
   add('mcq2', 'مفردات اختيار من متعدد: ' + spec.mcqCount, nMcq === spec.mcqCount ? 'pass' : 'fail', nMcq + ' مفردة');
   if (spec.long.count) {
     const loM = Math.min.apply(null, spec.long.marks);
-    const nLong = items.filter(x => !x.isMcq && x.marks >= loM).length;
+    const nLong = items.filter(x => !x.isMcq && (x.partMax != null ? x.partMax : x.marks) >= loM).length;
     add('long1', 'مفردة إجابة طويلة واحدة (' + spec.long.marks.join('–') + ')', nLong === 1 ? 'pass' : 'warn', nLong + ' مفردة');
   }
   const fails = checks.filter(c => c.status === 'fail').length, warns = checks.filter(c => c.status === 'warn').length;
