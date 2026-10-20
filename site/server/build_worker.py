@@ -120,6 +120,18 @@ def _ar_content():
                     items.append({'lesson_id': lid, 'type': 'short', 'stem': q.strip(), 'choices': [], 'correct': 0, 'answer': a.strip(),
                                   'marks': mk, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': '', 'qid': 'ar%d_%d' % (lid, n[0])})
             else: raise SystemExit('ar_content/%s #%d: مفتاح غير معروف: %s' % (fn, lid, ln))
+    # موازنة الدرجات: بعد مفردتي الاختيار من متعدد يبقى 13 درجة (عدد فردي) للإجابات القصيرة،
+    # فلا تكتمل الورقة (15) إلا بوجود مفردات بدرجة واحدة. نجعل في الدروس الفردية أول قصيرة
+    # «معرفة» بدرجة، وفي الزوجية آخر قصيرة «تطبيق» بدرجة — فتتوافر مفردات الدرجة الواحدة في كل هدف.
+    by = {}
+    for q in items:
+        if q['type'] == 'short': by.setdefault(q['lesson_id'], []).append(q)
+    for lid, qs in by.items():
+        if lid % 2:
+            k = [q for q in qs if q['ao'] == 'معرفة' and q['marks'] == 2][:1]
+        else:
+            k = [q for q in qs if q['ao'] == 'تطبيق' and q['marks'] == 2][-1:]
+        for q in k: q['marks'] = 1
     return study, items
 _AR_STUDY, _AR_Q = _ar_content()
 # مجالات التعثر في الخطة العلاجية حسب نوع الدرس (تطابق قائمة WEAK_LANG في client_study.js)
