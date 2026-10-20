@@ -922,6 +922,9 @@ button.lv-opt{cursor:pointer}
 .g-stage:fullscreen .tug-p{min-height:calc(100vh - 160px)}.g-stage:fullscreen .tug-q{font-size:1.35rem}.g-stage:fullscreen .tug-b{font-size:1.2rem;min-height:84px}
 @media (max-width:900px){.tug{grid-template-columns:1fr 1fr}.tug-mid{grid-column:1/-1;order:-1}.tug-p{min-height:0}.tug-ch{grid-template-columns:1fr}}
 @media (max-width:520px){.tug-names{grid-template-columns:1fr}.tug-b{min-height:52px;font-size:.92rem}.tug-q{font-size:1rem}}
+.apk-help{text-align:right;line-height:1.8}
+.apk-help ol{margin:8px 0;padding-inline-start:22px}
+.apk-help li{margin:4px 0}
 /* ---------- لوحة التحكم الشاملة ---------- */
 .top a.stat-link{text-decoration:none;cursor:pointer;transition:filter .15s,transform .15s}
 .top a.stat-link:hover{filter:brightness(.95);transform:translateY(-1px)}

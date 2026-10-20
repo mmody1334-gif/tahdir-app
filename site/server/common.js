@@ -371,8 +371,11 @@ function doPrint(name){var a=$('printArea'),t=document.title;document.title=Stri
 function PR_LOGOS(){return '<div class="plogo-row"><img class="plogo-moe" src="/brand/moe.png" alt="وزارة التعليم"><img class="plogo-vis" src="/brand/vision.png" alt="رؤية عُمان 2040"></div>';}
 function PR_WRAP(h){return '<table class="prw"><thead><tr><td>'+PR_LOGOS()+'<div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+h+'</td></tr></tbody></table>';}
 // الأسس والأيونات: X^2 أو 10^-3 أو Mg^2+ أو ^{...} تُعرض أسًا مرفوعًا
-var SUP_RE=/\^\{([^}]{1,14})\}|\^([+\-−]?(?:[0-9]{1,3}|[A-Za-z])[+\-−]?)/g;
-function supify(s){return String(s).replace(SUP_RE,function(m,a,b){return '<sup>'+(a||b)+'</sup>';});}
+// كانت الشحنة المنفردة (Cl^- و H3O^+ و HCO3^-) لا تطابق النمط لأنه اشترط رقمًا أو حرفًا
+// بعد الإشارة، فبقيت «^» ظاهرة في الصفحة وفي ملف Word. والآن تُقبل الإشارة وحدها أيضًا.
+// وبعد الأس نضع علامة اتجاه (LRM) حتى لا تقفز الإشارة «−» إلى أول السطر العربي.
+var SUP_RE=/\^\{([^}]{1,14})\}|\^((?:[0-9]{1,3}|[A-Za-z])[+\-−]?|[+\-−](?:[0-9]{1,3}|[A-Za-z])?)/g;
+function supify(s){return String(s).replace(SUP_RE,function(m,a,b,off,str){var x=a||b,pre=str.charAt(off-1);return '<sup>'+x+'</sup>'+(/[A-Za-z0-9\)\]]/.test(pre)?'\u200e':'');});}
 function supifyIn(root){
   if(!root||!root.ownerDocument&&root!==document)return;
   var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:function(n){var p=n.parentNode;if(!p||/^(SCRIPT|STYLE|TEXTAREA|OPTION|TITLE)$/.test(p.nodeName)||p.isContentEditable&&p.closest&&p.closest('[contenteditable="true"]'))return NodeFilter.FILTER_REJECT;return n.nodeValue.indexOf('^')>=0?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;}}),list=[],n;
@@ -551,3 +554,21 @@ else setTimeout(tourMaybe,0);
     dialog({title:'مرحبًا بكم في «الكبسولة» 💊',html:h,okText:'⬇ تحميل التطبيق الجديد (أندرويد)',cancelText:'حسنًا'}).then(function(r){if(r)location.href=APK_URL;});
   },900);
 })();
+
+// ---------- تحميل تطبيق الأندرويد: تنبيه «Play للحماية» قبل التحميل ----------
+// التطبيق يُثبَّت من خارج متجر Play، فيعرض أندرويد للمرة الأولى رسالة «تم حظر التطبيق
+// لحماية جهازك» من مطوّر لم يُعرف بعد. لا يستطيع الموقع منعها، لكنها لا تمنع التثبيت:
+// نشرح للمعلّم قبل التحميل أين يضغط، حتى لا يظن أن التطبيق ضار فيلغي التثبيت.
+document.addEventListener('click',function(e){
+  var a=e.target&&e.target.closest&&e.target.closest('a[href$="/download/tahdir.apk"]');
+  if(!a||e.ctrlKey||e.metaKey||!$('modal'))return;
+  e.preventDefault();
+  dialog({title:'📱 تثبيت تطبيق «الكبسولة»',okText:'⬇ تحميل التطبيق',cancelText:'إلغاء',
+    html:'<div class="m-msg apk-help"><p>التطبيق آمن ومجاني، ويُثبَّت من موقع الكبسولة مباشرة لا من متجر Play؛ لذلك قد يعرض أندرويد عند التثبيت رسالة <b>«تم حظر التطبيق لحماية جهازك»</b>.</p>'
+      +'<ol><li>افتح الملف <b>tahdir.apk</b> بعد اكتمال التحميل.</li>'
+      +'<li>إن ظهرت رسالة «خدمة Google Play للحماية» فاضغط <b>«التثبيت على أي حال»</b> (أو «مزيد من التفاصيل» ثم «التثبيت على أي حال»).</li>'
+      +'<li>إن طُلب الإذن بالتثبيت من المتصفح ففعّل <b>«السماح من هذا المصدر»</b> ثم ارجع واضغط «تثبيت».</li>'
+      +'<li>إن سُئلت عن إرسال التطبيق للفحص فاختر <b>«إرسال»</b> أو «فحص التطبيق»؛ هذا يساعد Google على التعرّف عليه فتختفي الرسالة مع الوقت.</li></ol>'
+      +'<p class="muted small">لا يطلب التطبيق أي صلاحيات غير الإنترنت.</p></div>'
+  }).then(function(ok){if(ok)location.href=a.getAttribute('href');});
+},true);
