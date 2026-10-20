@@ -48,7 +48,7 @@
     }
     if (eocd < 0) throw new Error('الملف ليس Word صالحًا (.docx)');
     var total = dv.getUint16(eocd + 10, true), ptr = dv.getUint32(eocd + 16, true);
-    var out = null;
+    var out = null, numXml = '';
     for (var k = 0; k < total; k++) {
       if (ptr + 46 > u8.length || dv.getUint32(ptr, true) !== 0x02014b50) break;
       var method = dv.getUint16(ptr + 10, true);
@@ -57,7 +57,7 @@
       var lho = dv.getUint32(ptr + 42, true);
       var name = new TextDecoder().decode(u8.subarray(ptr + 46, ptr + 46 + nameLen));
       ptr += 46 + nameLen + extraLen + comLen;
-      if (name !== 'word/document.xml') continue;
+      if (name !== 'word/document.xml' && name !== 'word/numbering.xml') continue;
       var lnameLen = dv.getUint16(lho + 26, true), lextraLen = dv.getUint16(lho + 28, true);
       var dstart = lho + 30 + lnameLen + lextraLen;
       if (!csize) { // حجم غير مسجّل: نأخذ حتى الترويسة التالية أو نهاية الملف
@@ -68,14 +68,64 @@
         csize = nxt - dstart;
       }
       var data = u8.subarray(dstart, dstart + csize);
-      out = new TextDecoder().decode(method === 0 ? data : await inflateRaw(data));
-      break;
+      var xml = new TextDecoder().decode(method === 0 ? data : await inflateRaw(data));
+      if (name === 'word/numbering.xml') numXml = xml; else out = xml;
     }
     if (!out) throw new Error('لم أجد محتوى الورقة داخل ملف Word');
-    return out;
+    // نُلحق تعريفات الترقيم بالمستند ليقرأها xmlToText (الترقيم التلقائي لا يُكتب في النصّ)
+    return numXml ? out + '\u0000NUMBERING\u0000' + numXml : out;
+  }
+  // **الترقيم التلقائي في Word**: أرقام الأسئلة (1. 2. …) وحروف الفروع (أ. ب. …) تُولَّد
+  // من numbering.xml ولا تُكتب في نصّ الفقرة، فكانت الورقة تُقرأ بلا أرقام فلا تُرى
+  // المفردات. نعيد بناءها: لكل فقرة numId/ilvl نزيد عدّادها ونكتب الرقم بصيغته.
+  function numberingMap(numXml) {
+    var abs = {}, nums = {};
+    (numXml.match(/<w:abstractNum\b[\s\S]*?<\/w:abstractNum>/g) || []).forEach(function (a) {
+      var id = (/w:abstractNumId="(\d+)"/.exec(a) || [])[1]; if (id == null) return;
+      var lv = {};
+      (a.match(/<w:lvl\b[\s\S]*?<\/w:lvl>/g) || []).forEach(function (l) {
+        var il = +((/w:ilvl="(\d+)"/.exec(l) || [])[1] || 0);
+        lv[il] = { fmt: (/<w:numFmt w:val="([^"]+)"/.exec(l) || [])[1] || 'decimal', start: +((/<w:start w:val="(\d+)"/.exec(l) || [])[1] || 1),
+          text: (/<w:lvlText w:val="([^"]*)"/.exec(l) || [])[1] || '%1.' };
+      });
+      abs[id] = lv;
+    });
+    (numXml.match(/<w:num\b[\s\S]*?<\/w:num>/g) || []).forEach(function (n) {
+      var id = (/w:numId="(\d+)"/.exec(n) || [])[1], a = (/<w:abstractNumId w:val="(\d+)"/.exec(n) || [])[1];
+      if (id != null && a != null) nums[id] = abs[a] || {};
+    });
+    return nums;
+  }
+  var AR_LET = 'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'.split('');
+  function fmtNum(fmt, n) {
+    if (fmt === 'bullet' || fmt === 'none') return '';
+    if (/arabicAlpha|arabicAbjad|hebrew/.test(fmt)) return AR_LET[(n - 1) % AR_LET.length];
+    if (fmt === 'lowerLetter') return String.fromCharCode(96 + ((n - 1) % 26) + 1);
+    if (fmt === 'upperLetter') return String.fromCharCode(64 + ((n - 1) % 26) + 1);
+    if (/Roman/i.test(fmt)) { var r = ['', 'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']; return r[n] || String(n); }
+    return String(n);
   }
   function xmlToText(xml) {
-    var s = String(xml)
+    var parts = String(xml).split('\u0000NUMBERING\u0000');
+    var doc = parts[0], nmap = parts[1] ? numberingMap(parts[1]) : {};
+    // مربعات النص تُخزَّن مرتين (Choice للعرض الحديث وFallback للقديم) فتتكرّر
+    // نصوصها ودرجاتها [1] فتتضاعف الدرجة الكلية — نحذف نسخة Fallback.
+    doc = doc.replace(/<mc:Fallback>[\s\S]*?<\/mc:Fallback>/g, '');
+    var ctr = {};
+    doc = doc.replace(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, function (all, inner) {
+      var pPr = (/<w:pPr>[\s\S]*?<\/w:pPr>/.exec(inner) || [''])[0];
+      var nid = (/<w:numId w:val="(\d+)"/.exec(pPr) || [])[1], il = +((/<w:ilvl w:val="(\d+)"/.exec(pPr) || [])[1] || 0);
+      if (nid == null || nid === '0' || !nmap[nid]) return all;
+      var lv = nmap[nid][il] || { fmt: 'decimal', start: 1, text: '%1.' };
+      var c = ctr[nid] || (ctr[nid] = {});
+      c[il] = (c[il] == null ? lv.start : c[il] + 1);
+      Object.keys(c).forEach(function (k) { if (+k > il) delete c[k]; });
+      var lab = fmtNum(lv.fmt, c[il]); if (!lab) return all;
+      var tx = lv.text.replace(/%(\d)/g, function (_, d) { var l2 = +d - 1; return l2 === il ? lab : fmtNum((nmap[nid][l2] || {}).fmt || 'decimal', c[l2] || 1); });
+      if (!/[\.\)\-]$/.test(tx)) tx += '.';
+      return all.replace(/(<\/w:pPr>)/, '$1<w:t>' + tx + ' </w:t>');
+    });
+    var s = doc
       .replace(/<w:tab[^>]*\/>/g, ' ')
       .replace(/<w:br[^>]*\/>/g, '\n')
       .replace(/<\/w:p>/g, '\n')
@@ -127,12 +177,18 @@
       });
       if (cur.length) groups.push(cur);
       var lines = groups.map(function (line) {
-        line.sort(function (a, b) { return a.x - b.x; });
+        // **اتجاه السطر**: السطر العربي يُقرأ من اليمين إلى اليسار، فنرتّب قطعه تنازليًّا
+        // حسب الموضع الأفقي. كان الترتيب تصاعديًّا دائمًا فتخرج الجملة مقلوبة الكلمات
+        // («عشر الحادي للصف…») ويُلصق رقم السؤال بآخرها فتضيع بعض المفردات.
+        var ar = 0, la = 0;
+        line.forEach(function (it) { ar += (it.s.match(/[\u0600-\u06FF\uFB50-\uFEFF]/g) || []).length; la += (it.s.match(/[A-Za-z]/g) || []).length; });
+        var rtl = ar > la;
+        line.sort(function (a, b) { return rtl ? (b.x + b.w) - (a.x + a.w) : a.x - b.x; });
         var out = '';
         for (var k = 0; k < line.length; k++) {
           if (k > 0) {
             var prev = line[k - 1];
-            var gap = line[k].x - (prev.x + prev.w);
+            var gap = rtl ? prev.x - (line[k].x + line[k].w) : line[k].x - (prev.x + prev.w);
             var spaceAt = Math.max(0.8, (line[k].h || 8) * 0.16);
             var endsSpace = /\s$/.test(prev.s), startsSpace = /^\s/.test(line[k].s);
             if (!endsSpace && !startsSpace && gap > spaceAt) out += ' ';
@@ -216,9 +272,7 @@
       }
       // PDF: غالبًا يخرج النصّ معكوسًا فيصعب الحكم على الصياغة — نوسمه
       // لو عُكس النصّ تلقائيًّا (PDF بصري) صار قابلًا للحكم على الصياغة أيضًا.
-      if (source === 'pdf' && !(rep.summary && rep.summary.unreversed)) {
-        rep.checks.forEach(function (c) { if (c.id === 'qstart') { c.status = 'skip'; c.detail = 'لم يُفحص: نصّ PDF قد يخرج معكوسًا — ارفع Word أو الصق النصّ'; } });
-      }
+
       // ورقة خارجية بصيغة PDF: نُنبه أن بعض القواعد قد لا تُقرأ لالتصاق الكلمات
       if (source === 'pdf') rep.pdfNote = 'قراءة PDF تقريبية: قد تلتصق بعض الكلمات وتُفقد الدرجات أو الخيارات. للدقة الكاملة ارفع نسخة Word أو الصق النصّ.';
       render(rep);
