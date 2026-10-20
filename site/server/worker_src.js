@@ -170,6 +170,8 @@ async function ensureSchema(db) {
   try { await db.prepare('ALTER TABLE users ADD COLUMN scope TEXT').run(); } catch (e) { /* already there */ }
   // «الشاملة»: معلمون نُقلوا إلى لوحة التحكم المخفية (/elkabsula) فلا يظهرون في اللوحة الأساسية
   try { await db.prepare('ALTER TABLE users ADD COLUMN vault INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
+  // فتح «الشاملة» بكلمة مرورها يُحفظ على الجلسة نفسها (يعمل حتى مع حجب الكوكيز)
+  try { await db.prepare('ALTER TABLE sessions ADD COLUMN vault_ok INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
   schemaReady = true;
 }
 
@@ -283,7 +285,7 @@ async function currentUser(req, env) {
   const sid = c.sid || String(req.headers.get('X-Tahdir-Sid') || '').trim();
   if (!sid) return null;
   const row = await env.DB.prepare(
-    `SELECT s.token, s.device_id, s.expires_at, s.last_seen, u.id, u.name, u.username, u.role, u.active, u.scope
+    `SELECT s.token, s.device_id, s.expires_at, s.last_seen, s.vault_ok, u.id, u.name, u.username, u.role, u.active, u.scope
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).bind(sid).first();
   if (!row || row.expires_at < now() || !row.active) return null;
   // device must still be registered (admin may have removed it)
@@ -645,6 +647,7 @@ function checkQuizText(text, grade, subject, withAnswer) {
 }
 
 // اللوحة الأساسية تعرض المدير والمعلمين غير المنقولين، و«الشاملة» تعرض المنقولين فقط
+const VAULT_PW_SHA = 'b7d6b125623bd91adbe6793c8df91eb88f90182b85717c5cbf8ba6ec6b39d2fe';
 const inVault = (u, vault) => vault ? (+u.vault === 1 && u.role !== 'admin') : !(+u.vault === 1 && u.role !== 'admin');
 async function adminStats(env, vault) {
   const DB = env.DB;
@@ -1038,7 +1041,17 @@ export default {
       if (p === '/admin') return html('admin');
       // لوحة التحكم «الشاملة» المخفية: نفس الصفحة، والواجهة تطلب بياناتها بـ vault=1
       if (p === '/elkabsula' || p === '/elkabsula/') return html('admin');
+      // كلمة مرور «الشاملة» (تُخزَّن بصمتها فقط) — تُطلب مرة لكل جلسة دخول
+      if (p === '/api/admin/vault-unlock' && m === 'POST') {
+        const b = await body(req);
+        const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('elkabsula-vault:' + String(b.password || ''))));
+        const hex = Array.from(d, x => x.toString(16).padStart(2, '0')).join('');
+        if (hex !== VAULT_PW_SHA) { await new Promise(r => setTimeout(r, 900)); return json({ error: 'كلمة المرور غير صحيحة.' }, 403); }
+        await env.DB.prepare('UPDATE sessions SET vault_ok = 1 WHERE token = ?').bind(me.token).run();
+        return json({ ok: true });
+      }
       const VAULT = url.searchParams.get('vault') === '1';
+      if (VAULT && !+me.vault_ok) return json({ error: 'vault_locked' }, 423);
       if (p === '/api/admin/stats') return json(await adminStats(env, VAULT));
       if (p === '/api/admin/activity') return json(await adminActivity(env, VAULT));
       if (p === '/api/admin/report') return json(await adminReport(env, Math.max(0, Math.min(3650, +url.searchParams.get('days') || 0)), VAULT));

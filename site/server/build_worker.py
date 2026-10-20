@@ -866,6 +866,14 @@ button.lv-opt{cursor:pointer}
 @media (max-width:900px){.tug{grid-template-columns:1fr 1fr}.tug-mid{grid-column:1/-1;order:-1}.tug-p{min-height:0}.tug-ch{grid-template-columns:1fr}}
 @media (max-width:520px){.tug-names{grid-template-columns:1fr}.tug-b{min-height:52px;font-size:.92rem}.tug-q{font-size:1rem}}
 /* ---------- لوحة التحكم الشاملة ---------- */
+.top a.stat-link{text-decoration:none;cursor:pointer;transition:filter .15s,transform .15s}
+.top a.stat-link:hover{filter:brightness(.95);transform:translateY(-1px)}
+.vault-lock{max-width:380px;margin:48px auto;background:#fff;border:1px solid #e2e0d6;border-radius:18px;padding:28px 24px;text-align:center;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 28px rgba(11,59,51,.08)}
+.vault-lock .vl-ico{font-size:40px}
+.vault-lock h2{margin:0;color:#0b3b33}
+.vault-lock p{margin:0;color:#5b6b66}
+.vault-lock input{font:inherit;font-size:20px;text-align:center;letter-spacing:.3em;padding:12px;border:1px solid #cfd8d4;border-radius:12px;direction:ltr}
+.vault-lock .vl-back{color:#0b3b33;font-size:14px}
 .acts .vault-btn{font-size:1.15rem;line-height:1;padding-inline:12px;background:#0b3b33;color:#fff;border-color:#0b3b33}
 .acts .vault-btn:hover{background:#c98a1e;border-color:#c98a1e}
 body.vault-mode .stats .stat{background:#0b3b33;color:#ffd400;border-color:#0b3b33}

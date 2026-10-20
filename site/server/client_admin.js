@@ -12,7 +12,16 @@ var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جها�
 // وإلا ظهر الحدث في السجل بنصه الإنجليزي الخام.
 var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور',device_stale_removed:'إزالة جهاز مهمل تلقائيًا'};
 function load(){
-  return Promise.all([api(vq('/api/admin/stats')),api(vq('/api/admin/activity')),api('/api/admin/courses'),api('/api/lessons'),api(vq('/api/admin/report?days='+repDays))]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
+  return Promise.all([api(vq('/api/admin/stats')),api(vq('/api/admin/activity')),api('/api/admin/courses'),api('/api/lessons'),api(vq('/api/admin/report?days='+repDays))]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){if(e.message==='vault_locked')return vaultLock();toast(e.message);});
+}
+// «الشاملة» محمية بكلمة مرور خاصة تُطلب مرة لكل جلسة دخول
+function vaultLock(){
+  $('dash').innerHTML='<form class="vault-lock" id="vaultForm" autocomplete="off"><div class="vl-ico">🔒</div><h2>لوحة التحكم الشاملة</h2><p>أدخل كلمة المرور الخاصة بهذه اللوحة.</p>'+
+    '<input type="password" id="vaultPw" inputmode="numeric" placeholder="كلمة المرور" aria-label="كلمة مرور اللوحة الشاملة" required>'+
+    '<button type="submit" class="btn primary">فتح اللوحة</button><a class="vl-back" href="/admin">العودة إلى لوحة التحكم</a></form>';
+  var f=$('vaultForm'),i=$('vaultPw');i.focus();
+  f.onsubmit=function(ev){ev.preventDefault();var b=f.querySelector('button');b.disabled=true;
+    api('/api/admin/vault-unlock',{password:i.value}).then(function(){$('dash').innerHTML='<div class="empty-state">جارٍ تحميل البيانات…</div>';load();},function(e){b.disabled=false;i.value='';i.focus();toast(e.message);});};
 }
 function courseName(k){var p=String(k).split('|');return p[0]+' — الصف '+gLabel(p[1]);}
 function sortedCourses(){return (crs.courses||[]).slice().sort(function(a,b){return (gn(a.grade)-gn(b.grade))||a.subject.localeCompare(b.subject,'ar');});}
@@ -334,7 +343,14 @@ function doAct(u,a){
   if(a==='toggle')return act1(u,{action:'toggle'},u.active?'أُوقف الحساب':'فُعّل الحساب');
   if(a==='delete')return dialog({title:'حذف '+u.name,message:'سيُحذف الحساب نهائيًا ولن يستطيع الدخول. تبقى إحصائياته القديمة محفوظة.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/teachers/'+u.id,null,'DELETE').then(function(){toast('حُذف المعلم');load();},function(e){toast(e.message);});});
 }
-if(VAULT){document.title='الشاملة · الكبسولة';document.body.classList.add('vault-mode');var st=document.querySelector('.stats .stat');if(st)st.textContent='لوحة التحكم الشاملة';}
+(function(){
+  // شارة «لوحة التحكم» أعلى اليمين: تفتح «الشاملة»، ومن داخلها تعود إلى اللوحة الأساسية
+  var st=document.querySelector('.stats .stat');if(!st)return;
+  if(VAULT){document.title='الشاملة · الكبسولة';document.body.classList.add('vault-mode');}
+  var a=document.createElement('a');a.className='stat stat-link';a.href=VAULT?'/admin':'/elkabsula';
+  a.textContent=VAULT?'لوحة التحكم الشاملة':'لوحة التحكم';a.title=VAULT?'العودة إلى لوحة التحكم الأساسية':'فتح لوحة التحكم الشاملة';
+  st.parentNode.replaceChild(a,st);
+})();
 $('refreshBtn').onclick=function(){load().then(function(){toast('تم التحديث');});};
 api('/api/me').then(function(m){initNav(m);});
 load();
