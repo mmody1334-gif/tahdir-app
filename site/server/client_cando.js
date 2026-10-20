@@ -76,7 +76,7 @@ function svgToPng(el,h){return new Promise(function(res){var c=el.cloneNode(true
 function wordAssets(){
   if(ASSETS_WORD)return Promise.resolve(ASSETS_WORD);
   var be=brandEls();
-  return Promise.all([toDataUrl('/brand/moe.png'),toDataUrl('/brand/vision.png'),Promise.all(be.svgs.map(function(s){return svgToPng(s,46);}))]).then(function(r){
+  return Promise.all([toDataUrl('/brand/moe.png'),toDataUrl('/brand/vision.png'),Promise.resolve([])]).then(function(r){
     ASSETS_WORD={moe:r[0],vis:r[1],logo:r[2].join(' '),name:be.name,word:true};return ASSETS_WORD;
   },function(){var a=liveAssets();a.logo='';return a;});
 }
@@ -86,8 +86,8 @@ function sheetHeader(A,C,live){
   return '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><tr>'+
     '<td style="width:24%;text-align:right;vertical-align:middle;border:0;padding:0">'+img(A.moe,62,'وزارة التعليم')+'</td>'+
     '<td style="text-align:center;vertical-align:middle;border:0;padding:0">'+
-      '<div style="line-height:1">'+A.logo+(A.name?'<span style="font-weight:800;color:'+INK+';font-size:'+fs(20,1.5)+';vertical-align:middle;margin-inline-start:6px">'+A.name+'</span>':'')+'</div>'+
-      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11.5,.86)+';margin-top:4px">المديرية العامة للتعليم بمحافظة البريمي</div>'+
+      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11,.82)+'">سلطنة عُمان · وزارة التعليم</div>'+
+      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11.5,.86)+';margin-top:2px">المديرية العامة للتعليم بمحافظة البريمي</div>'+
       '<div style="font-weight:800;color:'+INK2+';font-size:'+fs(12.5,.95)+'">مدرسة حذيفة بن محصن</div></td>'+
     '<td style="width:24%;text-align:left;vertical-align:middle;border:0;padding:0">'+img(A.vis,58,'رؤية عُمان 2040')+'</td></tr></table>'+
     '<div style="'+PCA+'background:'+INK+';color:#fff;border-radius:14px;padding:8px 14px;display:block;border-bottom:4px solid '+GOLD+'">'+
