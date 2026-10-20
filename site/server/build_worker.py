@@ -55,6 +55,88 @@ def _untat(o):
     return o
 lessons = _untat(lessons)
 qbank = _untat(json.load(open(os.path.join(DATA, 'quiz_bank.json'), encoding='utf-8')))
+
+# ===== محتوى اللغة العربية (5-12): ملخصات + خطط علاجية + بنك أسئلة =====
+# المصدر: data/ar_content/*.txt بصيغة مختصرة سهلة التحرير، كتلة لكل درس:
+#   #<رقم الدرس>
+#   i: مقدمة الملخص
+#   o: نص الهدف :: نقطة ;; نقطة ;; نقطة
+#   t: مصطلح = تعريفه
+#   r: «تذكّر»
+#   f: محور العلاج        s: شرح مبسّط
+#   a: fill|عنوان النشاط|التعليمات   (أو match / choose)  ثم أسطر  - سؤال => جواب
+#   m: ع|نص السؤال|الصحيح|خطأ|خطأ|خطأ            (ع معرفة · ط تطبيق · س استدلال)
+#   w: ط2|نص السؤال => الإجابة النموذجية           (الرقم = الدرجة)
+_AO = {'ع': ('معرفة', 'منخفضة'), 'ط': ('تطبيق', 'متوسطة'), 'س': ('استدلال', 'مرتفعة')}
+def _ar_content():
+    import hashlib
+    d = os.path.join(DATA, 'ar_content'); study = {}; items = []
+    if not os.path.isdir(d): return study, items
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith('.txt'): continue
+        cur = None
+        for ln in open(os.path.join(d, fn), encoding='utf-8').read().split('\n'):
+            ln = ln.strip()
+            if not ln or ln.startswith('//'): continue
+            if ln.startswith('#'):
+                lid = int(ln[1:].split()[0]); n = [0]
+                S = {'summary': {'intro': '', 'outcomes': [], 'terms': [], 'remember': []},
+                     'remedial': {'focus': '', 'weak_areas': ['الفهم والاستيعاب', 'التطبيق اللغوي'], 'simple': '', 'activities': []}}
+                study[str(lid)] = S; cur = (lid, S, n); continue
+            if cur is None: raise SystemExit('ar_content/%s: سطر قبل رقم الدرس: %s' % (fn, ln))
+            lid, S, n = cur
+            if ln.startswith('- '):
+                q, _, a = ln[2:].partition('=>')
+                S['remedial']['activities'][-1]['items'].append({'q': q.strip(), 'a': a.strip()}); continue
+            k, _, v = ln.partition(':'); v = v.strip()
+            if k == 'i': S['summary']['intro'] = v
+            elif k == 'o':
+                t, _, pts = v.partition('::')
+                S['summary']['outcomes'].append({'code': '', 'text': t.strip(), 'points': [x.strip() for x in pts.split(';;') if x.strip()]})
+            elif k == 't':
+                t, _, dd = v.partition('=')
+                S['summary']['terms'].append({'t': t.strip(), 'd': dd.strip()})
+            elif k == 'r': S['summary']['remember'].append(v)
+            elif k == 'f': S['remedial']['focus'] = v
+            elif k == 's': S['remedial']['simple'] = v
+            elif k == 'a':
+                ty, ti, ins = (v.split('|') + ['', ''])[:3]
+                S['remedial']['activities'].append({'title': ti.strip(), 'type': ty.strip(), 'instructions': ins.strip(), 'items': []})
+            elif k in ('m', 'w'):
+                n[0] += 1
+                if k == 'm':
+                    p = [x.strip() for x in v.split('|')]
+                    ao, dif = _AO[p[0][0]]; ch = [x for x in p[2:] if x]
+                    if len(ch) < 3 or len(set(ch)) != len(ch): raise SystemExit('ar_content/%s #%d: خيارات ناقصة: %s' % (fn, lid, v))
+                    # ترتيب ثابت (غير عشوائي في كل بناء) للخيارات
+                    h = int(hashlib.md5(p[1].encode('utf-8')).hexdigest(), 16)
+                    order = sorted(range(len(ch)), key=lambda i: (h >> (i * 7)) % 997)
+                    chs = [ch[i] for i in order]
+                    items.append({'lesson_id': lid, 'type': 'mcq', 'stem': p[1], 'choices': chs, 'correct': chs.index(ch[0]), 'answer': ch[0],
+                                  'marks': 1, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': '', 'qid': 'ar%d_%d' % (lid, n[0])})
+                else:
+                    head, _, rest = v.partition('|'); q, _, a = rest.partition('=>')
+                    ao, dif = _AO[head[0]]; mk = int(head[1:] or 2)
+                    items.append({'lesson_id': lid, 'type': 'short', 'stem': q.strip(), 'choices': [], 'correct': 0, 'answer': a.strip(),
+                                  'marks': mk, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': '', 'qid': 'ar%d_%d' % (lid, n[0])})
+            else: raise SystemExit('ar_content/%s #%d: مفتاح غير معروف: %s' % (fn, lid, ln))
+    return study, items
+_AR_STUDY, _AR_Q = _ar_content()
+# مجالات التعثر في الخطة العلاجية حسب نوع الدرس (تطابق قائمة WEAK_LANG في client_study.js)
+def _ar_weak(title):
+    t = title or ''
+    if re.search('خط (النسخ|الرقعة)|مهاراتي في الكتابة', t): return ['الخط', 'الإملاء وعلامات الترقيم']
+    if re.search('إملا|املا|همز|ترقيم|الفاصلة|الألف|الالف|التاء المربوطة|تكتب ولا|تنطق ولا|ألف التفريق|الهاء في', t): return ['الإملاء وعلامات الترقيم']
+    if re.search('نحو|صرف|الفعل|الفاعل|المفعول|الخبر|المضاف|الجملة|حروف الجر|شبه جملة|الإعراب|المجرد|الميزان|النعت|العطف|الممنوع|الحال|تمييز|العدد|اسم ال|صيغ|الصفة|أسلوب|كاد|المقصور|المعاجم|المعجم|النون الساكنة', t): return ['القواعد النحوية والصرفية']
+    if re.search('بلاغ|التشبيه|السجع|الجناس|المسند|التقديم|الخبر والإنشاء|العروض|بحر|نقد', t): return ['التذوق الأدبي والبلاغي']
+    if re.search('تعبير|كتابة|التلخيص|تلخيص|منهجية|تصميم|محضر|المذكرات|التحقيق|ترجمة|عرض كتاب|الرسالة|الوصف|السرد|وصف', t): return ['التعبير الكتابي']
+    if re.search('استماع|الاستماع|تحدث|التحدث|شفوي|الإلقاء|الالقاء|قراءة صورة|قراءة شعار|قراءة غلاف', t): return ['الاستماع والتحدث', 'الفهم والاستيعاب']
+    if re.search('شعر|قصيدة|النص الأدبي|نصوص أدبية|النصوص|أدب|الأدب|معلقة|المقام', t): return ['التذوق الأدبي والبلاغي', 'الثروة اللغوية (المفردات ومعانيها)']
+    return ['الفهم والاستيعاب', 'الثروة اللغوية (المفردات ومعانيها)']
+_LT = {str(l.get('id')): l.get('title', '') for l in lessons}
+for _k, _v in _AR_STUDY.items():
+    _v['remedial']['weak_areas'] = _ar_weak(_LT.get(_k, ''))
+qbank = qbank + _untat(_AR_Q)
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
 def fin_items():
     p = os.path.join(DATA, 'finals.json')
@@ -1304,6 +1386,8 @@ def _study_with_mm():
     if os.path.exists(mp):
         for k, v in json.load(open(mp, encoding='utf-8')).items():
             st['lessons'].setdefault(str(k), {})['mm'] = v
+    for k, v in _AR_STUDY.items():
+        st['lessons'].setdefault(k, {}).update(v)
     return st
 _PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN)}
 _PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
