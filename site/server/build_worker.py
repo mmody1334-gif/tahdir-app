@@ -149,6 +149,63 @@ _LT = {str(l.get('id')): l.get('title', '') for l in lessons}
 for _k, _v in _AR_STUDY.items():
     _v['remedial']['weak_areas'] = _ar_weak(_LT.get(_k, ''))
 qbank = qbank + _untat(_AR_Q)
+# ===== بنك أسئلة الأحياء الإضافي (9-12): أسئلة نهاية الوحدة في كتب الطالب والنشاط + أسئلة بنمط كامبريدج =====
+# المصدر: data/bio_bank/*.txt — كتلة لكل درس:
+#   #<رقم الدرس>
+#   s: مصدر الأسئلة التالية (مثل: أسئلة نهاية الوحدة — كتاب الطالب)
+#   m: ع|نص السؤال|الصحيح|خطأ|خطأ|خطأ          (ع معرفة · ط تطبيق · س استدلال)
+#   w: ط2|نص السؤال => الإجابة                    (قصيرة؛ الرقم = الدرجة)
+#   l: س3|نص السؤال => الإجابة                    (مقالية)
+#   n: إرشادات التصحيح للسؤال السابق
+#   T: عنوان الجدول ;; خلية ^ خلية ;; خلية ^ خلية   (جدول للسؤال السابق)
+# داخل النصوص: « // » سطر جديد، و« ;; » في الإجابة سطر جديد (نقطة تصحيح).
+def _bio_bank():
+    import hashlib
+    d = os.path.join(DATA, 'bio_bank'); items = []
+    if not os.path.isdir(d): return items
+    G = {str(l.get('id')): l.get('grade', '') for l in lessons}
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith('.txt'): continue
+        lid = None; src = ''; n = 0
+        for raw in open(os.path.join(d, fn), encoding='utf-8').read().split('\n'):
+            ln = raw.strip()
+            if not ln or ln.startswith('//'): continue
+            if ln.startswith('#'):
+                lid = int(ln[1:].split()[0]); src = ''
+                if str(lid) not in G: raise SystemExit('bio_bank/%s: درس غير موجود #%d' % (fn, lid))
+                continue
+            if lid is None: raise SystemExit('bio_bank/%s: سطر قبل رقم الدرس: %s' % (fn, ln))
+            k, _, v = ln.partition(':'); v = v.strip()
+            hi = G[str(lid)] in ('الحادي عشر', 'الثاني عشر')
+            def aod(c):
+                ao, dif = _AO[c]
+                return (('AO1' if c == 'ع' else 'AO2') if hi else ao), dif
+            nl = lambda x: x.replace(' // ', '\n').strip()
+            if k == 's': src = v; continue
+            if k == 'n': items[-1]['notes'] = v; continue
+            if k == 'T':
+                rows = [[c.strip() for c in r.split('^')] for r in v.split(';;')]
+                items[-1]['table'] = {'caption': rows[0][0], 'rows': rows[1:]}; continue
+            n += 1; qid = 'b%d_%d' % (lid, n)
+            if k == 'm':
+                p = [x.strip() for x in v.split('|')]
+                ao, dif = aod(p[0][0]); ch = [x for x in p[2:] if x]
+                if len(ch) < 3 or len(set(ch)) != len(ch): raise SystemExit('bio_bank/%s #%d: خيارات ناقصة/مكررة: %s' % (fn, lid, v))
+                h = int(hashlib.md5(p[1].encode('utf-8')).hexdigest(), 16)
+                order = sorted(range(len(ch)), key=lambda i: (h >> (i * 7)) % 997)
+                chs = [ch[i] for i in order]
+                items.append({'lesson_id': lid, 'type': 'mcq', 'stem': nl(p[1]), 'choices': chs, 'correct': chs.index(ch[0]), 'answer': ch[0],
+                              'marks': 1, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': '', 'qid': qid, 'src': src})
+            elif k in ('w', 'l'):
+                head, _, rest = v.partition('|'); q, _, a = rest.partition('=>')
+                if not a.strip(): raise SystemExit('bio_bank/%s #%d: سؤال بلا إجابة: %s' % (fn, lid, v))
+                ao, dif = aod(head[0]); mk = int(head[1:] or (2 if k == 'w' else (4 if hi else 3)))
+                items.append({'lesson_id': lid, 'type': 'short' if k == 'w' else 'long', 'stem': nl(q), 'answer': '\n'.join(x.strip() for x in a.split(';;') if x.strip()),
+                              'marks': mk, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': 'تُقبل أي إجابة تؤدي المعنى نفسه.', 'qid': qid, 'src': src})
+            else: raise SystemExit('bio_bank/%s #%d: مفتاح غير معروف: %s' % (fn, lid, ln))
+    return items
+_BIO_Q = _bio_bank()
+qbank = qbank + _untat(_BIO_Q)
 # أسئلة الاختبارات النهائية (بصورتها الأصلية) تدخل بنك الاختبارات القصيرة للعلوم، بأهداف تقويم مطابقة للوثيقة
 def fin_items():
     p = os.path.join(DATA, 'finals.json')
