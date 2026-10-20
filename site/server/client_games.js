@@ -112,7 +112,7 @@ function enough(g){
   if(g.need==='hard')return hardMcq().length>=g.min;
   return p.length>=g.min;
 }
-function renderHome(){
+function renderHome(){arena(false);
   stopAll();game=null;
   // مادة/صف بلا أسئلة صالحة للعب: نوضّح ذلك صراحة بدل عرض ألعاب كلها معطّلة
   if(!data.items.some(playableItem)){
@@ -137,7 +137,10 @@ function renderHome(){
   $('gmain').innerHTML=h;
   Array.prototype.forEach.call(document.querySelectorAll('[data-game]'),function(b){b.onclick=function(){var g=GAMES.filter(function(x){return x.id===b.getAttribute('data-game');})[0];if(!enough(g)){toast(selIds().length?'اختر دروسًا أكثر لهذه اللعبة':'اختر الدروس أولًا من القائمة');return;}startGame(g);};});
 }
+// «الساحة»: ألعاب الحركة تملأ الشاشة كلها (فوق الشريط الجانبي والترويسة) لتظهر الشخصيات والمشهد كبيرة على السبورة
+function arena(on){var st=$('stage');if(st)st.classList.toggle('arena',!!on);document.body.classList.toggle('g-arena',!!on);}
 function stage(title,inner){
+  document.body.classList.remove('g-arena');
   return '<div class="g-stage" id="stage"><div class="g-bar"><button type="button" class="btn small" id="gBack">→ الألعاب</button><b class="g-title">'+esc(title)+'</b><span class="g-bar-r"><button type="button" class="btn small" id="gFull">⛶ ملء الشاشة</button></span></div><div class="g-score" id="gScore"></div><div class="gm-body" id="gBody">'+inner+'</div></div>';
 }
 function bindStage(){$('gBack').onclick=renderHome;$('gFull').onclick=function(){toggleFull($('stage'));};}

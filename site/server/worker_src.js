@@ -168,6 +168,8 @@ async function ensureSchema(db) {
   if (schemaReady) return;
   await db.batch(SCHEMA.map(s => db.prepare(s)));
   try { await db.prepare('ALTER TABLE users ADD COLUMN scope TEXT').run(); } catch (e) { /* already there */ }
+  // «الشاملة»: معلمون نُقلوا إلى لوحة التحكم المخفية (/elkabsula) فلا يظهرون في اللوحة الأساسية
+  try { await db.prepare('ALTER TABLE users ADD COLUMN vault INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
   schemaReady = true;
 }
 
@@ -642,9 +644,11 @@ function checkQuizText(text, grade, subject, withAnswer) {
   };
 }
 
-async function adminStats(env) {
+// اللوحة الأساسية تعرض المدير والمعلمين غير المنقولين، و«الشاملة» تعرض المنقولين فقط
+const inVault = (u, vault) => vault ? (+u.vault === 1 && u.role !== 'admin') : !(+u.vault === 1 && u.role !== 'admin');
+async function adminStats(env, vault) {
   const DB = env.DB;
-  const users = (await DB.prepare("SELECT id,name,username,role,active,max_devices,created_at,scope FROM users ORDER BY role='admin' DESC, name").all()).results || [];
+  const users = ((await DB.prepare("SELECT id,name,username,role,active,max_devices,created_at,scope,vault FROM users ORDER BY role='admin' DESC, name").all()).results || []).filter(u => inVault(u, vault));
   const agg = (await DB.prepare(`SELECT user_id,
       SUM(type='login') logins,
       SUM(type LIKE 'copy%') copies,
@@ -662,8 +666,9 @@ async function adminStats(env) {
   const totals = await DB.prepare("SELECT SUM(type='login') logins, SUM(type LIKE 'copy%') copies FROM events").first();
   const by = (arr, k = 'user_id') => arr.reduce((m, r) => ((m[r[k]] = m[r[k]] || []).push(r), m), {});
   const A = Object.fromEntries(agg.map(r => [r.user_id, r])), G = by(grades), D = by(devs), B = Object.fromEntries(blocked.map(r => [r.user_id, r])), T = by(top);
+  const sumA = k => users.reduce((t, u) => t + ((A[u.id] && +A[u.id][k]) || 0), 0);
   return {
-    totals: { teachers: users.filter(u => u.role === 'teacher').length, active7: active7 ? active7.n : 0, logins: (totals && totals.logins) || 0, copies: (totals && totals.copies) || 0 },
+    totals: { teachers: users.filter(u => u.role === 'teacher').length, active7: users.filter(u => A[u.id] && A[u.id].last_active > weekAgo).length, logins: sumA('logins'), copies: sumA('copies') },
     users: users.map(u => ({
       ...u,
       logins: (A[u.id] && A[u.id].logins) || 0,
@@ -679,9 +684,10 @@ async function adminStats(env) {
   };
 }
 const PREP_T = "('send_prep','copy_json','copy_all')", HW_T = "('send_hw','copy_hw')";
-async function adminReport(env, days) {
+async function adminReport(env, days, vault) {
   const DB = env.DB, since = days > 0 ? now() - days * 86400000 : 0;
-  const users = (await DB.prepare("SELECT id,name,username,role,active,scope FROM users ORDER BY role='admin' DESC, name").all()).results || [];
+  const users = ((await DB.prepare("SELECT id,name,username,role,active,scope,vault FROM users ORDER BY role='admin' DESC, name").all()).results || []).filter(u => inVault(u, vault));
+  const UIDS = '(' + (users.map(u => +u.id).join(',') || '0') + ')';
   const agg = (await DB.prepare(`SELECT user_id,
       SUM(type='login') logins,
       SUM(type IN ${PREP_T}) preps,
@@ -694,21 +700,22 @@ async function adminReport(env, days) {
     FROM events WHERE at > ? GROUP BY user_id`).bind(since).all()).results || [];
   const byGrade = (await DB.prepare(`SELECT grade,
       SUM(type IN ${PREP_T}) preps, SUM(type IN ${HW_T}) hws, SUM(type IN ('quiz_make','review_make')) quizzes
-    FROM events WHERE at > ? AND grade IS NOT NULL AND grade<>'' GROUP BY grade`).bind(since).all()).results || [];
+    FROM events WHERE at > ? AND user_id IN ${UIDS} AND grade IS NOT NULL AND grade<>'' GROUP BY grade`).bind(since).all()).results || [];
   const daily = (await DB.prepare(`SELECT CAST((at + 14400000) / 86400000 AS INTEGER) d, COUNT(DISTINCT user_id) users,
       SUM(type IN ${PREP_T}) preps, SUM(type IN ${HW_T}) hws, SUM(type IN ('quiz_make','review_make')) quizzes
-    FROM events WHERE at > ? GROUP BY d ORDER BY d`).bind(Math.max(since, now() - 30 * 86400000)).all()).results || [];
+    FROM events WHERE at > ? AND user_id IN ${UIDS} GROUP BY d ORDER BY d`).bind(Math.max(since, now() - 30 * 86400000)).all()).results || [];
   const A = Object.fromEntries(agg.map(r => [r.user_id, r])), z = { games: 0, study: 0, logins: 0, preps: 0, prep_lessons: 0, hws: 0, hw_lessons: 0, quizzes: 0, reviews: 0, prints: 0, views: 0, last_login: null, last_active: null };
   const rows = users.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, active: u.active, scope: u.scope, ...z, ...(A[u.id] || {}) }));
   const sum = k => rows.reduce((t, r) => t + (+r[k] || 0), 0);
   return { days, rows, by_grade: byGrade, daily,
     totals: { active: rows.filter(r => r.last_active).length, logins: sum('logins'), preps: sum('preps'), hws: sum('hws'), quizzes: sum('quizzes') + sum('reviews') } };
 }
-async function adminActivity(env) {
-  const ev = (await env.DB.prepare(`SELECT e.type,e.grade,e.lesson_title,e.at,e.ip,u.name,d.label FROM events e JOIN users u ON u.id=e.user_id
+async function adminActivity(env, vault) {
+  const VW = vault ? "u.vault=1 AND u.role<>'admin'" : "NOT (u.vault=1 AND u.role<>'admin')";
+  const ev = (await env.DB.prepare(`SELECT e.type,e.grade,e.lesson_title,e.at,e.ip,u.name,d.label FROM events e JOIN users u ON u.id=e.user_id AND ${VW}
      LEFT JOIN devices d ON d.user_id=e.user_id AND d.device_id=e.device_id ORDER BY e.at DESC LIMIT 150`).all()).results || [];
   const at = (await env.DB.prepare(`SELECT a.username,a.reason,a.label,a.ip,a.at,u.name FROM attempts a LEFT JOIN users u ON u.id=a.user_id
-     WHERE a.ok=0 ORDER BY a.at DESC LIMIT 100`).all()).results || [];
+     WHERE a.ok=0 AND ${vault ? 'u.id IS NOT NULL AND ' + VW : '(u.id IS NULL OR ' + VW + ')'} ORDER BY a.at DESC LIMIT 100`).all()).results || [];
   return { events: ev, failed: at };
 }
 async function createUser(env, { name, username, password, role = 'teacher', max_devices = 2, scope = null }) {
@@ -1029,9 +1036,12 @@ export default {
       // ----- admin only -----
       if (me.role !== 'admin') return p.startsWith('/api/') ? json({ error: 'غير مسموح.' }, 403) : redirect('/app');
       if (p === '/admin') return html('admin');
-      if (p === '/api/admin/stats') return json(await adminStats(env));
-      if (p === '/api/admin/activity') return json(await adminActivity(env));
-      if (p === '/api/admin/report') return json(await adminReport(env, Math.max(0, Math.min(3650, +url.searchParams.get('days') || 0))));
+      // لوحة التحكم «الشاملة» المخفية: نفس الصفحة، والواجهة تطلب بياناتها بـ vault=1
+      if (p === '/elkabsula' || p === '/elkabsula/') return html('admin');
+      const VAULT = url.searchParams.get('vault') === '1';
+      if (p === '/api/admin/stats') return json(await adminStats(env, VAULT));
+      if (p === '/api/admin/activity') return json(await adminActivity(env, VAULT));
+      if (p === '/api/admin/report') return json(await adminReport(env, Math.max(0, Math.min(3650, +url.searchParams.get('days') || 0)), VAULT));
       if (p === '/api/admin/courses' && m === 'GET') return json({ courses: await coursesList(env), build: BUILD });
       if (p === '/api/admin/courses' && m === 'POST') {
         const b = await body(req), subject = String(b.subject || '').trim().slice(0, 40), grade = String(b.grade || '').trim().slice(0, 30);
@@ -1121,6 +1131,9 @@ export default {
           } else if (b.action === 'scope') {
             const v = Array.isArray(b.value) ? b.value.map(x => String(x).slice(0, 80)).slice(0, 50) : [];
             await env.DB.prepare('UPDATE users SET scope = ? WHERE id = ?').bind(v.length ? JSON.stringify(v) : null, id).run();
+          } else if (b.action === 'vault') {
+            if (u.role === 'admin') return json({ error: 'لا يمكن نقل حساب المدير.' }, 400);
+            await env.DB.prepare('UPDATE users SET vault = ? WHERE id = ?').bind(b.value ? 1 : 0, id).run();
           } else if (b.action === 'rename') {
             const n = String(b.name || '').trim().slice(0, 80); if (!n) return json({ error: 'اكتب الاسم.' }, 400);
             await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(n, id).run();

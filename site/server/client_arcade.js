@@ -74,17 +74,39 @@ function arcSetup(g,o){
 }
 
 // ---------- ⚽ مباراة كرة القدم ----------
+// لاعب كرة كرتوني بجانب جانبي: رأس وشعر وعين، قميص برقم، ذراعان وساقان تتأرجحان أثناء الجري،
+// والساق الأمامية تركل. يُرسم متجهًا لليسار ويُعكس للفريق الآخر.
+function ballToon(id,x,color,num,face){
+  var skin=id==='blPR'?'#e7b48a':'#f1c9a5',dark='#1d2733',sh=tugShade(color);
+  return '<g transform="translate('+x+' 236) scale('+(face<0?1:-1)+' 1) scale(1.25)"><g id="'+id+'" class="bl-pl">'+
+    '<ellipse cx="0" cy="2" rx="22" ry="5" fill="#000" opacity=".22"/>'+
+    '<g class="bl-run">'+
+      '<g class="bl-leg2"><path d="M4 -40 L8 -20 L12 -3" fill="none" stroke="'+skin+'" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 -40 L6 -30" stroke="#fff" stroke-width="9" stroke-linecap="round"/><path d="M7 -9 L12 -3" stroke="'+sh+'" stroke-width="8" stroke-linecap="round"/><path d="M8 -4 h10 a4 4 0 0 1 0 6 h-12z" fill="'+dark+'"/></g>'+
+      '<path d="M8 -70 L18 -58 L14 -46" fill="none" stroke="'+skin+'" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" class="bl-arm2"/>'+
+      '<path d="M-12 -74 C-12 -84 12 -84 12 -74 L10 -44 L-10 -44 Z" fill="'+color+'" stroke="'+sh+'" stroke-width="2"/>'+
+      '<text x="0" y="-52" font-size="15" fill="#fff" text-anchor="middle" font-weight="900" transform="scale('+(face<0?1:-1)+' 1)" style="font-family:sans-serif">'+num+'</text>'+
+      '<rect x="-11" y="-46" width="22" height="9" rx="3" fill="#f4f6fb" stroke="'+sh+'" stroke-width="1.5"/>'+
+      '<g class="bl-leg"><path d="M-4 -40 L-10 -21 L-14 -4" fill="none" stroke="'+skin+'" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M-4 -40 L-6 -30" stroke="#fff" stroke-width="9" stroke-linecap="round"/><path d="M-11 -10 L-14 -4" stroke="'+color+'" stroke-width="8" stroke-linecap="round"/><path d="M-12 -5 h-10 a4 4 0 0 0 0 6 h12z" fill="'+dark+'"/></g>'+
+      '<path d="M-6 -70 L-16 -58 L-22 -50" fill="none" stroke="'+skin+'" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" class="bl-arm"/>'+
+      '<path d="M-6 -70 L-11 -64" stroke="'+color+'" stroke-width="8" stroke-linecap="round"/>'+
+      '<circle cx="0" cy="-92" r="13" fill="'+skin+'" stroke="'+dark+'" stroke-width="1.8"/>'+
+      '<path d="M-13 -94 C-13 -110 13 -110 13 -92 C8 -100 -4 -100 -9 -94 Z" fill="'+dark+'"/>'+
+      '<ellipse cx="-6" cy="-92" rx="3.4" ry="3.8" fill="#fff"/><circle cx="-7" cy="-91.5" r="2" fill="'+dark+'"/>'+
+      '<path d="M-10 -84 q4 3 7 0" stroke="'+dark+'" stroke-width="1.8" fill="none" stroke-linecap="round"/>'+
+      '<circle cx="3" cy="-86" r="3" fill="#ff8a8a" opacity=".45"/>'+
+    '</g></g></g>';
+}
 function ballScene(){
-  var r=ARC_C[0],b=ARC_C[1],stripes='';for(var i=0;i<10;i++)stripes+='<rect x="'+(i*80)+'" y="0" width="80" height="360" fill="'+(i%2?'#3fa34d':'#46b055')+'"/>';
-  return '<svg class="arc-svg" viewBox="0 0 800 360" role="img" aria-label="ملعب كرة القدم">'+stripes+
-    '<g fill="none" stroke="#fff" stroke-width="4" opacity=".9"><rect x="30" y="20" width="740" height="320"/><line x1="400" y1="20" x2="400" y2="340"/><circle cx="400" cy="180" r="55"/><rect x="30" y="100" width="90" height="160"/><rect x="680" y="100" width="90" height="160"/></g>'+
+  var r=ARC_C[0],b=ARC_C[1],stripes='';for(var i=0;i<10;i++)stripes+='<rect x="'+(i*80)+'" y="0" width="80" height="360" fill="'+(i%2?'#3fa34d':'#47b257')+'"/>';
+  return '<svg class="arc-svg" viewBox="0 0 800 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ملعب كرة القدم">'+stripes+
+    '<rect width="800" height="360" fill="url(#blVig)"/><defs><radialGradient id="blVig" cx=".5" cy=".5" r=".75"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></radialGradient></defs>'+
+    '<g fill="none" stroke="#fff" stroke-width="4" opacity=".9"><rect x="30" y="20" width="740" height="320" rx="4"/><line x1="400" y1="20" x2="400" y2="340"/><circle cx="400" cy="180" r="55"/><rect x="30" y="100" width="90" height="160"/><rect x="680" y="100" width="90" height="160"/><path d="M120 150 a32 32 0 0 1 0 60"/><path d="M680 150 a32 32 0 0 0 0 60"/></g>'+
     '<circle cx="400" cy="180" r="5" fill="#fff"/>'+
-    '<g id="bgL" class="bl-goal"><rect x="4" y="125" width="28" height="110" fill="#fff" opacity=".35"/><path d="M4 125h28M4 235h28M4 125v110" stroke="#fff" stroke-width="6" fill="none"/><path d="M8 130l20 20M8 150l20 20M8 170l20 20M8 190l20 20M8 210l20 20" stroke="#fff" stroke-width="1.5" opacity=".7"/></g>'+
-    '<g id="bgR" class="bl-goal"><rect x="768" y="125" width="28" height="110" fill="#fff" opacity=".35"/><path d="M796 125h-28M796 235h-28M796 125v110" stroke="#fff" stroke-width="6" fill="none"/><path d="M792 130l-20 20M792 150l-20 20M792 170l-20 20M792 190l-20 20M792 210l-20 20" stroke="#fff" stroke-width="1.5" opacity=".7"/></g>'+
+    '<g id="bgL" class="bl-goal"><rect x="4" y="120" width="30" height="120" fill="#fff" opacity=".3"/><path d="M8 125l22 22M8 145l22 22M8 165l22 22M8 185l22 22M8 205l22 22M30 125l-22 22M30 145l-22 22M30 165l-22 22M30 185l-22 22M30 205l-22 22" stroke="#fff" stroke-width="1.3" opacity=".7"/><path d="M34 120H4V240H34" stroke="#fff" stroke-width="7" fill="none" stroke-linejoin="round"/></g>'+
+    '<g id="bgR" class="bl-goal"><rect x="766" y="120" width="30" height="120" fill="#fff" opacity=".3"/><path d="M770 125l22 22M770 145l22 22M770 165l22 22M770 185l22 22M770 205l22 22M792 125l-22 22M792 145l-22 22M792 165l-22 22M792 185l-22 22M792 205l-22 22" stroke="#fff" stroke-width="1.3" opacity=".7"/><path d="M766 120H796V240H766" stroke="#fff" stroke-width="7" fill="none" stroke-linejoin="round"/></g>'+
     '<g id="blMove" class="bl-move">'+
-      '<g id="blPR" class="bl-pl"><ellipse cx="452" cy="232" rx="20" ry="6" fill="#000" opacity=".2"/><rect x="438" y="168" width="28" height="40" rx="10" fill="'+r+'"/><text x="452" y="195" font-size="16" fill="#fff" text-anchor="middle" font-weight="900">10</text><circle cx="452" cy="156" r="13" fill="#f1c9a5"/><path d="M439 152a13 12 0 0 1 26 0z" fill="#24323a"/><line x1="444" y1="208" x2="438" y2="230" stroke="#24323a" stroke-width="7" stroke-linecap="round" class="bl-leg"/><line x1="460" y1="208" x2="464" y2="230" stroke="#24323a" stroke-width="7" stroke-linecap="round"/></g>'+
-      '<g id="blPB" class="bl-pl"><ellipse cx="348" cy="232" rx="20" ry="6" fill="#000" opacity=".2"/><rect x="334" y="168" width="28" height="40" rx="10" fill="'+b+'"/><text x="348" y="195" font-size="16" fill="#fff" text-anchor="middle" font-weight="900">7</text><circle cx="348" cy="156" r="13" fill="#f1c9a5"/><path d="M335 152a13 12 0 0 1 26 0z" fill="#24323a"/><line x1="356" y1="208" x2="362" y2="230" stroke="#24323a" stroke-width="7" stroke-linecap="round" class="bl-leg"/><line x1="340" y1="208" x2="336" y2="230" stroke="#24323a" stroke-width="7" stroke-linecap="round"/></g>'+
-      '<g class="bl-ball-wrap"><ellipse cx="400" cy="234" rx="14" ry="4" fill="#000" opacity=".25"/><g id="blBall" class="bl-ball"><circle cx="400" cy="220" r="14" fill="#fff" stroke="#24323a" stroke-width="2"/><path d="M400 212l7 5-3 8h-8l-3-8z" fill="#24323a"/><path d="M393 208l-4-4M407 208l4-4M389 224l-5 2M411 224l5 2M400 230v5" stroke="#24323a" stroke-width="2"/></g></g>'+
+      ballToon('blPR',466,r,10,-1)+ballToon('blPB',334,b,7,1)+
+      '<g class="bl-ball-wrap"><ellipse cx="400" cy="238" rx="13" ry="4" fill="#000" opacity=".25"/><g id="blBall" class="bl-ball"><circle cx="400" cy="222" r="14" fill="#fff" stroke="#24323a" stroke-width="2"/><path d="M400 214l7 5-3 8h-8l-3-8z" fill="#24323a"/><path d="M393 210l-4-4M407 210l4-4M389 226l-5 2M411 226l5 2M400 232v4" stroke="#24323a" stroke-width="2"/></g></g>'+
     '</g></svg>';
 }
 function gBall(g){
@@ -97,7 +119,7 @@ function ballPlay(g,names,cfg){
   stopAll();tugCtx();
   var N=cfg.len,pos=0,goals=[0,0],over=false,paused=true;
   var h='<div class="tug arc-ball" id="arc">'+arcPanels(2,names).replace('</section>','</section><div class="tug-mid"><div class="bl-board"><span class="bl-t" style="--tc:'+ARC_C[0]+'">'+esc(names[0])+'</span><b id="blS0">0</b><span class="bl-sep">-</span><b id="blS1">0</b><span class="bl-t" style="--tc:'+ARC_C[1]+'">'+esc(names[1])+'</span></div>'+(cfg.time?'<div class="tug-top"><span class="tug-time" id="tgTime">'+cfg.time+'</span></div>':'<div class="tug-top muted small">أول من يسجّل 3 أهداف</div>')+ballScene()+'<div class="tug-crowd" aria-hidden="true"><span>📣</span><span>🙌</span><span>🥁</span><span>👏</span><span>📣</span><span>🎺</span></div></div>')+'<canvas class="tug-fx" id="tgFx"></canvas><div class="tug-cd" id="tgCd"></div></div>';
-  $('gBody').innerHTML=h;$('gScore').innerHTML='';
+  $('gBody').innerHTML=h;$('gScore').innerHTML='';arena(true);
   var mv=$('blMove'),ball=$('blBall');
   var place=function(){mv.style.transform='translateX('+(-pos/N*330)+'px)';};
   var E=arcEngine(2,{
@@ -143,9 +165,9 @@ function rocketSvg(c,i){
     '<path d="M-14 4 L-26 24 L-14 18Z M14 4 L26 24 L14 18Z" fill="'+c+'" stroke="#24323a" stroke-width="2"/>'+
     '<g class="rk-flame"><path d="M-9 20 Q0 52 9 20Z" fill="#ffb000"/><path d="M-5 20 Q0 38 5 20Z" fill="#fff3a0"/></g></g></g>';
 }
-function rocketScene(n){
-  var w=800,h=420,stars='';for(var i=0;i<70;i++)stars+='<circle class="st" cx="'+Math.round(Math.random()*w)+'" cy="'+Math.round(Math.random()*h*.85)+'" r="'+(Math.random()*1.8+.4).toFixed(1)+'" style="animation-delay:'+(Math.random()*3).toFixed(2)+'s"/>';
-  var lanes='',rk='';for(var j=0;j<n;j++){var x=Math.round(w*(j+.5)/n);lanes+='<line x1="'+x+'" y1="70" x2="'+x+'" y2="'+(h-40)+'" stroke="'+ARC_C[j]+'" stroke-width="2" stroke-dasharray="3 9" opacity=".55"/>';rk+='<g transform="translate('+x+' 0)"><g class="rk-move" id="rkm'+j+'" style="transform:translateY('+(h-60)+'px)">'+rocketSvg(ARC_C[j],j)+'</g></g>';}
+function rocketScene(n,W){
+  var w=W||800,h=420,stars='';for(var i=0;i<70;i++)stars+='<circle class="st" cx="'+Math.round(Math.random()*w)+'" cy="'+Math.round(Math.random()*h*.85)+'" r="'+(Math.random()*1.8+.4).toFixed(1)+'" style="animation-delay:'+(Math.random()*3).toFixed(2)+'s"/>';
+  var lanes='',rk='';for(var j=0;j<n;j++){var x=Math.round(w*(j+.5)/n);lanes+='<line x1="'+x+'" y1="70" x2="'+x+'" y2="'+(h-40)+'" stroke="'+ARC_C[j]+'" stroke-width="2" stroke-dasharray="3 9" opacity=".55"/>';rk+='<g transform="translate('+x+' 0)"><g class="rk-move" id="rkm'+j+'" style="transform:translateY('+(h-60)+'px)"><g transform="scale(1.6)">'+rocketSvg(ARC_C[j],j)+'</g></g></g>';}
   return '<svg class="arc-svg rk-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="سباق الصواريخ نحو القمر">'+
     '<defs><radialGradient id="rkSky" cx=".5" cy="0" r="1.1"><stop offset="0" stop-color="#2b2f6b"/><stop offset=".6" stop-color="#0d1033"/><stop offset="1" stop-color="#05061a"/></radialGradient></defs>'+
     '<rect width="'+w+'" height="'+h+'" fill="url(#rkSky)"/><g fill="#fff">'+stars+'</g>'+
@@ -163,7 +185,9 @@ function rocketPlay(g,names,cfg){
   stopAll();tugCtx();
   var n=names.length,N=cfg.len,H=420,hgt=[],over=false;for(var i=0;i<n;i++)hgt.push(0);
   var h='<div class="arc-rk" id="arc"><div class="rk-top">'+rocketScene(n)+'</div><div class="rk-panels rk-n'+n+'">'+arcPanels(n,names)+'</div><canvas class="tug-fx" id="tgFx"></canvas><div class="tug-cd" id="tgCd"></div></div>';
-  $('gBody').innerHTML=h;$('gScore').innerHTML='';
+  $('gBody').innerHTML=h;$('gScore').innerHTML='';arena(true);
+  // المشهد بعرض الساحة كله (بدل شريط ضيق بحواف سوداء)
+  var tb=document.querySelector('.rk-top').getBoundingClientRect();if(tb.width>300&&tb.height>150)document.querySelector('.rk-top').innerHTML=rocketScene(n,Math.max(800,Math.round(420*tb.width/tb.height)));
   var y=function(k){return (H-60)-k/N*(H-140);};
   var move=function(i){var m=$('rkm'+i);m.style.transform='translateY('+y(hgt[i])+'px)';};
   var E=arcEngine(n,{
@@ -203,7 +227,7 @@ function balloonPlay(g,count,secs){
   stopAll();tugCtx();resetScores();
   var qs=tugDeck().slice(0,count),qi=-1,turn=0,timer=null,locked=false;
   var BC=['#ff4d6d','#4dabf7','#ffd43b','#51cf66','#b197fc'];
-  $('gBody').innerHTML='<div class="bn-wrap" id="bnWrap"><div class="bn-head"><span class="bn-turn" id="bnTurn"></span><span class="bn-qn" id="bnQn"></span>'+timerHtml('bnT')+'</div><div class="bn-q" id="bnQ" dir="auto"></div><div class="bn-sky" id="bnSky"><div class="bn-cloud c1">☁️</div><div class="bn-cloud c2">☁️</div><div class="bn-cloud c3">☁️</div></div><div class="tug-cd" id="tgCd"></div></div>';
+  arena(true);$('gBody').innerHTML='<div class="bn-wrap" id="bnWrap"><div class="bn-head"><span class="bn-turn" id="bnTurn"></span><span class="bn-qn" id="bnQn"></span>'+timerHtml('bnT')+'</div><div class="bn-q" id="bnQ" dir="auto"></div><div class="bn-sky" id="bnSky"><div class="bn-cloud c1">☁️</div><div class="bn-cloud c2">☁️</div><div class="bn-cloud c3">☁️</div></div><div class="tug-cd" id="tgCd"></div></div>';
   renderScore(false);
   var setTurn=function(){$('bnTurn').innerHTML='الدور: <b style="color:'+TEAM_COLORS[turn]+'">'+esc(teams[turn].name)+'</b>';$('bnTurn').style.setProperty('--tc',TEAM_COLORS[turn]);};
   var next=function(){

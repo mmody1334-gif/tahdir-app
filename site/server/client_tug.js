@@ -3,35 +3,68 @@
 // خطوة نحوه، والخطأ يجمّده لحظة. ثلاث إجابات صحيحة متتالية = «شدّة مضاعفة». يفوز من يسحب الراية لخطّه.
 // الأصوات مولَّدة بـ WebAudio (بلا ملفات)، والمشهد SVG متحرّك، والاحتفال قصاصات ملوّنة على canvas.
 var TUG_C=['#e21b3c','#1368ce'];
+// شخصية كرتونية تشدّ الحبل. تُرسم في إحداثيات محلية (القدمان عند 0,0 والوجه نحو اليسار حيث الحبل)،
+// ثم تُعكس أفقيًا للفريق الأيسر. المجموعة الداخلية .tf هي التي تتحرك (ميلان/شدّ/سقوط/قفز)
+// حتى لا يلغي تحويلُ CSS موضعَ الشخصية.
+function tugToon(color,i,hair){
+  var skin=['#f1c9a5','#d9a37a','#c68a5c'][i%3],pants='#2b3a55',dark='#1d2733',sh=tugShade(color);
+  return '<g class="tf tf'+i+'">'+
+    '<ellipse cx="4" cy="2" rx="40" ry="7" fill="#000" opacity=".18"/>'+
+    // الساق الخلفية (ممدودة للخلف) والأمامية (مثنية مرتكزة)
+    '<path d="M10 -64 L26 -34 L38 -4" fill="none" stroke="'+pants+'" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<path d="M4 -64 L-14 -36 L-24 -4" fill="none" stroke="#33466a" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<path d="M28 -6 h22 a6 6 0 0 1 0 9 h-24 z" fill="'+dark+'"/><path d="M-34 -6 h20 a6 6 0 0 1 0 9 h-22 a5 5 0 0 1 2 -9z" fill="'+dark+'"/>'+
+    '<path d="M27 2 h23" stroke="#fff" stroke-width="2" opacity=".6"/><path d="M-35 2 h21" stroke="#fff" stroke-width="2" opacity=".6"/>'+
+    // الذراع الخلفية
+    '<path d="M26 -110 L-4 -100 L-36 -96" fill="none" stroke="'+sh+'" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>'+
+    // الجذع مائل للخلف
+    '<path d="M-6 -66 C-4 -90 8 -114 26 -122 L44 -112 C38 -96 26 -80 18 -62 Z" fill="'+color+'" stroke="'+sh+'" stroke-width="2.5" stroke-linejoin="round"/>'+
+    '<path d="M2 -66 C6 -84 16 -102 32 -114" fill="none" stroke="#fff" stroke-width="4" opacity=".55"/>'+
+    '<rect x="-8" y="-70" width="30" height="10" rx="5" fill="'+pants+'" transform="rotate(-18 7 -65)"/>'+
+    // الرأس
+    '<g transform="rotate(14 36 -138)">'+
+      '<circle cx="36" cy="-138" r="19" fill="'+skin+'" stroke="'+dark+'" stroke-width="2"/>'+
+      '<path d="'+(hair?'M17 -140 C17 -164 56 -166 56 -140 C50 -150 32 -152 24 -146 Z':'M16 -138 C14 -162 58 -164 56 -136 L50 -142 C40 -150 26 -150 20 -140 Z')+'" fill="'+dark+'"/>'+
+      '<path d="M15 -141 C14 -151 30 -158 40 -154" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"/>'+
+      '<ellipse cx="26" cy="-139" rx="4.5" ry="5" fill="#fff"/><circle cx="24.5" cy="-138.5" r="2.6" fill="'+dark+'"/>'+
+      '<path d="M20 -148 L30 -145" stroke="'+dark+'" stroke-width="2.6" stroke-linecap="round"/>'+
+      '<path d="M20 -127 h9" stroke="'+dark+'" stroke-width="2.4" stroke-linecap="round"/><rect x="20.5" y="-129" width="8" height="3" rx="1" fill="#fff"/>'+
+      '<circle cx="35" cy="-130" r="4" fill="#ff8a8a" opacity=".45"/>'+
+      '<circle cx="44" cy="-137" r="4" fill="'+skin+'" stroke="'+dark+'" stroke-width="1.5"/>'+
+    '</g>'+
+    // الذراع الأمامية واليدان على الحبل
+    '<path d="M30 -112 L2 -104 L-30 -98" fill="none" stroke="'+color+'" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<path d="M2 -104 L-30 -98" fill="none" stroke="'+skin+'" stroke-width="10" stroke-linecap="round"/>'+
+    '<circle cx="-34" cy="-97" r="7" fill="'+skin+'" stroke="'+dark+'" stroke-width="1.8"/><circle cx="-42" cy="-96" r="6.5" fill="'+skin+'" stroke="'+dark+'" stroke-width="1.8"/>'+
+  '</g>';
+}
+function tugShade(hex){var n=parseInt(hex.slice(1),16),r=(n>>16)*.68|0,g=((n>>8)&255)*.68|0,b=(n&255)*.68|0;return 'rgb('+r+','+g+','+b+')';}
 function tugFigure(x,color,dir,i){
-  // شخص يشدّ: dir=1 يميل يمينًا (فريق اليمين)، -1 يسارًا. الرأس والجسم والذراعان نحو الحبل
-  var lean=dir*14,hx=x+lean;
-  return '<g class="tf tf'+i+'" style="--d:'+dir+'">'+
-    '<line x1="'+(x+dir*-6)+'" y1="250" x2="'+x+'" y2="205" stroke="#24323a" stroke-width="7" stroke-linecap="round"/>'+
-    '<line x1="'+(x+dir*14)+'" y1="252" x2="'+x+'" y2="205" stroke="#24323a" stroke-width="7" stroke-linecap="round"/>'+
-    '<line x1="'+x+'" y1="205" x2="'+hx+'" y2="150" stroke="'+color+'" stroke-width="16" stroke-linecap="round"/>'+
-    '<line x1="'+(hx-dir*2)+'" y1="160" x2="'+(x-dir*26)+'" y2="172" stroke="'+color+'" stroke-width="7" stroke-linecap="round"/>'+
-    '<circle cx="'+(hx+dir*3)+'" cy="132" r="15" fill="#f1c9a5" stroke="#24323a" stroke-width="2"/>'+
-    '<path d="M'+(hx+dir*3-16)+' 128 a16 14 0 0 1 32 0 z" fill="'+color+'"/>'+
-    '<circle cx="'+(hx+dir*9)+'" cy="133" r="2.2" fill="#24323a"/>'+
-    '</g>';
+  // dir=1 فريق اليمين (وجهه لليسار نحو الحبل) · dir=-1 فريق اليسار (معكوس)
+  return '<g transform="translate('+x+' 330) scale('+(dir>0?1:-1)+' 1) scale(1.08)" class="tfw">'+tugToon(color,i,i===1)+'</g>';
 }
 function tugScene(){
-  var r=TUG_C[0],b=TUG_C[1];
-  return '<svg class="tug-svg" viewBox="0 0 800 290" role="img" aria-label="ساحة شدّ الحبل">'+
-    '<defs><linearGradient id="tgSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f6ff"/><stop offset="1" stop-color="#fff"/></linearGradient>'+
-    '<pattern id="tgRope" width="14" height="10" patternUnits="userSpaceOnUse"><rect width="14" height="10" fill="#c58b45"/><path d="M0 10 L7 0 M7 10 L14 0" stroke="#8a5a24" stroke-width="3"/></pattern></defs>'+
-    '<rect width="800" height="290" fill="url(#tgSky)"/>'+
-    '<rect y="252" width="800" height="38" fill="#cfe8c4"/><rect y="252" width="800" height="5" fill="#9ccb88"/>'+
-    '<rect x="0" y="252" width="200" height="38" fill="'+b+'" opacity=".14"/><rect x="600" y="252" width="200" height="38" fill="'+r+'" opacity=".14"/>'+
-    '<line x1="400" y1="60" x2="400" y2="290" stroke="#24323a" stroke-width="3" stroke-dasharray="8 8" opacity=".55"/>'+
-    '<line x1="200" y1="90" x2="200" y2="290" stroke="'+b+'" stroke-width="4" stroke-dasharray="4 6"/><line x1="600" y1="90" x2="600" y2="290" stroke="'+r+'" stroke-width="4" stroke-dasharray="4 6"/>'+
-    '<text x="200" y="84" text-anchor="middle" font-size="22">🏁</text><text x="600" y="84" text-anchor="middle" font-size="22">🏁</text>'+
+  var r=TUG_C[0],b=TUG_C[1],grass='';
+  for(var k=0;k<46;k++){var gx=(k*37)%800,gy=338+((k*13)%40);grass+='<path d="M'+gx+' '+gy+' l3 -9 l3 9" stroke="#5aa64a" stroke-width="2" fill="none" opacity=".6"/>';}
+  return '<svg class="tug-svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ساحة شدّ الحبل">'+
+    '<defs><linearGradient id="tgSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd8ff"/><stop offset=".75" stop-color="#e6f6ff"/></linearGradient>'+
+    '<linearGradient id="tgGr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd16f"/><stop offset="1" stop-color="#5fa94a"/></linearGradient>'+
+    '<pattern id="tgRope" width="16" height="12" patternUnits="userSpaceOnUse"><rect width="16" height="12" fill="#d29b52"/><path d="M-2 12 L8 0 M6 12 L16 0" stroke="#9a6a2c" stroke-width="3.5"/></pattern></defs>'+
+    '<rect width="800" height="400" fill="url(#tgSky)"/>'+
+    '<g class="tg-cloud"><ellipse cx="140" cy="70" rx="48" ry="16" fill="#fff" opacity=".9"/><ellipse cx="170" cy="60" rx="30" ry="14" fill="#fff" opacity=".9"/></g>'+
+    '<g class="tg-cloud c2"><ellipse cx="620" cy="50" rx="56" ry="17" fill="#fff" opacity=".85"/><ellipse cx="590" cy="42" rx="30" ry="13" fill="#fff" opacity=".85"/></g>'+
+    '<circle cx="720" cy="80" r="28" fill="#ffe36e"/><circle cx="720" cy="80" r="40" fill="#ffe36e" opacity=".25"/>'+
+    '<path d="M0 250 Q120 205 240 245 T480 238 T800 236 V330 H0Z" fill="#b7e39b" opacity=".7"/>'+
+    '<rect y="326" width="800" height="74" fill="url(#tgGr)"/>'+grass+
+    '<rect x="0" y="326" width="200" height="74" fill="'+b+'" opacity=".16"/><rect x="600" y="326" width="200" height="74" fill="'+r+'" opacity=".16"/>'+
+    '<line x1="400" y1="120" x2="400" y2="400" stroke="#24323a" stroke-width="3" stroke-dasharray="9 9" opacity=".5"/>'+
+    '<g><line x1="200" y1="150" x2="200" y2="400" stroke="'+b+'" stroke-width="5" stroke-dasharray="6 7"/><path d="M200 150 l30 10 l-30 10z" fill="'+b+'"/></g>'+
+    '<g><line x1="600" y1="150" x2="600" y2="400" stroke="'+r+'" stroke-width="5" stroke-dasharray="6 7"/><path d="M600 150 l-30 10 l30 10z" fill="'+r+'"/></g>'+
     '<g id="tugMove" class="tug-move">'+
-      '<rect x="215" y="166" width="370" height="10" rx="5" fill="url(#tgRope)"/>'+
-      '<g class="tug-flag"><line x1="400" y1="171" x2="400" y2="210" stroke="#24323a" stroke-width="3"/><path d="M400 176 L428 186 L400 196 Z" fill="#ffd400" stroke="#24323a" stroke-width="2"/><circle cx="400" cy="171" r="7" fill="#ffd400" stroke="#24323a" stroke-width="2"/></g>'+
-      '<g id="tugR" class="tug-team r">'+tugFigure(490,r,1,0)+tugFigure(555,r,1,1)+'</g>'+
-      '<g id="tugB" class="tug-team b">'+tugFigure(310,b,-1,0)+tugFigure(245,b,-1,1)+'</g>'+
+      '<rect x="150" y="223" width="500" height="13" rx="6.5" fill="url(#tgRope)" stroke="#7a5322" stroke-width="1.5"/>'+
+      '<g id="tugB" class="tug-team b">'+tugFigure(258,b,-1,1)+tugFigure(330,b,-1,0)+'</g>'+
+      '<g id="tugR" class="tug-team r">'+tugFigure(542,r,1,1)+tugFigure(470,r,1,0)+'</g>'+
+      '<g class="tug-flag"><line x1="400" y1="229" x2="400" y2="282" stroke="#24323a" stroke-width="3"/><path d="M400 236 L434 249 L400 262 Z" fill="#ffd400" stroke="#24323a" stroke-width="2"/><circle cx="400" cy="229" r="8" fill="#ffd400" stroke="#24323a" stroke-width="2"/></g>'+
       '<g id="tugDust"></g>'+
     '</g></svg>';
 }
@@ -72,7 +105,7 @@ function tugPlay(g,names,cfg){
     '<div class="tug-crowd" aria-hidden="true"><span>📣</span><span>🙌</span><span>🎉</span><span>👏</span><span>📣</span><span>🙌</span></div>'+
     '<div class="tug-meter"><span style="--tc:'+TUG_C[0]+'"></span><i id="tgMeter"></i><span style="--tc:'+TUG_C[1]+'"></span></div></div>'+
     panel(1)+'<canvas class="tug-fx" id="tgFx"></canvas><div class="tug-cd" id="tgCd"></div></div>';
-  $('gBody').innerHTML=h;$('gScore').innerHTML='';
+  $('gBody').innerHTML=h;$('gScore').innerHTML='';arena(true);
   var mv=$('tugMove');
   var setPos=function(){
     var f=pos/N;mv.style.transform='translateX('+(f*200)+'px)';
@@ -89,7 +122,7 @@ function tugPlay(g,names,cfg){
     Array.prototype.forEach.call($('tgC'+p.i).querySelectorAll('.tug-b'),function(b){b.addEventListener('pointerdown',function(e){e.preventDefault();answer(p,+b.getAttribute('data-c'));});b.onclick=function(e){if(e.detail===0)answer(p,+b.getAttribute('data-c'));};});
     var el=$('tgP'+p.i);el.classList.remove('in');void el.offsetWidth;el.classList.add('in');
   };
-  var dust=function(dir){var d=$('tugDust');if(!d)return;var x=dir>0?560:240,h2='';for(var i=0;i<6;i++)h2+='<circle class="tug-puff" cx="'+(x+(Math.random()*60-30))+'" cy="'+(248-Math.random()*10)+'" r="'+(5+Math.random()*7)+'" style="--dx:'+((Math.random()*40-20)*dir)+'px;animation-delay:'+(i*25)+'ms"/>';d.innerHTML=h2;};
+  var dust=function(dir){var d=$('tugDust');if(!d)return;var x=dir>0?580:220,h2='';for(var i=0;i<6;i++)h2+='<circle class="tug-puff" cx="'+(x+(Math.random()*60-30))+'" cy="'+(326-Math.random()*10)+'" r="'+(5+Math.random()*7)+'" style="--dx:'+((Math.random()*40-20)*dir)+'px;animation-delay:'+(i*25)+'ms"/>';d.innerHTML=h2;};
   var pull=function(p,steps){
     var dir=p.i===0?1:-1;pos=Math.max(-N,Math.min(N,pos+dir*steps));p.pulls+=steps;
     var tm=$(p.i===0?'tugR':'tugB');tm.classList.remove('heave');void tm.getBoundingClientRect();tm.classList.add('heave');

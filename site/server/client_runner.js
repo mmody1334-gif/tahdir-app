@@ -21,16 +21,16 @@ var RN_SCENES={
 };
 function runnerWorld(cv,o){
   var c=cv.getContext('2d'),W=cv.width,H=cv.height,S=RN_SCENES[o.scene]||RN_SCENES.city;
-  var HZ=H*.36,GY=H*.98,CX=W/2,RW=W*.44;
+  var HZ=H*.36,GY=H*.98,CX=W/2,RW=Math.min(W*.44,H*.95);
   var t=0,speed=o.demo?1:1,dist=0,run=false,raf=0,slow=1,objs=[],decos=[],lane=0,laneX=0,jumpT=0,crash=0,coinsGot=0,onCoin=null,shake=0;
-  var proj=function(z,lx){var s=1/(1+z*4.2);return {x:CX+lx*RW*s,y:HZ+(GY-HZ)*s,s:s};};
+  var U=H/460,proj=function(z,lx){var s=1/(1+z*4.2);return {x:CX+lx*RW*s,y:HZ+(GY-HZ)*s,s:s*U};};
   for(var i=0;i<14;i++)decos.push({z:i/14,side:i%2?1:-1,k:Math.random()});
   var spawnCoins=function(){var l=Math.floor(Math.random()*3)-1;for(var i=0;i<5;i++)objs.push({t:'coin',z:1+i*.06,l:l});};
   var coinTimer=0;
   function drawSky(){var gr=c.createLinearGradient(0,0,0,HZ);gr.addColorStop(0,S.sky[0]);gr.addColorStop(1,S.sky[1]);c.fillStyle=gr;c.fillRect(0,0,W,HZ+2);
-    if(o.scene==='space'){c.fillStyle='#fff';for(var i=0;i<40;i++){var x=(i*97.3)%W,y=(i*53.7)%HZ;c.globalAlpha=.4+.6*Math.abs(Math.sin(t*.03+i));c.fillRect(x,y,2,2);}c.globalAlpha=1;c.fillStyle='#f3efd9';c.beginPath();c.arc(W*.8,HZ*.4,26,0,7);c.fill();}
-    else{c.fillStyle=o.scene==='desert'?'#fff2a8':'#fffbe0';c.beginPath();c.arc(W*.82,HZ*.42,o.scene==='desert'?30:22,0,7);c.fill();
-      c.fillStyle='rgba(255,255,255,.85)';[[.15,.3],[.45,.2],[.65,.38]].forEach(function(p,i){var x=((p[0]*W+t*.15*(i+1))%(W+120))-60;c.beginPath();c.ellipse(x,p[1]*HZ,40,12,0,0,7);c.ellipse(x+25,p[1]*HZ-6,26,10,0,0,7);c.fill();});}}
+    if(o.scene==='space'){c.fillStyle='#fff';for(var i=0;i<40;i++){var x=(i*97.3)%W,y=(i*53.7)%HZ;c.globalAlpha=.4+.6*Math.abs(Math.sin(t*.03+i));c.fillRect(x,y,2*U,2*U);}c.globalAlpha=1;c.fillStyle='#f3efd9';c.beginPath();c.arc(W*.8,HZ*.4,26*U,0,7);c.fill();}
+    else{c.fillStyle=o.scene==='desert'?'#fff2a8':'#fffbe0';c.beginPath();c.arc(W*.82,HZ*.42,(o.scene==='desert'?30:22)*U,0,7);c.fill();
+      c.fillStyle='rgba(255,255,255,.85)';[[.15,.3],[.45,.2],[.65,.38]].forEach(function(p,i){var x=((p[0]*W+t*.15*(i+1))%(W+120))-60;c.beginPath();c.ellipse(x,p[1]*HZ,40*U,12*U,0,0,7);c.ellipse(x+25*U,p[1]*HZ-6*U,26*U,10*U,0,0,7);c.fill();});}}
   function drawGround(){c.fillStyle=S.ground;c.fillRect(0,HZ,W,H-HZ);
     var a=proj(1,-1.5),b=proj(1,1.5),d=proj(0,1.5),e=proj(0,-1.5);c.fillStyle=S.road;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.lineTo(d.x,d.y);c.lineTo(e.x,e.y);c.fill();
     // خطوط المسارات المتقطعة المتحركة
@@ -45,16 +45,44 @@ function runnerWorld(cv,o){
     if(ob.t==='low'){c.fillStyle='#e21b3c';c.fillRect(p.x-60*s,p.y-38*s,120*s,14*s);c.fillStyle='#fff';for(var i=0;i<4;i++)c.fillRect(p.x-60*s+i*30*s+6*s,p.y-38*s,12*s,14*s);c.fillStyle='#555';c.fillRect(p.x-56*s,p.y-24*s,8*s,24*s);c.fillRect(p.x+48*s,p.y-24*s,8*s,24*s);return;}
     if(ob.t==='wall'){ // قطار/جدار عالٍ
       var w=124*s,h=150*s;c.fillStyle=o.scene==='desert'?'#b5651d':(o.scene==='space'?'#6741d9':'#1368ce');c.fillRect(p.x-w/2,p.y-h,w,h);c.fillStyle='rgba(255,255,255,.85)';c.fillRect(p.x-w*.38,p.y-h*.82,w*.76,h*.3);c.fillStyle='#ffd400';c.fillRect(p.x-w*.4,p.y-h*.2,w*.18,h*.08);c.fillRect(p.x+w*.22,p.y-h*.2,w*.18,h*.08);c.fillStyle='#24323a';c.fillRect(p.x-w/2,p.y-6*s,w,6*s);}}
+  // العدّاء من الخلف (كما في Subway Surfers): شعر وأذنان، قميص بلون الفريق ورقمه على الظهر،
+  // ذراعان تتأرجحان على الجانبين، وساقان بحذاءين يرتفع كل منهما بالتناوب مع ظهور النعل.
+  function rr(x,y,w,h,r){c.beginPath();if(c.roundRect)c.roundRect(x,y,w,h,r);else c.rect(x,y,w,h);}
+  function limb(x1,y1,x2,y2,x3,y3,w,col){c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.lineJoin='round';c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.lineTo(x3,y3);c.stroke();}
   function drawRunner(){
-    var p=proj(.02,laneX),s=p.s*1.55,jy=jumpT>0?Math.sin(Math.PI*(1-jumpT))*90*s:0,ph=t*.35*(slow>.5?1:.4),y=p.y-jy;
-    c.save();c.translate(p.x,y);if(crash>0){c.rotate((1-crash)*1.4*(laneX>=0?1:-1));}
-    c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,jy,26*s,7*s,0,0,7);c.fill();
-    var leg=function(a,col){c.strokeStyle=col;c.lineWidth=9*s;c.lineCap='round';c.beginPath();c.moveTo(0,-48*s);c.lineTo(Math.sin(a)*16*s,-24*s);c.lineTo(Math.sin(a)*10*s-4*s,0);c.stroke();};
-    leg(ph,'#1d3557');leg(ph+Math.PI,'#24323a');
-    c.fillStyle='#e21b3c';c.beginPath();c.roundRect?c.roundRect(-15*s,-92*s,30*s,48*s,10*s):c.rect(-15*s,-92*s,30*s,48*s);c.fill();
-    c.fillStyle='#fff';c.font='bold '+Math.round(16*s)+'px sans-serif';c.textAlign='center';c.fillText('10',0,-62*s);
-    var arm=function(a){c.strokeStyle='#f1c9a5';c.lineWidth=7*s;c.beginPath();c.moveTo(0,-84*s);c.lineTo(Math.sin(a)*20*s,-64*s);c.stroke();};arm(ph+Math.PI);arm(ph);
-    c.fillStyle='#f1c9a5';c.beginPath();c.arc(0,-106*s,14*s,0,7);c.fill();c.fillStyle='#fff';c.beginPath();c.arc(0,-110*s,15*s,Math.PI,0);c.fill();
+    var p=proj(.02,laneX),s=p.s*1.7,jy=jumpT>0?Math.sin(Math.PI*(1-jumpT))*95*s:0,run=(slow>.5?1:.35)*(crash>0?0:1),ph=t*.32*run,y=p.y-jy;
+    var col=o.color||'#e21b3c',skin='#e9b98f',shorts='#24324f',shoe='#1d2733';
+    c.save();c.translate(p.x,y);
+    // ظل على الأرض (يصغر أثناء القفز)
+    c.fillStyle='rgba(0,0,0,.28)';c.beginPath();c.ellipse(0,jy,(28-jy/s*.08)*s,8*s,0,0,7);c.fill();
+    if(crash>0){c.rotate((1-crash)*1.3*(laneX>=0?1:-1));}
+    var lean=(lane-laneX)*.25;c.rotate(lean);
+    var air=jumpT>0;
+    // الساقان: الرافعة تقصر (القدم أعلى) وتظهر نعلها
+    [[-1,ph],[1,ph+Math.PI]].forEach(function(L){
+      var sd=L[0],up=air?.6:Math.max(0,Math.sin(L[1])),fy=-up*22*s,ky=-26*s-up*10*s;
+      limb(sd*8*s,-50*s,sd*10*s,ky,sd*9*s,fy-6*s,10*s,skin);
+      c.strokeStyle=shorts;c.lineWidth=12*s;c.beginPath();c.moveTo(sd*8*s,-52*s);c.lineTo(sd*9*s,-40*s);c.stroke();
+      c.fillStyle=shoe;rr(sd*9*s-8*s,fy-10*s,16*s,12*s,5*s);c.fill();
+      if(up>.25){c.fillStyle='#f4f6fb';rr(sd*9*s-7*s,fy-1*s,14*s,4*s,2*s);c.fill();}
+      c.fillStyle='#fff';c.fillRect(sd*9*s-8*s,fy-12*s,16*s,3*s);
+    });
+    // الشورت والقميص
+    c.fillStyle=shorts;rr(-17*s,-58*s,34*s,16*s,6*s);c.fill();
+    var g=c.createLinearGradient(-18*s,0,18*s,0);g.addColorStop(0,col);g.addColorStop(.5,col);g.addColorStop(1,'rgba(0,0,0,.25)');
+    c.fillStyle=col;rr(-18*s,-100*s,36*s,48*s,12*s);c.fill();c.fillStyle=g;c.fill();
+    c.fillStyle='rgba(255,255,255,.9)';c.font='900 '+Math.round(19*s)+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(o.num||10),0,-74*s);
+    c.strokeStyle='rgba(255,255,255,.6)';c.lineWidth=3*s;c.beginPath();c.moveTo(-18*s,-93*s);c.lineTo(18*s,-93*s);c.stroke();
+    // الذراعان على الجانبين تتأرجحان عكس الساقين
+    [[-1,ph+Math.PI],[1,ph]].forEach(function(A){var sd=A[0],sw=air?-1:Math.sin(A[1]),hx=sd*25*s,hy=-66*s-sw*10*s;
+      limb(sd*16*s,-94*s,sd*24*s,-80*s-sw*4*s,hx,hy,8*s,skin);c.strokeStyle=col;c.lineWidth=10*s;c.beginPath();c.moveTo(sd*16*s,-95*s);c.lineTo(sd*20*s,-87*s);c.stroke();
+      c.fillStyle=skin;c.beginPath();c.arc(hx,hy,4.5*s,0,7);c.fill();});
+    // الرأس من الخلف: رقبة، أذنان، شعر، وقبعة بلون الفريق
+    c.fillStyle=skin;rr(-5*s,-108*s,10*s,10*s,3*s);c.fill();
+    c.beginPath();c.arc(-14*s,-118*s,4*s,0,7);c.arc(14*s,-118*s,4*s,0,7);c.fill();
+    c.fillStyle='#2a1d14';c.beginPath();c.arc(0,-120*s,14.5*s,0,7);c.fill();
+    c.fillStyle=col;c.beginPath();c.arc(0,-124*s,15*s,Math.PI,0);c.fill();c.fillRect(-15*s,-125*s,30*s,4*s);
+    c.fillStyle='rgba(255,255,255,.5)';c.beginPath();c.arc(-5*s,-131*s,4*s,0,7);c.fill();
     c.restore();
   }
   function frame(){
@@ -101,8 +129,10 @@ function runnerPlay(g,cfg,ti){
   var DIRS=[{d:-1,ic:'⬅️',k:'ArrowLeft',t:'يسار'},{d:0,ic:'⬆️',k:'ArrowUp',t:'قفز'},{d:1,ic:'➡️',k:'ArrowRight',t:'يمين'}];
   $('gBody').innerHTML='<div class="rn" id="rn"><div class="rn-hud"><span class="rn-team" style="--tc:'+TEAM_COLORS[ti]+'">🏃 '+esc(team.name)+'</span><span class="rn-lives" id="rnLives"></span><span class="rn-sc">⭐ <b id="rnScore">0</b></span><span class="rn-coins">🪙 <b id="rnCoins">0</b></span><span class="rn-qn" id="rnQn"></span></div>'+
     '<div class="rn-view"><canvas id="rnCv" width="960" height="460"></canvas><div class="rn-q" id="rnQ" hidden><div class="rn-qt" id="rnQt" dir="auto"></div><div class="rn-ch" id="rnCh"></div><div class="rn-bar"><i id="rnBar"></i></div></div><div class="tug-cd" id="tgCd"></div></div></div>';
-  renderScore(false);
-  W=runnerWorld($('rnCv'),{scene:cfg.scene});
+  renderScore(false);arena(true);
+  var cv=$('rnCv'),bx=cv.parentNode.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
+  if(bx.width>200&&bx.height>200){cv.width=Math.round(bx.width*dpr);cv.height=Math.round(bx.height*dpr);}
+  W=runnerWorld(cv,{scene:cfg.scene,color:TEAM_COLORS[ti],num:ti+1});
   var hud=function(){$('rnLives').textContent='❤️'.repeat(lives)+'🖤'.repeat(Math.max(0,cfg.lives-lives));$('rnScore').textContent=score;$('rnCoins').textContent=W.coins();$('rnQn').textContent='حاجز '+Math.min(asked+1,cfg.q)+' / '+cfg.q;};
   W.onCoin(function(){score+=5;sfx('coin');hud();});
   var tick=setInterval(function(){if(state==='run'){score+=1;$('rnScore').textContent=score;}},250);stopFns.push(function(){clearInterval(tick);});

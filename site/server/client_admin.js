@@ -1,6 +1,9 @@
 (function(){
 'use strict';
 guard();
+// «الشاملة»: نفس اللوحة على /elkabsula، تعرض فقط المعلمين المنقولين إليها (مخفية عن اللوحة الأساسية)
+var VAULT=/^\/elkabsula/.test(location.pathname),VQ=VAULT?'vault=1':'';
+function vq(u){return VQ?u+(u.indexOf('?')>=0?'&':'?')+VQ:u;}
 var data=null,act=null,tab='teachers',q='',rep=null,repDays=30,crs=null,lessonsAll=null,openCourse=null;
 var GRADES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function gn(g){var i=GRADES.indexOf(g);return i<0?99:i;}
@@ -9,7 +12,7 @@ var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جها�
 // وإلا ظهر الحدث في السجل بنصه الإنجليزي الخام.
 var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور',device_stale_removed:'إزالة جهاز مهمل تلقائيًا'};
 function load(){
-  return Promise.all([api('/api/admin/stats'),api('/api/admin/activity'),api('/api/admin/courses'),api('/api/lessons'),api('/api/admin/report?days='+repDays)]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
+  return Promise.all([api(vq('/api/admin/stats')),api(vq('/api/admin/activity')),api('/api/admin/courses'),api('/api/lessons'),api(vq('/api/admin/report?days='+repDays))]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){toast(e.message);});
 }
 function courseName(k){var p=String(k).split('|');return p[0]+' — الصف '+gLabel(p[1]);}
 function sortedCourses(){return (crs.courses||[]).slice().sort(function(a,b){return (gn(a.grade)-gn(b.grade))||a.subject.localeCompare(b.subject,'ar');});}
@@ -196,7 +199,7 @@ function usedGrades(u){
 }
 function teacherRows(){
   var list=data.users.filter(function(u){return !q||(u.name+u.username).toLowerCase().indexOf(q)>=0;});
-  if(!list.length)return '<div class="empty-state">لا يوجد معلمون بعد. أضف المعلمين من زر «إضافة معلمين».</div>';
+  if(!list.length)return '<div class="empty-state">'+(VAULT?'لا يوجد معلمون في اللوحة الشاملة بعد. افتح أي معلم في لوحة التحكم الأساسية واضغط السهم ⬅ بجوار «كلمة مرور جديدة» لنقله إلى هنا.':'لا يوجد معلمون بعد. أضف المعلمين من زر «إضافة معلمين».')+'</div>';
   return '<div class="t-wrap"><table class="tbl"><thead><tr><th>المعلم</th><th>مرات الدخول</th><th>آخر دخول</th><th>المواد والصفوف المسموحة</th><th>الصفوف المستخدمة</th><th>دروس منسوخة</th><th>الأجهزة</th><th></th></tr></thead><tbody>'+
     list.map(function(u){
       var st=!u.active?'<span class="pill off">موقوف</span>':u.role==='admin'?'<span class="pill adm">مدير</span>':'';
@@ -220,7 +223,7 @@ function activityView(){
 function render(){
   var T=[['teachers','المعلمون'],['report','تقرير الاستخدام'],['courses','المواد والدروس'],['activity','النشاط والتنبيهات']];
   var h=(tab==='report'?'':kpis())+'<div class="tabs" role="tablist">'+T.map(function(t){return '<button type="button" role="tab" class="tab'+(tab===t[0]?' on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
-  if(tab==='teachers')h+='<div class="toolbar"><input id="search" placeholder="ابحث باسم المعلم" value="'+esc(q)+'"><button type="button" class="btn primary" id="addBtn">إضافة معلمين</button></div>'+teacherRows();
+  if(tab==='teachers')h+='<div class="toolbar"><input id="search" placeholder="ابحث باسم المعلم" value="'+esc(q)+'">'+(VAULT?'':'<button type="button" class="btn primary" id="addBtn">إضافة معلمين</button>')+'</div>'+teacherRows();
   else if(tab==='report')h+=reportView();
   else if(tab==='courses')h+=coursesView();
   else h+=activityView();
@@ -229,7 +232,7 @@ function render(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-open]'),function(b){b.onclick=function(){openTeacher(+b.getAttribute('data-open'));};});
   if($('search'))$('search').oninput=function(){q=this.value.trim().toLowerCase();var pos=this.selectionStart;render();var s=$('search');s.focus();s.setSelectionRange(pos,pos);};
   if($('addBtn'))$('addBtn').onclick=addTeachers;
-  Array.prototype.forEach.call(document.querySelectorAll('[data-days]'),function(b){b.onclick=function(){repDays=+b.getAttribute('data-days');api('/api/admin/report?days='+repDays).then(function(r){rep=r;render();});};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-days]'),function(b){b.onclick=function(){repDays=+b.getAttribute('data-days');api(vq('/api/admin/report?days='+repDays)).then(function(r){rep=r;render();});};});
   if($('csvBtn'))$('csvBtn').onclick=downloadCsv;
   if($('addCourse'))$('addCourse').onclick=addCourse;
   Array.prototype.forEach.call(document.querySelectorAll('[data-course]'),function(b){b.onclick=function(){openCourse=b.getAttribute('data-course');render();};});
@@ -304,6 +307,7 @@ function openTeacher(id){
     '<h4>الأجهزة ('+u.devices.length+' من '+(u.role==='admin'?'غير محدود':u.max_devices)+')</h4><ul class="devs">'+dev+'</ul>'+
     '<h4>أكثر الدروس نسخًا</h4><ul class="toplist">'+top+'</ul>'+
     '<h4>إجراءات</h4><div class="acts">'+
+      (u.role!=='admin'?'<button type="button" class="btn small vault-btn" data-act="vault" title="'+(VAULT?'إرجاع إلى لوحة التحكم الأساسية':'نقل إلى لوحة التحكم الشاملة')+'" aria-label="'+(VAULT?'إرجاع إلى لوحة التحكم الأساسية':'نقل إلى لوحة التحكم الشاملة')+'">'+(VAULT?'➡':'⬅')+'</button>':'')+
       '<button type="button" class="btn small" data-act="password">كلمة مرور جديدة</button>'+
       '<button type="button" class="btn small" data-act="rename">تعديل الاسم</button>'+
       (u.role!=='admin'?'<button type="button" class="btn small primary" data-act="scope">المواد والصفوف المسموحة</button><button type="button" class="btn small" data-act="clean_stale">مسح الأجهزة المهملة</button><button type="button" class="btn small" data-act="reset_devices">مسح كل الأجهزة</button><button type="button" class="btn small" data-act="max_devices">عدد الأجهزة المسموح</button><button type="button" class="btn small" data-act="toggle">'+(u.active?'إيقاف الحساب':'تفعيل الحساب')+'</button><button type="button" class="btn small danger" data-act="delete">حذف المعلم</button>':'')+
@@ -326,9 +330,11 @@ function doAct(u,a){
   if(a==='clean_stale')return api('/api/admin/teachers/'+u.id,{action:'clean_stale'}).then(function(r){toast(r.removed?('أُزيل '+r.removed+' جهازًا مهملًا'):'لا توجد أجهزة مهملة');load();},function(e){toast(e.message);});
   if(a==='reset_devices')return dialog({title:'مسح أجهزة '+u.name,message:'سيُسجَّل خروجه من كل الأجهزة، ويستطيع الدخول من جهازين جديدين.',okText:'مسح الأجهزة',danger:true}).then(function(ok){if(ok)act1(u,{action:'reset_devices'},'مُسحت الأجهزة');});
   if(a==='scope')return scopeDialog(u);
+  if(a==='vault')return act1(u,{action:'vault',value:VAULT?0:1},VAULT?'أُرجع '+u.name+' إلى لوحة التحكم الأساسية':'نُقل '+u.name+' إلى اللوحة الشاملة');
   if(a==='toggle')return act1(u,{action:'toggle'},u.active?'أُوقف الحساب':'فُعّل الحساب');
   if(a==='delete')return dialog({title:'حذف '+u.name,message:'سيُحذف الحساب نهائيًا ولن يستطيع الدخول. تبقى إحصائياته القديمة محفوظة.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/teachers/'+u.id,null,'DELETE').then(function(){toast('حُذف المعلم');load();},function(e){toast(e.message);});});
 }
+if(VAULT){document.title='الشاملة · الكبسولة';document.body.classList.add('vault-mode');var st=document.querySelector('.stats .stat');if(st)st.textContent='لوحة التحكم الشاملة';}
 $('refreshBtn').onclick=function(){load().then(function(){toast('تم التحديث');});};
 api('/api/me').then(function(m){initNav(m);});
 load();

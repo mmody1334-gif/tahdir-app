@@ -754,8 +754,8 @@ button.lv-opt{cursor:pointer}
 .bl-board{display:flex;justify-content:center;align-items:center;gap:10px;background:#0b3b33;color:#fff;border-radius:14px;padding:6px 14px;font-size:1.1rem;font-weight:800}
 .bl-board b{font-size:2rem;min-width:1.2em;text-align:center;font-variant-numeric:tabular-nums}.bl-t{color:color-mix(in srgb,var(--tc) 55%,#fff);max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bl-move{transition:transform .5s cubic-bezier(.3,1.4,.5,1)}
-.bl-pl.kick .bl-leg{transform-box:fill-box;transform-origin:50% 0;animation:blKick .4s}@keyframes blKick{40%{transform:rotate(-55deg)}}
-#blPB.kick .bl-leg{animation-name:blKick2}@keyframes blKick2{40%{transform:rotate(55deg)}}
+
+
 .bl-ball{transform-box:fill-box;transform-origin:center}.bl-ball.roll-l{animation:blRollL .5s ease-out}.bl-ball.roll-r{animation:blRollR .5s ease-out}
 @keyframes blRollL{to{transform:rotate(-360deg)}}@keyframes blRollR{to{transform:rotate(360deg)}}
 .bl-goal.shake{animation:tugShake .3s 3}
@@ -865,6 +865,98 @@ button.lv-opt{cursor:pointer}
 .g-stage:fullscreen .tug-p{min-height:calc(100vh - 160px)}.g-stage:fullscreen .tug-q{font-size:1.35rem}.g-stage:fullscreen .tug-b{font-size:1.2rem;min-height:84px}
 @media (max-width:900px){.tug{grid-template-columns:1fr 1fr}.tug-mid{grid-column:1/-1;order:-1}.tug-p{min-height:0}.tug-ch{grid-template-columns:1fr}}
 @media (max-width:520px){.tug-names{grid-template-columns:1fr}.tug-b{min-height:52px;font-size:.92rem}.tug-q{font-size:1rem}}
+/* ---------- لوحة التحكم الشاملة ---------- */
+.acts .vault-btn{font-size:1.15rem;line-height:1;padding-inline:12px;background:#0b3b33;color:#fff;border-color:#0b3b33}
+.acts .vault-btn:hover{background:#c98a1e;border-color:#c98a1e}
+body.vault-mode .stats .stat{background:#0b3b33;color:#ffd400;border-color:#0b3b33}
+body.vault-mode .dash .tabs .tab.on{background:#0b3b33;color:#fff}
+/* ---------- شعار المادة المتحرك (الترحيب) ---------- */
+.morph{position:relative;width:min(300px,72vw);aspect-ratio:4/3;margin:0 auto 6px}
+.morph .mz{position:absolute;inset:0;opacity:0;transform:scale(.35) rotate(-30deg);filter:blur(8px);transition:opacity .32s ease,transform .5s cubic-bezier(.2,1.5,.4,1),filter .32s ease;pointer-events:none}
+.morph .mz.on{opacity:1;transform:none;filter:none}
+.morph .mz svg,.morph .mz .cell-art{width:100%!important;height:100%!important;margin:0;animation:none}
+.morph .mz.final{animation:mzLand .9s cubic-bezier(.2,1.6,.4,1)}
+.morph.done .mz.final svg{animation:mzFloat 3.2s ease-in-out .9s infinite alternate!important}
+@keyframes mzLand{0%{transform:scale(.3) rotate(25deg)}60%{transform:scale(1.12) rotate(-4deg)}100%{transform:none}}
+@keyframes mzFloat{to{transform:translateY(-7px) scale(1.02)}}
+.morph .mz-ring{position:absolute;inset:8%;border-radius:50%;border:4px solid var(--main,#1f8a70);opacity:0;pointer-events:none}
+.morph.done .mz-ring{animation:mzRing 1s ease-out .15s}
+@keyframes mzRing{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.35)}}
+/* الخلية حيّة: غشاء يتموج، ميتوكوندريا تنجرف، نواة تنبض */
+.morph .c-mem{transform-box:fill-box;transform-origin:center;animation:mzMem 2.2s ease-in-out infinite alternate}
+@keyframes mzMem{0%{transform:scale(1,1)}50%{transform:scale(1.03,.97)}100%{transform:scale(.97,1.03)}}
+.morph .c-nuc,.morph .c-nucl{transform-box:fill-box;transform-origin:center;animation:mzPulse 1.4s ease-in-out infinite alternate}
+@keyframes mzPulse{to{transform:scale(1.08)}}
+.morph .c-mito{animation:mzDrift 2.6s ease-in-out infinite alternate}.morph .c-mito+.c-mito{animation-delay:-1.3s}
+@keyframes mzDrift{to{translate:6px -4px}}
+.morph .c-ves{animation:mzVes 1.8s ease-in-out infinite alternate}@keyframes mzVes{to{translate:-5px 5px}}
+.morph .mz-bub circle{animation:mzBub 1.4s ease-in infinite}.morph .mz-bub circle:nth-child(2){animation-delay:.45s}.morph .mz-bub circle:nth-child(3){animation-delay:.9s}
+@keyframes mzBub{0%{transform:translateY(0);opacity:.9}100%{transform:translateY(-70px);opacity:0}}
+.morph .mz-orb{transform-origin:120px 90px;animation:mzSpin 2.2s linear infinite}.morph .mz-orb.o2{animation-duration:3s;animation-direction:reverse}
+@keyframes mzSpin{to{transform:rotate(360deg)}}
+.morph .mz-spark{transform-origin:60px 68px;animation:mzTw 1s ease-in-out infinite alternate}@keyframes mzTw{to{transform:scale(.5) rotate(45deg)}}
+.morph .mz-leaf{transform-origin:170px 70px;animation:mzLeaf 1.6s ease-in-out infinite alternate}@keyframes mzLeaf{to{transform:rotate(-12deg)}}
+.morph .mz-cur{animation:mzBlink .8s steps(2) infinite}@keyframes mzBlink{50%{opacity:0}}
+.morph .mz-comp{transform-origin:178px 40px;animation:mzLeaf 1.4s ease-in-out infinite alternate}
+.mz-tag{display:inline-block;margin:0 auto 8px;padding:4px 16px;border-radius:999px;background:var(--main-l,#e3f1eb);color:var(--main-d,#0b3b33);font-weight:700;opacity:0;transform:translateY(6px);transition:opacity .4s .3s,transform .4s .3s}
+.mz-tag.on{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.morph *{animation:none!important;transition:none!important}}
+/* ---------- الساحة: ألعاب الحركة بملء الشاشة ---------- */
+body.g-arena{overflow:hidden}
+.g-stage.arena{position:fixed;inset:0;z-index:9000;border-radius:0;border:0;min-height:0;overflow:hidden;padding:8px 14px 12px;gap:6px;background:radial-gradient(1400px 500px at 50% -10%,#e6f5ef,transparent 70%),#f7f9fb}
+.g-stage.arena .g-bar{padding:2px 0}.g-stage.arena .g-score:empty{display:none}
+.g-stage.arena .gm-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0}
+.g-stage.arena .tug,.g-stage.arena .arc-rk,.g-stage.arena .rn,.g-stage.arena .bn-wrap{flex:1;min-height:0}
+.g-stage.arena .tug{grid-template-columns:minmax(250px,1fr) minmax(0,1.9fr) minmax(250px,1fr);padding:0;height:100%}
+.g-stage.arena .tug-p{min-height:0;height:100%;overflow:auto}
+.g-stage.arena .tug-q{font-size:clamp(1rem,1.5vw,1.45rem);min-height:0}
+.g-stage.arena .tug-ch{grid-template-columns:1fr;gap:10px}
+.g-stage.arena .tug-b{min-height:clamp(52px,7.5vh,84px);font-size:clamp(.98rem,1.25vw,1.3rem);word-break:normal;overflow-wrap:anywhere}
+.g-stage.arena .tug-mid{min-height:0;justify-content:center}
+.g-stage.arena .tug-svg,.g-stage.arena .tug-mid .arc-svg{max-height:62vh;width:100%;height:auto}
+.g-stage.arena .tug-crowd{font-size:clamp(1.4rem,2.4vw,2.2rem)}
+.g-stage.arena .tug-meter{height:16px}
+.g-stage.arena .bl-board{font-size:clamp(1.1rem,1.8vw,1.8rem)}
+/* الصواريخ: المشهد في الأعلى ولوحات اللاعبين أسفله */
+.g-stage.arena .arc-rk{display:flex;flex-direction:column;gap:8px}
+.g-stage.arena .rk-top{flex:1 1 52%;min-height:0;display:flex}
+.g-stage.arena .rk-top .arc-svg{width:100%;height:100%;max-height:none}
+.g-stage.arena .rk-panels{flex:0 1 48%;min-height:0}
+.g-stage.arena .rk-panels .tug-p{height:100%;overflow:auto;padding:8px;gap:6px}
+.g-stage.arena .rk-panels .tug-q{font-size:clamp(.95rem,1.2vw,1.2rem);padding:8px 10px}
+.g-stage.arena .rk-panels .tug-ch{grid-template-columns:1fr 1fr;gap:6px}
+.g-stage.arena .rk-panels .tug-b{min-height:44px;font-size:clamp(.88rem,1.05vw,1.1rem);padding:6px 8px}
+.g-stage.arena .rk-n2 .tug-ch{grid-template-columns:1fr 1fr}
+/* العدّاء */
+.g-stage.arena .rn{display:flex;flex-direction:column;gap:8px}
+.g-stage.arena .rn-view{flex:1;min-height:0;background:#0b1f2a}
+.g-stage.arena .rn-view canvas{width:100%;height:100%;display:block}
+.g-stage.arena .rn-qt{font-size:clamp(1.15rem,1.9vw,1.9rem)}
+.g-stage.arena .rn-b{font-size:clamp(1rem,1.4vw,1.45rem)}
+/* البالونات */
+.g-stage.arena .bn-wrap{display:flex;flex-direction:column;gap:8px}
+.g-stage.arena .bn-sky{flex:1;min-height:0}
+.g-stage.arena .bn{width:clamp(110px,14vw,210px)}
+.g-stage.arena .bn-q{font-size:clamp(1.1rem,1.7vw,1.8rem)}
+@media (max-width:900px){.g-stage.arena{overflow:auto}.g-stage.arena .tug{grid-template-columns:1fr 1fr;height:auto}.g-stage.arena .tug-mid{grid-column:1/-1;order:-1}.g-stage.arena .tug-p{height:auto}}
+/* شخصيات شدّ الحبل */
+.tug-svg .tg-cloud{animation:tgCloud 14s linear infinite alternate}.tug-svg .tg-cloud.c2{animation-duration:18s}@keyframes tgCloud{to{transform:translateX(60px)}}
+.tug-team .tf{transform-box:fill-box;transform-origin:50% 100%}
+.tug-team:not(.heave):not(.fall):not(.cheer) .tf{animation:tugStrain .55s ease-in-out infinite alternate}.tug-team .tf1{animation-delay:.2s!important}
+@keyframes tugStrain{from{transform:rotate(0)}to{transform:rotate(3deg) translateX(2px)}}
+.tug-team.heave .tf{animation:tugHeave2 .45s ease}@keyframes tugHeave2{45%{transform:rotate(11deg) translateX(8px)}}
+.tug-team.fall .tf{animation:tugFall2 .9s cubic-bezier(.5,0,.8,.6) forwards}@keyframes tugFall2{to{transform:rotate(-78deg) translateY(6px)}}
+.tug-team.cheer .tf{animation:tugJump2 .45s ease-in-out infinite alternate}@keyframes tugJump2{from{transform:translateY(0) rotate(0)}to{transform:translateY(-28px) rotate(-4deg)}}
+/* لاعبو كرة القدم: جري متواصل وركلة */
+.bl-pl .bl-leg,.bl-pl .bl-leg2,.bl-pl .bl-arm,.bl-pl .bl-arm2{transform-box:view-box}
+.bl-pl .bl-leg{transform-origin:-4px -40px;animation:blStride .5s ease-in-out infinite alternate}
+.bl-pl .bl-leg2{transform-origin:4px -40px;animation:blStride .5s ease-in-out infinite alternate-reverse}
+.bl-pl .bl-arm{transform-origin:-6px -70px;animation:blStride .5s ease-in-out infinite alternate-reverse}
+.bl-pl .bl-arm2{transform-origin:8px -70px;animation:blStride .5s ease-in-out infinite alternate}
+.bl-pl .bl-run{animation:blBob .25s ease-in-out infinite alternate}
+@keyframes blStride{from{transform:rotate(-22deg)}to{transform:rotate(22deg)}}
+@keyframes blBob{to{transform:translateY(-3px)}}
+.bl-pl.kick .bl-leg{animation:blKick3 .45s ease-out}@keyframes blKick3{0%{transform:rotate(30deg)}45%{transform:rotate(-70deg)}100%{transform:rotate(0)}}
 @media (prefers-reduced-motion:reduce){.tug *{animation:none!important;transition:none!important}}
 /* ---------- «أستطيع أن ✓» ---------- */
 .cd-layout .u-btn.cd-u{width:100%;margin:2px 0}

@@ -265,6 +265,48 @@ function selectLesson(id){
   if(!viewed[id]){viewed[id]=1;track('view',l);}
   if(window.innerWidth<=860){try{$('panel').scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}}
 }
+
+// ===== شعار المادة المتحرك في شاشة الترحيب =====
+// خلية حيّة تنبض، ثم تتحول تباعًا إلى رموز المواد (دورق الكيمياء، ذرّة الفيزياء، مجهر العلوم…)
+// وتستقر أخيرًا على رمز مادة المعلم. الإدارة (أ. محمد مجدي) = الأحياء.
+var MORPH_ICONS={
+  bio:null, // تُؤخذ من رسم الخلية
+  chem:'<svg viewBox="0 0 240 180"><defs><linearGradient id="mzLiq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7ee0c3"/><stop offset="1" stop-color="#1f8a70"/></linearGradient></defs><path d="M104 22h32M108 22v44L70 146a10 10 0 0 0 9 14h82a10 10 0 0 0 9-14L132 66V22" fill="#eef9f5" stroke="#0b3b33" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/><path d="M86 118h68l16 28a10 10 0 0 1-9 14H79a10 10 0 0 1-9-14z" fill="url(#mzLiq)"/><g class="mz-bub"><circle cx="104" cy="140" r="5" fill="#fff" opacity=".85"/><circle cx="124" cy="146" r="3.5" fill="#fff" opacity=".8"/><circle cx="138" cy="134" r="4" fill="#fff" opacity=".8"/></g><path d="M100 40h14M100 54h10" stroke="#0b3b33" stroke-width="3" stroke-linecap="round" opacity=".5"/></svg>',
+  phys:'<svg viewBox="0 0 240 180"><g fill="none" stroke="#1368ce" stroke-width="5"><ellipse cx="120" cy="90" rx="84" ry="30"/><ellipse cx="120" cy="90" rx="84" ry="30" transform="rotate(60 120 90)"/><ellipse cx="120" cy="90" rx="84" ry="30" transform="rotate(-60 120 90)"/></g><circle cx="120" cy="90" r="15" fill="#e21b3c"/><circle cx="114" cy="85" r="5" fill="#fff" opacity=".6"/><g class="mz-orb"><circle cx="204" cy="90" r="8" fill="#ffd400" stroke="#0b3b33" stroke-width="2"/></g><g class="mz-orb o2"><circle cx="78" cy="17" r="8" fill="#ffd400" stroke="#0b3b33" stroke-width="2"/></g></svg>',
+  sci:'<svg viewBox="0 0 240 180"><g stroke="#0b3b33" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M70 160h110" /><path d="M125 160v-20" /><path d="M98 140h56" fill="none"/><rect x="104" y="30" width="26" height="70" rx="6" transform="rotate(-25 117 65)" fill="#e3f1eb"/><path d="M150 72a40 40 0 0 1-30 68" fill="none"/><path d="M116 108l18 8"/><circle cx="148" cy="66" r="10" fill="#c98a1e"/></g><g class="mz-spark"><path d="M60 50l6 12 12 6-12 6-6 12-6-12-12-6 12-6z" fill="#ffd400"/></g></svg>',
+  env:'<svg viewBox="0 0 240 180"><circle cx="120" cy="90" r="62" fill="#4dabf7"/><path d="M84 52c18 4 22 22 10 30s-2 22 12 28-6 26-22 18c-10-14-18-34-12-50 3-10 6-20 12-26zM140 40c14 8 30 22 34 44-10 2-20-6-24 4s4 18-6 24-18-10-14-24 2-26 10-48z" fill="#51cf66"/><g class="mz-leaf"><path d="M168 30c30 0 40 22 34 44-26 0-40-18-34-44z" fill="#2f9e44"/><path d="M172 36c8 14 16 24 28 34" stroke="#d3f9d8" stroke-width="3" fill="none"/></g></svg>',
+  it:'<svg viewBox="0 0 240 180"><rect x="56" y="34" width="128" height="86" rx="10" fill="#0b3b33"/><rect x="66" y="44" width="108" height="66" rx="5" fill="#12243a"/><path d="M50 128h140l-12 18H62z" fill="#9aa7b8"/><g class="mz-code" font-family="monospace" font-weight="900" font-size="26" fill="#7fd3ff"><text x="80" y="86">&lt;/&gt;</text></g><rect class="mz-cur" x="150" y="68" width="10" height="22" fill="#ffd400"/></svg>',
+  math:'<svg viewBox="0 0 240 180"><text x="120" y="120" text-anchor="middle" font-size="96" font-weight="900" fill="#1368ce" font-family="serif">π</text><g class="mz-comp" stroke="#0b3b33" stroke-width="6" stroke-linecap="round"><path d="M178 40l-22 70M178 40l22 70"/><circle cx="178" cy="40" r="7" fill="#c98a1e"/></g><text x="56" y="70" font-size="34" font-weight="900" fill="#e21b3c">+</text><text x="54" y="140" font-size="34" font-weight="900" fill="#26890c">÷</text></svg>',
+  ar:'<svg viewBox="0 0 240 180"><path d="M120 50c-20-14-48-16-70-10v100c22-6 50-4 70 10 20-14 48-16 70-10V40c-22-6-50-4-70 10z" fill="#fff" stroke="#0b3b33" stroke-width="6" stroke-linejoin="round"/><path d="M120 50v100" stroke="#0b3b33" stroke-width="5"/><text x="86" y="112" text-anchor="middle" font-size="46" font-weight="900" fill="#1f8a70">ض</text><text x="156" y="112" text-anchor="middle" font-size="40" font-weight="900" fill="#c98a1e">ع</text></svg>',
+  en:'<svg viewBox="0 0 240 180"><rect x="52" y="34" width="136" height="112" rx="18" fill="#fff" stroke="#0b3b33" stroke-width="6"/><text x="120" y="116" text-anchor="middle" font-size="62" font-weight="900" fill="#1368ce" font-family="sans-serif">Aa</text><path d="M188 52l20-12v100l-20-12" fill="#e21b3c"/></svg>',
+  isl:'<svg viewBox="0 0 240 180"><path d="M120 34c-24 22-48 30-48 60v52h96V94c0-30-24-38-48-60z" fill="#1f8a70" stroke="#0b3b33" stroke-width="5" stroke-linejoin="round"/><path d="M106 146v-30a14 14 0 0 1 28 0v30" fill="#e3f1eb" stroke="#0b3b33" stroke-width="4"/><path d="M60 60v86M180 60v86" stroke="#0b3b33" stroke-width="8" stroke-linecap="round"/><path d="M128 18a14 14 0 1 0 6 22a11 11 0 1 1-6-22z" fill="#ffd400"/></svg>'
+};
+var MORPH_NAMES={bio:'الأحياء',chem:'الكيمياء',phys:'الفيزياء',sci:'العلوم',env:'العلوم البيئية',it:'تقنية المعلومات',math:'الرياضيات',ar:'اللغة العربية',en:'اللغة الإنجليزية',isl:'التربية الإسلامية'};
+function morphKey(sub){sub=sub||'';
+  if(!sub||/أحياء/.test(sub))return 'bio';if(/كيمياء/.test(sub))return 'chem';if(/فيزياء/.test(sub))return 'phys';if(/بيئ/.test(sub))return 'env';
+  if(/علوم/.test(sub))return 'sci';if(/تقنية/.test(sub))return 'it';if(/رياض/.test(sub))return 'math';if(/العربية/.test(sub))return 'ar';
+  if(/انجليز|إنجليز|English/i.test(sub))return 'en';if(/إسلام/.test(sub))return 'isl';return 'bio';}
+function teacherMorph(){
+  if(me&&me.role==='admin')return 'bio';
+  var ss=subjects();if(ss.length===1)return morphKey(ss[0]);
+  return morphKey(subj!=null&&ss.indexOf(subj)>=0?subj:ss[0]);
+}
+function morphHtml(){
+  var cell=$('cellArt')?$('cellArt').innerHTML:'';
+  return '<div class="morph" id="morph" aria-hidden="true">'+Object.keys(MORPH_NAMES).map(function(k){return '<div class="mz mz-'+k+'" data-k="'+k+'">'+(k==='bio'?cell:MORPH_ICONS[k])+'</div>';}).join('')+'<div class="mz-ring"></div></div><div class="mz-tag" id="mzTag"></div>';
+}
+function runMorph(){
+  var box=$('morph');if(!box)return;var fin=teacherMorph();
+  var all=box.querySelectorAll('.mz'),byK={};Array.prototype.forEach.call(all,function(e){byK[e.getAttribute('data-k')]=e;});
+  var order=['bio'].concat(['chem','phys','sci','env','it','math','ar','en','isl'].filter(function(k){return k!==fin;})).concat([fin]);
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var show=function(k,final){Array.prototype.forEach.call(all,function(e){e.classList.remove('on');});var e=byK[k];if(!e)return;void e.offsetWidth;e.classList.add('on');if(final){e.classList.add('final');box.classList.add('done');var t=$('mzTag');if(t){t.innerHTML='مادتك: <b>'+esc(MORPH_NAMES[k])+'</b>';t.classList.add('on');}}};
+  if(reduce){show(fin,true);return;}
+  box.classList.add('alive');show('bio');
+  var i=0,step=function(){if(!document.body.contains(box))return;i++;if(i>=order.length)return;var last=i===order.length-1;show(order[i],last);if(!last)setTimeout(step,i===1?560:460);};
+  setTimeout(step,1700);
+}
+var morphPlayed=false;
 function showWelcome(t,m){$('panel').innerHTML='<div class="welcome">'+$('cellArt').innerHTML+'<h2>'+esc(t)+'</h2><p>'+esc(m)+'</p></div>';}
 function openSettings(){
   // «القيم الثابتة» انتقلت إلى داخل تحضير كل درس (الاستراتيجيات + الوسائل ومصادر التعلم)
@@ -285,7 +327,7 @@ function init(){
     if(location.hash==='#settings'){history.replaceState(null,'','/app');setTimeout(openSettings,50);}
     if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
     $('statLessons').textContent=lessons.length;$('statFilled').textContent=lessons.filter(function(l){return !isEmpty(l);}).length;
-    renderTree();showWelcome('أهلًا '+me.name,'اختر الصف ثم الوحدة ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في منصة نور.');
+    renderTree();$('panel').innerHTML='<div class="welcome">'+morphHtml()+'<h2>'+esc('أهلًا '+me.name)+'</h2><p>'+esc('اختر الصف ثم الوحدة ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في منصة نور.')+'</p></div>';runMorph();
   },function(e){showWelcome('تعذّر تحميل الدروس',e.message);});
 }
 init();
