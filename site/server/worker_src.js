@@ -159,6 +159,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS pl_code ON players(code)`,
   `CREATE TABLE IF NOT EXISTS nour_tasks(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS exports(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT, format TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)`,
+  `CREATE TABLE IF NOT EXISTS moves(code TEXT PRIMARY KEY, sid TEXT, did TEXT, exp INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
   `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`
@@ -903,6 +905,77 @@ async function gamesData(env, me, key) {
   return { lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, concepts: l.concepts || '', subject: l.subject, grade: l.grade })), items, pack };
 }
 
+
+// ---------- نقل المنصة إلى النطاق الجديد ----------
+// الرابط القديم (workers.dev) يُحوِّل صفحات المنصة إلى elkabsula.site، عدا:
+//  • مساحة «تقني حذيفة» (/teqany وما تحتها) تبقى على الرابط القديم.
+//  • الموارد التي تطلبها الأدوات والتطبيقات (/api · /tool · /download · /x · /version …)
+//    فلا تتعطل أداة نور (Tampermonkey/الإضافة) ولا تحديثها التلقائي.
+//  • تطبيقا أندرويد/آيفون (TahdirApp في User-Agent): نسخهم المثبتة لا تعرف النطاق الجديد.
+// التحويل لا يبدأ إلا بعد أن يصل أول طلب فعلي عبر النطاق الجديد (دليل أن الربط اكتمل)،
+// فلا ينقطع الموقع لو لم يُضبط النطاق بعد.
+const NEW_HOST = 'elkabsula.site', OLD_HOST = 'tahdir.hudhaifa-bio.workers.dev';
+let newLive = false, newLiveAt = 0;
+async function markNewLive(env) {
+  if (newLive) return; newLive = true;
+  try { await env.DB.prepare("INSERT OR REPLACE INTO kv(k,v) VALUES('new_host_live','1')").run(); } catch (e) {}
+}
+async function isNewLive(env) {
+  if (newLive) return true;
+  if (now() - newLiveAt < 60000) return false;
+  newLiveAt = now();
+  try { newLive = !!(await env.DB.prepare("SELECT v FROM kv WHERE k='new_host_live'").first()); } catch (e) {}
+  return newLive;
+}
+function isPageNav(req, p) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  if (/^\/(teqany|api|tool|download|x|fin|pdf|assets)(\/|$)/.test(p)) return false;
+  if (/^\/(version|manifest\.webmanifest|robots\.txt|sw\.js)$/.test(p) || /\.(png|jpe?g|svg|ico|js|css|json|webmanifest|zip|apk|pdf)$/i.test(p)) return false;
+  if (/TahdirApp\//.test(req.headers.get('User-Agent') || '')) return false;
+  const dest = req.headers.get('Sec-Fetch-Dest');
+  if (dest) return dest === 'document';
+  return /text\/html/.test(req.headers.get('Accept') || '');
+}
+async function moveRedirect(req, env, url) {
+  const to = url.pathname + url.search;
+  const c = cookies(req);
+  const sid = /^[a-f0-9]{64}$/.test(c.sid || '') ? c.sid : '', did = /^[a-f0-9]{48}$/.test(c.did || '') ? c.did : '';
+  let dest = 'https://' + NEW_HOST + '/__move?to=' + encodeURIComponent(to);
+  if (sid || did) {
+    // رمز لمرة واحدة صالح دقيقتين: ينقل جلسة المعلم ومعرّف جهازه فلا يحتاج دخولًا جديدًا
+    // ولا يُحسب جهازًا إضافيًا.
+    const code = rand(24);
+    try {
+      await env.DB.batch([
+        env.DB.prepare('INSERT INTO moves(code,sid,did,exp) VALUES(?,?,?,?)').bind(code, sid, did, now() + 120000),
+        env.DB.prepare('DELETE FROM moves WHERE exp < ?').bind(now())
+      ]);
+      dest += '&c=' + code;
+    } catch (e) {}
+  }
+  return new Response(null, { status: 302, headers: { Location: dest, 'Cache-Control': 'no-store', ...SEC_HEADERS } });
+}
+async function moveLanding(req, env, url) {
+  let to = url.searchParams.get('to') || '/';
+  if (!/^\/(?!\/)/.test(to) || /^\/__move/.test(to)) to = '/';
+  const h = new Headers({ Location: to, 'Cache-Control': 'no-store', ...SEC_HEADERS });
+  const code = String(url.searchParams.get('c') || '');
+  if (/^[a-f0-9]{48}$/.test(code)) {
+    const row = await env.DB.prepare('SELECT * FROM moves WHERE code = ?').bind(code).first();
+    if (row) {
+      await env.DB.prepare('DELETE FROM moves WHERE code = ?').bind(code).run();
+      const c = cookies(req);
+      if (row.exp >= now()) {
+        if (row.sid && !c.sid) h.append('Set-Cookie', setCookie('sid', row.sid, SESSION_DAYS * 86400, req));
+        if (row.did && !c.did) h.append('Set-Cookie', setCookie('did', row.did, 63072000, req));
+      }
+    }
+  }
+  // علامة قصيرة يقرؤها common.js ليعرض رسالة «تم نقل المنصة» مرة واحدة
+  h.append('Set-Cookie', `kmoved=1; Path=/; Secure; SameSite=Lax; Max-Age=600`);
+  return new Response(null, { status: 302, headers: h });
+}
+
 // ---------- router ----------
 export default {
   async fetch(req, env) {
@@ -920,6 +993,12 @@ export default {
       if (!env.DB) return new Response('اربط قاعدة بيانات D1 بالاسم DB من إعدادات الـ Worker.', { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       await ensureSchema(env.DB);
       const url = new URL(req.url), p = url.pathname, m = req.method;
+      if (url.hostname === 'www.' + NEW_HOST) return new Response(null, { status: 301, headers: { Location: 'https://' + NEW_HOST + p + url.search, 'Cache-Control': 'no-store' } });
+      if (url.hostname === NEW_HOST) {
+        await markNewLive(env);
+        if (p === '/__move') return moveLanding(req, env, url);
+      }
+      if (url.hostname === OLD_HOST && isPageNav(req, p) && await isNewLive(env)) return moveRedirect(req, env, url);
       if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live|courses)/.test(p)) await loadPacks(env, url);
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 
@@ -948,7 +1027,7 @@ export default {
       const TQ_MAP = {
         '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz',
         '/teqany/games': 'games', '/teqany/play': 'play', '/teqany/slides': 'slides',
-        '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries', '/teqany/cando': 'cando',
+        '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries', '/teqany/cando': 'cando', '/teqany/research': 'research',
         '/teqany/admin': 'admin', '/teqany/grading': 'grading', '/teqany/login': 'login', '/teqany/setup': 'setup',
       };
       if (p === '/teqany' || p === '/teqany/') return html('teqany');
@@ -973,6 +1052,8 @@ export default {
 
       // بقية صفحات «تقني» (بعد التحقق من الدخول)
       if (TQ_MAP[p]) return htmlTq(TQ_MAP[p]);
+      // أي صفحة جديدة في المنصة تعمل تلقائيًا تحت /teqany/<اسمها> بهوية «تقني حذيفة»
+      { const tq = p.match(/^\/teqany\/([a-z]+)\/?$/); if (tq && tq[1] !== 'css' && tq[1] !== 'teqany' && PAGES_TQ[tq[1]]) return htmlTq(tq[1]); }
       if (p === '/app') return html('app');
       if (p === '/api/me') {
         // «first»: أول دخول لهذا الحساب — يُستخدم لإظهار دليل الاستخدام مرة واحدة

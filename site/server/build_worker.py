@@ -1566,7 +1566,11 @@ def tq_shell(inner, cls=''):
 TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة للإرسال إلى نور'), ('/teqany/quiz', '✅', 'التقويم والاختبارات', 'اختبارات قصيرة وفق الوثيقة'),
   ('/teqany/games', '🎮', 'الألعاب التعليمية', 'شدّ الحبل، العدّاء، كرة القدم…'), ('/teqany/slides', '📽️', 'العروض التقديمية', 'عروض كل مادة وصف'),
   ('/teqany/finals', '🗂', 'الاختبارات النهائية', 'أسئلة الوزارة حسب الدرس'), ('/teqany/remedial', '🩹', 'الخطط العلاجية', 'للطلاب دون المستوى'),
-  ('/teqany/summaries', '📚', 'ملخصات الدروس', 'وفق مخرجات التعلم'), ('/teqany/cando', '☑️', 'أستطيع أن ✓', 'قوائم التقييم الذاتي')]
+  ('/teqany/summaries', '📚', 'ملخصات الدروس', 'وفق مخرجات التعلم'), ('/teqany/cando', '☑️', 'أستطيع أن ✓', 'قوائم التقييم الذاتي'),
+  ('/teqany/research', '🔬', 'البحوث الإجرائية', 'العلوم، اللغة العربية، الرياضيات')]
+# أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا
+TQ_SECTIONS += [('/teqany' + h, ic, t, '') for _k, h, ic, t in MENU_ITEMS
+                if h.startswith('/') and '/teqany' + h not in {x[0] for x in TQ_SECTIONS}]
 TEQANY = tq_shell('<section class="tq-hero"><span class="tq-kicker">منصة مدرسة حذيفة بن محصن</span>'
   '<h1 class="tq-h1">' + TEQANY_LOGO + '</h1>'
   '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
@@ -1609,7 +1613,8 @@ PAGES = {
 # ===== هوية «تقني حذيفة» لكل صفحة تحت /teqany =====
 # نأخذ HTML الصفحة كما هو ونستبدل: الشعار · الاسم · بادئة روابط الأقسام.
 # الروابط الخارجية (/api · /fin · /pdf · /tool) تبقى بلا بادئة لأنها موارد لا صفحات.
-_TQ_PAGES = r'app|quiz|games|play|slides|finals|remedial|summaries|cando|admin|grading|setup|login|teqany'
+# تُشتق تلقائيًا من كل صفحات المنصة: أي صفحة جديدة تعمل تحت /teqany/<اسمها> بلا تعديل هنا
+_TQ_PAGES = '|'.join(sorted(set(k for k in PAGES if k != 'css') | {'tahdir'}, key=len, reverse=True))
 def brand_tq(h):
     h = h.replace(BANNER, BANNER_TQ)
     h = h.replace(LOGO, TEQANY_LOGO)

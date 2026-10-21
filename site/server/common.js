@@ -7,7 +7,8 @@ function tqUrl(u){return (location.pathname.indexOf('/teqany')===0?'/teqany':'')
 // روابط الأقسام تأخذ البادئة /teqany، واسم «الكبسولة» يُستبدل بـ«تقني حذيفة»، فلا يخرج المستخدم للواجهة الأصلية.
 (function(){
   if(location.pathname.indexOf('/teqany')!==0)return;
-  var PG=/^\/(app|tahdir|quiz|games|slides|finals|remedial|summaries|cando|admin|grading|login|setup)(?=$|[?#\/])/;
+  // أي رابط صفحة من مقطع واحد (/quiz، /research، أو أي قسم يُضاف لاحقًا) — عدا الموارد
+  var PG=/^\/(?!(?:teqany|api|tool|download|x|fin|pdf|assets|elkabsula|privacy|support|version|play)(?=$|[?#\/]))[a-z]+(?=$|[?#\/])/;
   var fixA=function(a){var h=a.getAttribute('href');if(!h)return;if(PG.test(h))a.setAttribute('href','/teqany'+h);else if(h==='/')a.setAttribute('href','/teqany');};
   var fixTxt=function(t){if(t.nodeValue&&t.nodeValue.indexOf('الكبسولة')>=0)t.nodeValue=t.nodeValue.replace(/الكبسولة/g,'تقني حذيفة');};
   var fix=function(n){
@@ -572,3 +573,28 @@ document.addEventListener('click',function(e){
       +'<p class="muted small">لا يطلب التطبيق أي صلاحيات غير الإنترنت.</p></div>'
   }).then(function(ok){if(ok)location.href=a.getAttribute('href');});
 },true);
+
+// ---------- رسالة «تم نقل المنصة» ----------
+// من يفتح الرابط القديم (workers.dev) يُحوَّل إلى elkabsula.site، ويضع الخادم علامة
+// kmoved لعشر دقائق، فتظهر هذه الرسالة مرة واحدة على كل متصفح.
+(function(){
+  if(location.hostname!=='elkabsula.site'||!/(?:^|;\s*)kmoved=1/.test(document.cookie))return;
+  var K='kabsula_moved_seen_v1';
+  try{if(localStorage.getItem(K))return;}catch(e){}
+  var tries=0;
+  // ننتظر قليلًا حتى تنتهي نوافذ البدء الأخرى، ولا نعتبرها «مقروءة» إلا عند الضغط على «حسنًا»
+  // (فلو أغلقتها نافذة أخرى تظهر مجددًا في الصفحة التالية).
+  setTimeout(function show(){
+    var ov=$('modal');
+    if(!ov||!ov.hidden){if(++tries<30)setTimeout(show,800);return;}
+    dialog({title:'🌐 العنوان الجديد للمنصة',okText:'حسنًا',cancelText:false,
+      html:'<p class="m-msg">تم نقل منصة <b>«الكبسولة»</b> إلى عنوانها الجديد:</p>'+
+        '<p class="m-msg" style="text-align:center;font-size:1.25em;direction:ltr"><b>elkabsula.site</b></p>'+
+        '<p class="m-msg">الرابط القديم يحوّلكم إلى هنا تلقائيًا، وحساباتكم وتحضيركم كما هي دون أي تغيير. نرجو حفظ العنوان الجديد في المفضلة.</p>'
+    }).then(function(r){
+      if(r===null){if(++tries<30)setTimeout(show,800);return;} // أُغلقت بنافذة أخرى: نعيد عرضها بعدها
+      try{localStorage.setItem(K,'1');}catch(e){}
+      document.cookie='kmoved=; Path=/; Max-Age=0; Secure; SameSite=Lax';
+    });
+  },1500);
+})();
