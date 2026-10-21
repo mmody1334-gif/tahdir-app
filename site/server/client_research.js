@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 guard();
-var RS=window.RESEARCH||[],G=window.RSGEN,me=null,mine=[];
+var RS=window.RESEARCH||[],G=window.RSGEN,me=null,mine=[],AI_ON=false;
 var SUBJECTS=[['العلوم','🔬'],['اللغة العربية','📖'],['الرياضيات','➗']];
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
@@ -87,6 +87,7 @@ function renderForm(r){
     fld('f_tool','وصف أداة البحث — اختياري',f.tool,'مثال: اختبار تحصيلي من 20 مفردة',true)+
     tfld('f_scores','درجات الطلاب: لكل طالب سطر فيه «القبلي البعدي» — تقدر تلصقهما من Excel',f.scores,'12  18\n15  20\n9  14',7)+
     '<p class="muted small wide" id="f_stats"></p></div>'+
+    (AI_ON?'<label class="rsf wide ai-opt"><span><input type="checkbox" id="f_ai"'+(f.ai||!r?' checked':'')+'> ✨ اكتب المقدمة والإطار النظري ومناقشة النتائج بالذكاء الاصطناعي، مخصّصة لمادتك وصفّك ونتائجك</span><small class="muted">بلا مراجع أو دراسات مخترعة — المراجع من القائمة الموثّقة فقط. راجع النص قبل الاعتماد.</small></label>':'')+
     '<div class="rs-bar"><button type="button" class="btn primary" id="rsGen">✍️ اكتب البحث واحفظه</button><span class="muted small">يُحفظ في حسابك ويظهر في «'+esc(f.subject||subj)+'».</span></div></section>';
   $('rsMain').innerHTML=h;window.scrollTo(0,0);
   var ids=['subject','material','grade','year','term','school','target','units','authors','strat','stratOther','stratDesc','stratSteps','dv','problem','title','weeks','max','mastery','tool','scores'];
@@ -97,11 +98,19 @@ function renderForm(r){
   $('rsBack').onclick=function(){if(r)openDoc(r.id);else renderList();};
   $('rsGen').onclick=function(){
     read();if(!f.grade||!(f.material||f.subject)){toast('اكتب المادة والصف على الأقل');return;}
-    var t=G.titleOf(f);
+    var t=G.titleOf(f),btn=this;
+    var useAI=$('f_ai')&&$('f_ai').checked;
+    var pre=useAI?(function(){
+      btn.disabled=true;btn.textContent='✨ جارٍ الكتابة بالذكاء الاصطناعي…';
+      var A=G.analyze(f),st=A?{n:A.n,pre:A.pre.m.toFixed(2),post:A.post.m.toFixed(2),t:isFinite(A.t)?A.t.toFixed(2):'—',p:A.p<0.001?'< 0.001':A.p.toFixed(3),sig:A.sig,eta:A.eta.toFixed(2)}:null;
+      return api('/api/ai/research',{form:Object.assign({},f,{title:t,stratName:G.stratName(f),stats:st})}).then(function(x){f.ai=x;},function(e){toast(e.message);});
+    })():Promise.resolve((function(){if(!useAI)delete f.ai;})());
+    pre.then(function(){btn.disabled=false;btn.textContent='✍️ اكتب البحث واحفظه';
     api('/api/quizzes',{id:r?r.uid:null,title:t,grade:f.grade,subject:f.subject,kind:'research',data:{form:f}}).then(function(x){
       track('research_gen',f.strat,t);subj=f.subject;lsSet('rs_subject',subj);
       loadMine().then(function(){openDoc('u'+x.id);toast('كُتب البحث وحُفظ في حسابك ✓');});
     },function(e){toast(e.message);});
+    });
   };
 }
 function loadMine(){
@@ -109,6 +118,6 @@ function loadMine(){
     return Promise.all((r.quizzes||[]).map(function(q){return api('/api/quizzes/'+q.id).then(function(x){return fromMine(x.quiz);},function(){return null;});}));
   }).then(function(l){mine=(l||[]).filter(Boolean);},function(){mine=[];});
 }
-api('/api/me').then(function(m){me=m;initNav(m);return loadMine();}).then(renderList,function(){renderList();});
+api('/api/me').then(function(m){me=m;initNav(m);api('/api/ai/status').then(function(x){AI_ON=!!x.on;},function(){});return loadMine();}).then(renderList,function(){renderList();});
 renderList();
 })();

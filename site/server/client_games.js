@@ -63,6 +63,14 @@ function bestFor(g){var n=gnum(),b=g.best||g.grades;return n>=b[0]&&n<=b[1];}
 
 // ---------- الواجهة الجانبية ----------
 function unitsList(){var m={},order=[];data.lessons.forEach(function(l){var k=String(l.unit);if(!m[k]){m[k]={unit:k,name:l.unit_name||'',lessons:[]};order.push(k);}m[k].lessons.push(l);});return order.map(function(k){return m[k];});}
+// أسئلة ألعاب جديدة بالذكاء الاصطناعي: تُحفظ في المنصة فيستفيد منها كل المعلمين، وتظهر مع بقية الأسئلة
+var AI_ON=false;try{api('/api/ai/status').then(function(x){AI_ON=!!x.on;if(AI_ON&&course&&courses.length)renderSide();},function(){});}catch(e){}
+function aiGen(ids,btn){
+  var t=btn.textContent;btn.disabled=true;btn.textContent='✨ جارٍ التوليد…';
+  api('/api/ai/game-items',{key:course.key,lessons:ids}).then(function(r){
+    return api('/api/games/data?key='+encodeURIComponent(course.key)).then(function(d){data=d;lessonById={};data.lessons.forEach(function(l){lessonById[l.id]=l;});ids.forEach(function(id){sel[id]=1;});renderSide();if(!game)renderHome();toast('أُضيف '+(r.added||0)+' سؤالًا جديدًا ✓');});
+  },function(e){btn.disabled=false;btn.textContent=t;toast(e.message);});
+}
 function renderSide(){
   var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel')+'</section>';
   h+='<section class="qcard"><h3>2. الدروس</h3><div class="lpick">';
@@ -72,16 +80,18 @@ function renderSide(){
       var n=itemCount(l.id), off=n===0;
       // الدروس بلا أسئلة صالحة للعب تُعطَّل (ولا تُظلَّل) بدل أن تُنتج لوحة فارغة
       if(off&&sel[l.id])delete sel[l.id];
-      h+='<label class="lp-l'+(off?' lp-off':'')+'"'+(off?' title="لا توجد أسئلة ألعاب لهذا الدرس بعد"':'')+'><input type="checkbox" data-lid="'+l.id+'"'+(sel[l.id]?' checked':'')+(off?' disabled':'')+'> <span dir="auto">'+esc(l.title)+'</span><span class="muted">'+(off?'لا أسئلة':n)+'</span></label>';
+      h+='<label class="lp-l'+(off?' lp-off':'')+'"'+(off?' title="لا توجد أسئلة ألعاب لهذا الدرس بعد"':'')+'><input type="checkbox" data-lid="'+l.id+'"'+(sel[l.id]?' checked':'')+(off?' disabled':'')+'> <span dir="auto">'+esc(l.title)+'</span><span class="muted">'+(off?(AI_ON?'<button type="button" class="ai-mini" data-aigen="'+l.id+'" title="ولّد أسئلة لهذا الدرس بالذكاء الاصطناعي">✨ ولّد</button>':'لا أسئلة'):n)+'</span></label>';
     });
     h+='</div>';
   });
-  h+='</div><p class="muted small" id="selInfo"></p></section>';
+  h+='</div><p class="muted small" id="selInfo"></p>'+(AI_ON?'<button type="button" class="btn small" id="aiGen" title="8 أسئلة جديدة لكل درس مختار (حتى 3 دروس)">✨ أسئلة جديدة بالذكاء الاصطناعي</button>':'')+'</section>';
   h+='<section class="qcard"><h3>الفرق</h3><div class="teams-ed" id="teamsEd"></div><div class="qrow"><button type="button" class="btn small" id="addTeam">+ فريق</button><label class="small"><input type="checkbox" id="sndChk"'+(sound?' checked':'')+'> الأصوات</label></div></section>';
   $('gside').innerHTML=h;
   bindCoursePick(courses,'courseSel',selectCourse);
   Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)sel[id]=1;else delete sel[id];info();if(!game)renderHome();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-unit]'),function(b){b.onchange=function(){var u=unitsList().filter(function(x){return x.unit===b.getAttribute('data-unit');})[0];u.lessons.forEach(function(l){if(b.checked)sel[l.id]=1;else delete sel[l.id];});renderSide();if(!game)renderHome();};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-aigen]'),function(b){b.onclick=function(e){e.preventDefault();e.stopPropagation();aiGen([+b.getAttribute('data-aigen')],b);};});
+  if($('aiGen'))$('aiGen').onclick=function(){var ids=selIds();if(!ids.length){toast('اختر درسًا (حتى 3 دروس)');return;}if(ids.length>3)toast('سأولّد لأول 3 دروس مختارة');aiGen(ids.slice(0,3),this);};
   $('addTeam').onclick=function(){if(teams.length>=6)return;teams.push({name:'الفريق '+(teams.length+1),score:0});saveTeams();renderTeams();};
   $('sndChk').onchange=function(){sound=this.checked;};
   renderTeams();info();

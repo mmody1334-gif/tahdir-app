@@ -966,6 +966,7 @@ button.lv-opt{cursor:pointer}
 .st-ch button.ok{background:#e5f6ec;border-color:#22a35a}.st-ch button.no{background:#fdecec;border-color:#d64545}.st-ch button.dim{opacity:.5}.st-fb{border-radius:12px;padding:10px 12px;margin:10px 0;line-height:1.8}.st-fb.ok{background:#e5f6ec}.st-fb.no{background:#fdecec}.st-fb.key{background:#eef3f1}.st-fb small{display:block;color:#3d554e;margin-top:4px}
 .st-ans{width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;box-sizing:border-box}.st-selfb,.st-nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:8px}.st-t{border-collapse:collapse;margin:6px auto}.st-t td,.st-t th{border:1px solid #999;padding:3px 8px}
 .st-flip{background:#fff;border:2px solid #1f8a70;border-radius:18px;min-height:180px;display:grid;place-items:center;text-align:center;padding:20px;cursor:pointer;margin:12px 0}.st-flip b{font-size:1.4rem;color:#0b3b33;display:block}.st-flip small{color:var(--mute)}.st-flip.on{background:#e3f1eb}.st-end{text-align:center}.st-big{font-size:3rem}.st-end h2{font-size:2.4rem;margin:0;color:#0b3b33}
+.ai-mini{font:inherit;font-size:.72rem;border:1px solid #e0a93b;background:#fff8ea;color:#9a6700;border-radius:999px;padding:0 8px;cursor:pointer}.ai-opt{background:#fff8ea;border:1px dashed #e0a93b;border-radius:10px;padding:8px 10px}.ai-opt small{font-weight:400}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
@@ -1411,11 +1412,11 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
-# ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
+# «تصحيح الواجبات تلقائيًا» (/grading) يظهر في قائمة «الكبسولة» فقط، ولا يظهر في «تقني حذيفة» (يُحذف في brand_tq).
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'
@@ -1628,7 +1629,7 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
   ('/teqany/research', '🔬', 'البحوث الإجرائية', 'العلوم، اللغة العربية، الرياضيات')]
 # أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا
 TQ_SECTIONS += [('/teqany' + h, ic, t, '') for _k, h, ic, t in MENU_ITEMS
-                if h.startswith('/') and '/teqany' + h not in {x[0] for x in TQ_SECTIONS}]
+                if h.startswith('/') and _k != 'grading' and '/teqany' + h not in {x[0] for x in TQ_SECTIONS}]
 TEQANY = tq_shell('<section class="tq-hero"><span class="tq-kicker">منصة مدرسة حذيفة بن محصن</span>'
   '<h1 class="tq-h1">' + TEQANY_LOGO + '</h1>'
   '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
@@ -1680,6 +1681,8 @@ PAGES = {
 _TQ_PAGES = '|'.join(sorted(set(k for k in PAGES if k != 'css') | {'tahdir'}, key=len, reverse=True))
 def brand_tq(h):
     h = h.replace(BANNER, BANNER_TQ)
+    # «تصحيح الواجبات تلقائيًا» خاص بالكبسولة: لا يظهر في قائمة «تقني حذيفة»
+    h = re.sub(r'<a role="menuitem" href="/grading"[^>]*>.*?</a>', '', h)
     # «تقني حذيفة» يحتفظ باسم المدرسة كما كان (الواجهة الأساسية حُذف منها)
     h = h.replace('<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>', '<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>')
     h = h.replace('<span class="school">إعداد أ. محمد مجدي · معلم الأحياء</span>', '<span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>')

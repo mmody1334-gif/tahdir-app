@@ -75,7 +75,8 @@ function qDraw(){
   var it=Q.items[Q.i],h='<div class="st-prog"><span style="width:'+Math.round(Q.i/Q.items.length*100)+'%"></span></div><div class="st-card st-q"><div class="st-qn">سؤال '+(Q.i+1)+' من '+Q.items.length+'</div><p class="st-stem">'+rich(it.stem)+'</p>';
   if(it.table&&it.table.rows)h+='<table class="st-t">'+it.table.rows.map(function(r,ri){return '<tr>'+r.map(function(c){return (ri?'<td>':'<th>')+rich(c)+(ri?'</td>':'</th>');}).join('')+'</tr>';}).join('')+'</table>';
   if(it.type==='mcq'){h+='<div class="st-ch">'+it.choices.map(function(c,k){return '<button type="button" data-k="'+k+'">'+rich(c)+'</button>';}).join('')+'</div>';}
-  else h+='<textarea class="st-ans" id="ans" rows="3" placeholder="اكتب إجابتك هنا (اختياري) ثم اعرض نموذج الإجابة"></textarea><button type="button" class="st-go" id="show">عرض نموذج الإجابة</button>';
+  else h+=(INFO.ai?'<textarea class="st-ans" id="ans" rows="3" placeholder="اكتب إجابتك هنا ثم اضغط «صحّح إجابتي»"></textarea><div class="st-nav"><button type="button" class="st-go" id="aiG">✨ صحّح إجابتي</button><button type="button" class="st-link" id="show">عرض نموذج الإجابة فقط</button></div>'
+    :'<textarea class="st-ans" id="ans" rows="3" placeholder="اكتب إجابتك هنا (اختياري) ثم اعرض نموذج الإجابة"></textarea><button type="button" class="st-go" id="show">عرض نموذج الإجابة</button>');
   h+='<div id="fb"></div></div>';
   $('stBody').innerHTML=h;
   if(it.type==='mcq')Array.prototype.forEach.call(document.querySelectorAll('.st-ch [data-k]'),function(b){b.onclick=function(){
@@ -83,7 +84,18 @@ function qDraw(){
     Array.prototype.forEach.call(document.querySelectorAll('.st-ch [data-k]'),function(x){var kk=+x.getAttribute('data-k');x.classList.add(kk===it.correct?'ok':(kk===k?'no':'dim'));});
     $('fb').innerHTML='<div class="st-fb '+(ok?'ok':'no')+'">'+(ok?'✓ إجابة صحيحة، أحسنت!':'✗ الإجابة الصحيحة: '+rich(it.choices[it.correct]))+(it.notes?'<small>'+rich(it.notes)+'</small>':'')+'</div><button type="button" class="st-go" id="nx">التالي ←</button>';
     $('nx').onclick=next;};});
-  else $('show').onclick=function(){
+  else if($('aiG'))$('aiG').onclick=function(){
+    var a=$('ans').value.trim();if(a.length<2){$('ans').focus();return;}
+    var btn=this;btn.disabled=true;btn.textContent='جارٍ التصحيح…';
+    post('/api/s/grade',{c:CODE,lid:L.lesson.id,qid:it.qid,answer:a}).then(function(r){
+      if(r.error){btn.disabled=false;btn.textContent='✨ صحّح إجابتي';$('fb').innerHTML='<div class="st-fb no">'+esc(r.error)+'</div>';return;}
+      $('ans').disabled=true;var fr=r.max?r.score/r.max:0,cls=fr>=0.99?'ok':fr>0?'key':'no';
+      btn.parentNode.remove();Q.max+=1;Q.score+=fr;
+      $('fb').innerHTML='<div class="st-fb '+cls+'"><b>'+(fr>=0.99?'✓ ':fr>0?'½ ':'✗ ')+'درجتك: '+r.score+' من '+r.max+'</b><br>'+esc(r.feedback||'')+'</div><div class="st-fb key"><b>نموذج الإجابة:</b><br>'+rich(it.answer)+'</div><button type="button" class="st-go" id="nx">التالي ←</button>';
+      $('nx').onclick=next;
+    },function(){btn.disabled=false;btn.textContent='✨ صحّح إجابتي';toast&&toast('تعذّر الاتصال، حاول مرة أخرى');});
+  };
+  if($('show'))$('show').onclick=function(){if($('aiG'))$('aiG').parentNode.remove();
     this.remove();$('fb').innerHTML='<div class="st-fb key"><b>نموذج الإجابة:</b><br>'+rich(it.answer)+(it.notes?'<small>'+rich(it.notes)+'</small>':'')+'</div><p class="st-self">قارن إجابتك بالنموذج: هل كانت صحيحة؟</p><div class="st-selfb"><button type="button" class="st-go ok" data-s="1">✓ نعم</button><button type="button" class="st-go half" data-s="0.5">½ جزئيًا</button><button type="button" class="st-go no" data-s="0">✗ لا</button></div>';
     Array.prototype.forEach.call(document.querySelectorAll('[data-s]'),function(b){b.onclick=function(){Q.max+=1;Q.score+=+b.getAttribute('data-s');next();};});
   };

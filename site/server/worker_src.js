@@ -134,7 +134,7 @@ const EVENT_TYPES = new Set([
   // الاختبارات القصيرة ومراجعات الوحدات
   'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedy_make',
   // تحليل النتائج · الأوراق المتمايزة · سجل صعوبات التعلم
-  'analysis_new', 'research_gen', 'form_print', 'form_word', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
+  'analysis_new', 'research_gen', 'ai_research', 'ai_game', 'form_print', 'form_word', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
   // الخطط العلاجية والملخصات
   'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word',
   // الألعاب التعليمية
@@ -162,6 +162,10 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS nour_tasks(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS exports(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT, format TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)`,
+  `CREATE TABLE IF NOT EXISTS ai_items(id INTEGER PRIMARY KEY AUTOINCREMENT, lesson_id INTEGER NOT NULL, data TEXT NOT NULL, user_id INTEGER, created_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS ai_items_l ON ai_items(lesson_id)`,
+  `CREATE TABLE IF NOT EXISTS ai_log(id INTEGER PRIMARY KEY AUTOINCREMENT, who TEXT NOT NULL, kind TEXT NOT NULL, tokens INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS ai_log_who ON ai_log(who, kind, at)`,
   `CREATE TABLE IF NOT EXISTS classes(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, course TEXT NOT NULL, lessons TEXT, active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS s_attempts(id INTEGER PRIMARY KEY AUTOINCREMENT, class_id INTEGER NOT NULL, name TEXT, lesson_id INTEGER, score REAL, max REAL, n INTEGER, ip TEXT, at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS sa_class ON s_attempts(class_id, at)`,
@@ -906,6 +910,11 @@ async function gamesData(env, me, key) {
   ls.forEach(l => { if (l.hw_type !== 'mcq') return; [1, 2].forEach(n => {
     const c = String(l['hw_a' + n] || '').split('\n').map(x => x.trim()).filter(Boolean); if (!l['hw_q' + n] || c.length < 2) return;
     items.push({ qid: 900000 + (k++), lesson_id: l.id, type: 'mcq', stem: String(l['hw_q' + n]).replace(/^Choose the correct answer:\s*/i, ''), choices: c.slice(0, 4), correct: 0, marks: 1, ao: '', difficulty: 'منخفضة', src: 'hw' }); }); });
+  try {
+    const arr = [...ids], ai = [];
+    for (let i = 0; i < arr.length; i += 90) { const ch = arr.slice(i, i + 90); ai.push(...(((await env.DB.prepare('SELECT id, lesson_id, data FROM ai_items WHERE lesson_id IN (' + ch.map(() => '?').join(',') + ')').bind(...ch).all()).results) || [])); }
+    ai.forEach(r => { try { const q = JSON.parse(r.data); items.push({ qid: 800000000 + r.id, lesson_id: r.lesson_id, type: 'mcq', stem: q.stem, choices: q.choices, correct: q.correct, marks: 1, ao: '', difficulty: 'متوسطة', src: 'ai' }); } catch (e) {} });
+  } catch (e) { /* لا شيء */ }
   const pack = {}; ls.forEach(l => { if (GPACK[l.id]) pack[l.id] = GPACK[l.id]; });
   return { lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title, concepts: l.concepts || '', subject: l.subject, grade: l.grade })), items, pack };
 }
@@ -982,6 +991,85 @@ async function moveLanding(req, env, url) {
 }
 
 
+
+// ---------- الذكاء الاصطناعي (apmix.ai — صيغة OpenAI) ----------
+// المفتاح سرّ في Cloudflare (AI_KEY) لا يصل للمتصفح أبدًا. حدود يومية لكل معلم وكل جهاز طالب،
+// وحدّ شهري للرموز (AI_BUDGET) حتى لا تنفد الباقة. لا تُرسل أسماء الطلاب إطلاقًا.
+const AI_URL = 'https://api.apmix.ai/v1/chat/completions';
+const AI_LIMITS = { grade: 60, research: 12, game: 15 }; // في اليوم لكل (جهاز طالب | معلم)
+function aiOn(env) { return !!env.AI_KEY; }
+async function aiUsedMonth(env) {
+  const m = new Date(); m.setUTCDate(1); m.setUTCHours(0, 0, 0, 0);
+  const r = await env.DB.prepare('SELECT COALESCE(SUM(tokens),0) t FROM ai_log WHERE at >= ?').bind(m.getTime()).first();
+  return r ? r.t : 0;
+}
+async function aiGate(env, who, kind) {
+  if (!aiOn(env)) return 'الذكاء الاصطناعي غير مفعّل بعد.';
+  const n = await env.DB.prepare('SELECT COUNT(*) n FROM ai_log WHERE who = ? AND kind = ? AND at > ?').bind(who, kind, now() - 86400000).first();
+  if (n && n.n >= (AI_LIMITS[kind] || 20)) return 'وصلت إلى الحد اليومي لهذه الخدمة. حاول غدًا.';
+  const budget = +(env.AI_BUDGET || 2500000);
+  if (await aiUsedMonth(env) >= budget) return 'انتهى رصيد الذكاء الاصطناعي لهذا الشهر.';
+  return null;
+}
+async function aiChat(env, who, kind, system, user, maxTokens) {
+  const r = await fetch(env.AI_URL || AI_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.AI_KEY },
+    body: JSON.stringify({ model: env.AI_MODEL || 'google/gemini-3.8-flash', temperature: 0.3, max_tokens: maxTokens || 800,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
+  const j = await r.json().catch(() => ({}));
+  const used = (j.usage && (j.usage.total_tokens || ((j.usage.prompt_tokens || 0) + (j.usage.completion_tokens || 0)))) || Math.ceil((system.length + user.length) / 3) + 300;
+  await env.DB.prepare('INSERT INTO ai_log(who,kind,tokens,at) VALUES(?,?,?,?)').bind(who, kind, used, now()).run();
+  if (!r.ok) throw new Error('خدمة الذكاء الاصطناعي غير متاحة الآن (' + r.status + ').');
+  return String((((j.choices || [])[0] || {}).message || {}).content || '');
+}
+function aiJson(t) { const m = String(t).replace(/```json|```/g, '').match(/[\[{][\s\S]*[\]}]/); if (!m) throw new Error('رد غير مفهوم من الذكاء الاصطناعي.'); return JSON.parse(m[0]); }
+// تصحيح إجابة مقالية للطالب بمقارنتها بنموذج الإجابة
+async function aiGrade(env, ip, item, ans) {
+  const sys = 'أنت مصحّح لمادة دراسية في المنهج العُماني. قارن إجابة الطالب بنموذج الإجابة. اقبل الصياغة المختلفة إن كان المعنى العلمي صحيحًا، وتجاوز الأخطاء الإملائية البسيطة. لا تمنح درجة لإجابة فارغة أو خارج السؤال. أجب بـ JSON فقط: {"score": رقم من 0 إلى الدرجة العظمى (يقبل النصف), "feedback": "جملة أو جملتان بالعربية الفصحى موجهتان للطالب: ما الصحيح وما الناقص"}';
+  const usr = 'السؤال: ' + item.stem + '\nالدرجة العظمى: ' + (item.marks || 1) + '\nنموذج الإجابة: ' + item.answer + (item.notes ? '\nملاحظات التصحيح: ' + item.notes : '') + '\nإجابة الطالب: ' + ans;
+  const o = aiJson(await aiChat(env, ip, 'grade', sys, usr, 250));
+  const mx = +item.marks || 1; let sc = Math.round(Math.max(0, Math.min(mx, +o.score || 0)) * 2) / 2;
+  return { score: sc, max: mx, feedback: String(o.feedback || '').slice(0, 400) };
+}
+async function aiApi(req, env, me, p, m, url) {
+  if (p === '/api/ai/status') return json({ on: aiOn(env) });
+  if (p === '/api/ai/research' && m === 'POST') {
+    const gate = await aiGate(env, 'u' + me.id, 'research'); if (gate) return json({ error: gate }, 429);
+    const f = (await body(req)).form || {};
+    const S = f.stats ? 'نتائج التطبيق: عدد الطلبة ' + f.stats.n + '، متوسط القبلي ' + f.stats.pre + '، متوسط البعدي ' + f.stats.post + '، قيمة t = ' + f.stats.t + '، مستوى الدلالة ' + f.stats.p + (f.stats.sig ? ' (دال)' : ' (غير دال)') + '، مربع إيتا ' + f.stats.eta + '.' : 'لا توجد نتائج بعد.';
+    const sys = 'أنت خبير في البحث الإجرائي التربوي في سلطنة عُمان. اكتب بالعربية الفصحى بأسلوب أكاديمي واضح ومختصر. ممنوع منعًا باتًّا ذكر أي مرجع أو دراسة سابقة أو اسم باحث أو سنة نشر أو إحصاءات غير المعطاة لك. أجب بـ JSON فقط.';
+    const usr = 'بيانات البحث:\nالعنوان: ' + (f.title || '') + '\nالمادة: ' + (f.material || f.subject || '') + '\nالصف: ' + (f.grade || '') + '\nالوحدات: ' + (f.units || '') + '\nالاستراتيجية: ' + (f.stratName || '') + '\nالمتغير: ' + (f.dv || '') + '\nما لاحظه المعلم: ' + (f.problem || '') + '\n' + S +
+      '\n\nاكتب JSON بالمفاتيح: {"intro": "مقدمة وإحساس بالمشكلة (فقرتان، 120–180 كلمة) مرتبطة بالمادة والصف وما لاحظه المعلم", "theory": "إطار نظري للاستراتيجية في تدريس هذه المادة تحديدًا (3 فقرات، 200–280 كلمة): كيف تُطبَّق في دروس هذه الوحدات بأمثلة من المادة، ولماذا يُتوقع أن تحسّن المتغير", "discussion": "مناقشة النتائج (فقرتان، 120–180 كلمة) تفسّر الأرقام المعطاة بدقة وبلا مبالغة، وتذكر حدود البحث (حجم العينة) إن كانت النتيجة غير دالة"}';
+    try { const o = aiJson(await aiChat(env, 'u' + me.id, 'research', sys, usr, 1600)); return json({ intro: String(o.intro || ''), theory: String(o.theory || ''), discussion: String(o.discussion || '') }); }
+    catch (e) { return json({ error: e.message }, 502); }
+  }
+  if (p === '/api/ai/game-items' && m === 'POST') {
+    const b = await body(req), key = String(b.key || ''), sc = scopeOf(me);
+    if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
+    const ids = (Array.isArray(b.lessons) ? b.lessons : []).map(Number).slice(0, 3);
+    const ls = (await allLessons(env)).filter(l => courseKey(l) === key && ids.includes(l.id));
+    if (!ls.length) return json({ error: 'اختر درسًا.' }, 400);
+    await loadPacks(env, url);
+    let added = 0;
+    for (const l of ls) {
+      const gate = await aiGate(env, 'u' + me.id, 'game'); if (gate) return json({ error: gate, added }, 429);
+      const st = (STUDY.lessons[l.id] || {}).summary || {};
+      const ctx = [l.outcomes, l.concepts, st.intro, (st.outcomes || []).map(o => o.text + ': ' + (o.points || []).join(' ')).join('\n'), (st.terms || []).map(t => t.t + ': ' + t.d).join('\n')].filter(Boolean).join('\n').slice(0, 3500);
+      const old = (await env.DB.prepare('SELECT data FROM ai_items WHERE lesson_id = ?').bind(l.id).all()).results || [];
+      const en = /إنجليز|English/i.test(l.subject || '');
+      const sys = en ? 'You write multiple-choice game questions for school students. Output JSON only.' : 'أنت معلم تكتب أسئلة اختيار من متعدد لألعاب صفية لطلاب المنهج العُماني بالعربية الفصحى. كل سؤال قصير وواضح، له 4 خيارات قصيرة، وإجابة صحيحة واحدة فقط، والخيارات الخاطئة معقولة. لا تخرج عن محتوى الدرس. أجب بـ JSON فقط.';
+      const usr = (en ? 'Lesson: ' : 'الدرس: ') + l.title + ' — ' + (l.subject || '') + ' ' + (l.grade || '') + '\n' + ctx + (old.length ? '\n\nلا تكرر هذه الأسئلة: ' + old.slice(-20).map(r => { try { return JSON.parse(r.data).stem; } catch { return ''; } }).join(' | ') : '') +
+        '\n\nاكتب 8 أسئلة بصيغة JSON: [{"stem":"...","choices":["...","...","...","..."],"correct":0}] (correct هو رقم الخيار الصحيح من 0 إلى 3، ونوّع موضعه).';
+      try {
+        const arr = aiJson(await aiChat(env, 'u' + me.id, 'game', sys, usr, 1800));
+        const good = (Array.isArray(arr) ? arr : []).filter(q => q && q.stem && Array.isArray(q.choices) && q.choices.length === 4 && q.correct >= 0 && q.correct < 4).slice(0, 10);
+        for (const q of good) { await env.DB.prepare('INSERT INTO ai_items(lesson_id,data,user_id,created_at) VALUES(?,?,?,?)').bind(l.id, JSON.stringify({ stem: String(q.stem).slice(0, 300), choices: q.choices.map(c => String(c).slice(0, 120)), correct: +q.correct }), me.id, now()).run(); added++; }
+      } catch (e) { return json({ error: e.message, added }, 502); }
+    }
+    return json({ ok: true, added });
+  }
+  return null;
+}
+
 // ---------- «مساحة الطالب»: صفوف برمز يفتحها الطلاب بلا حساب ----------
 const SCODE_AB = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function newCode() { let c = ''; const a = new Uint8Array(6); crypto.getRandomValues(a); a.forEach(x => { c += SCODE_AB[x % SCODE_AB.length]; }); return c; }
@@ -1003,7 +1091,7 @@ async function studentApi(req, env, p, m, url) {
     if (!c) return json({ error: 'الرمز غير صحيح أو أُغلق هذا الصف. تأكد من الرمز مع معلمك.' }, 404);
     const ls = await classLessons(env, c);
     const t = await env.DB.prepare('SELECT name FROM users WHERE id = ?').bind(c.user_id).first();
-    return json({ name: c.name, teacher: t ? t.name : '', subject: c.course.split('|')[0], grade: c.course.split('|')[1], lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title })) });
+    return json({ ai: aiOn(env), name: c.name, teacher: t ? t.name : '', subject: c.course.split('|')[0], grade: c.course.split('|')[1], lessons: ls.map(l => ({ id: l.id, unit: l.unit, unit_name: l.unit_name, title: l.title })) });
   }
   if (p === '/api/s/lesson') {
     const c = await classByCode(env, url.searchParams.get('c'));
@@ -1013,8 +1101,19 @@ async function studentApi(req, env, p, m, url) {
     await loadPacks(env, url);
     const st = STUDY.lessons[id] || {};
     const items = itBank(c.course, QBANK.filter(q => q.lesson_id === id).concat(finQuizItems(c.course).filter(q => q.lesson_id === id)))
-      .map(q => ({ type: q.type, stem: q.stem, choices: q.choices, correct: q.correct, answer: q.answer, notes: q.notes, marks: q.marks, img: q.img || null, fig: q.fig || null, table: q.table || null }));
+      .map(q => ({ qid: q.qid, type: q.type, stem: q.stem, choices: q.choices, correct: q.correct, answer: q.answer, notes: q.notes, marks: q.marks, img: q.img || null, fig: q.fig || null, table: q.table || null }));
     return json({ lesson: { id: l.id, title: l.title, unit: l.unit, unit_name: l.unit_name }, summary: st.summary || null, items });
+  }
+  if (p === '/api/s/grade' && m === 'POST') {
+    const b = await body(req), c = await classByCode(env, b.c);
+    if (!c) return json({ error: 'الرمز غير صحيح.' }, 404);
+    const ans = String(b.answer || '').trim().slice(0, 700);
+    if (ans.length < 2) return json({ error: 'اكتب إجابتك أولًا.' }, 400);
+    const ip = 's' + ipOf(req), gate = await aiGate(env, ip, 'grade'); if (gate) return json({ error: gate }, 429);
+    const lid = +b.lid, ls = await classLessons(env, c); if (!ls.find(x => x.id === lid)) return json({ error: 'الدرس غير متاح.' }, 404);
+    const it = itBank(c.course, QBANK.filter(q => q.lesson_id === lid).concat(finQuizItems(c.course).filter(q => q.lesson_id === lid))).find(q => String(q.qid) === String(b.qid));
+    if (!it || it.type === 'mcq' || !it.answer) return json({ error: 'السؤال غير موجود.' }, 404);
+    try { return json(await aiGrade(env, ip, it, ans)); } catch (e) { return json({ error: e.message }, 502); }
   }
   if (p === '/api/s/attempt' && m === 'POST') {
     const b = await body(req), c = await classByCode(env, b.c);
@@ -1123,7 +1222,7 @@ export default {
         '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz',
         '/teqany/games': 'games', '/teqany/play': 'play', '/teqany/slides': 'slides',
         '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries', '/teqany/cando': 'cando', '/teqany/research': 'research',
-        '/teqany/admin': 'admin', '/teqany/grading': 'grading', '/teqany/login': 'login', '/teqany/setup': 'setup',
+        '/teqany/admin': 'admin', '/teqany/login': 'login', '/teqany/setup': 'setup',
       };
       if (p === '/teqany' || p === '/teqany/') return html('teqany');
       if (p === '/play') return html('play');
@@ -1150,7 +1249,7 @@ export default {
       // بقية صفحات «تقني» (بعد التحقق من الدخول)
       if (TQ_MAP[p]) return htmlTq(TQ_MAP[p]);
       // أي صفحة جديدة في المنصة تعمل تلقائيًا تحت /teqany/<اسمها> بهوية «تقني حذيفة»
-      { const tq = p.match(/^\/teqany\/([a-z]+)\/?$/); if (tq && tq[1] !== 'css' && tq[1] !== 'teqany' && PAGES_TQ[tq[1]]) return htmlTq(tq[1]); }
+      { const tq = p.match(/^\/teqany\/([a-z]+)\/?$/); if (tq && tq[1] !== 'css' && tq[1] !== 'teqany' && tq[1] !== 'grading' && PAGES_TQ[tq[1]]) return htmlTq(tq[1]); }
       if (p === '/app') return html('app');
       if (p === '/api/me') {
         // «first»: أول دخول لهذا الحساب — يُستخدم لإظهار دليل الاستخدام مرة واحدة
@@ -1204,6 +1303,7 @@ export default {
       if (p === '/api/games/data') { const d = await gamesData(env, me, url.searchParams.get('key') || ''); return d.error ? json(d, 403) : json(d); }
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
       if (p === '/api/lessons') return jsonETag(req, { lessons: await lessonsFor(env, me) });
+      if (p.startsWith('/api/ai/')) { const r = await aiApi(req, env, me, p, m, url); if (r) return r; }
       if (p.startsWith('/api/classes')) { const r = await classesApi(req, env, me, p, m, url); if (r) return r; }
       if (p === '/api/courses') { const sc = scopeOf(me); return json({ courses: (await coursesList(env)).filter(c => !sc || sc.has(c.key)) }); }
       if (p === '/api/quiz/bank') {

@@ -27,7 +27,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 const ASSETS = { fetch: async rq => { const f = join(dir, '../dist/assets', decodeURIComponent(new URL(rq.url).pathname)); return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': 'application/json' } }) : new Response('nf', { status: 404 }); } };
 // بيئة العامل: نمرّر أيضًا إعدادات قابلة للضبط من متغيّرات البيئة حتى نستطيع اختبارها محليًا
 // (مثل STALE_SECONDS: مدة إهمال الجهاز). في الإنتاج تُضبط من إعدادات الـWorker.
-const ENV = { DB, ASSETS };
+const ENV = { DB, ASSETS, ...(process.env.AI_KEY ? { AI_KEY: process.env.AI_KEY, AI_URL: process.env.AI_URL } : {}) };
 if (process.env.STALE_SECONDS) ENV.STALE_SECONDS = process.env.STALE_SECONDS;
 
 http.createServer(async (req, res) => {
