@@ -84,18 +84,20 @@ const NOUR = '<html><body><h1>نور</h1></body></html>';
     } catch (e) { console.log('proxy error', u.href, e.message); return route.abort(); }
   };
   const wire = async (c) => { for (const h of [NEW, OLD, 'https://www.elkabsula.site', 'https://lms.moe.gov.om']) await c.route(h + '/**', proxy); };
+  // التحويل المحاكى (location.replace) قد يُلغي انتظار goto: نتجاهل ERR_ABORTED وننتظر الصفحة النهائية
+  const go = async (p, u) => { try { await p.goto(u, { waitUntil: 'domcontentloaded' }); } catch (e) { if (!/ERR_ABORTED|interrupted/.test(e.message)) throw e; } await p.waitForLoadState('domcontentloaded').catch(() => {}); };
   const shut = (p) => p.evaluate(() => { const m = document.getElementById('modal'); if (m && !m.hidden) { m.dataset.seen = m.textContent.slice(0, 120); const b = document.getElementById('mCancel') || document.getElementById('mOk'); b && b.click(); } });
   const login = async (p, base) => {
-    await p.goto(base + '/', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1200); await shut(p);
+    await go(p, base + '/'); await p.waitForTimeout(1200); await shut(p);
     if (await p.$('#setupForm')) {
       await p.fill('#name', 'أ. محمد مجدي'); await p.fill('#username', USER); await p.fill('#password', PASS); await p.fill('#password2', PASS);
       await shut(p); await p.click('#setupForm button[type=submit]'); await p.waitForTimeout(1500);
-      await p.goto(base + '/', { waitUntil: 'domcontentloaded' });
+      await go(p, base + '/');
     }
     if (await p.$('#loginForm')) { await p.waitForTimeout(1200); await shut(p); await p.fill('#username', USER); await p.fill('#password', PASS); await p.click('#loginBtn'); await p.waitForTimeout(2500); }
   };
   const openLesson = async (p) => {
-    await p.goto(NEW + '/app', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2500);
+    await go(p, NEW + '/app'); await p.waitForTimeout(2500);
     await p.evaluate(() => { const m = document.getElementById('modal'); if (m && !m.hidden) { const b = document.getElementById('mOk') || document.getElementById('mCancel'); b && b.click(); } });
     await p.evaluate(() => { const el = [...document.querySelectorAll('.tree *')].find(x => x.textContent.trim() === 'الصف العاشر'); el && el.click(); });
     await p.waitForTimeout(300);
@@ -108,28 +110,29 @@ const NOUR = '<html><body><h1>نور</h1></body></html>';
     const dir = fs.mkdtempSync(os.tmpdir() + '/ext-');
     const c = await PW.chromium.launchPersistentContext(dir, { channel: 'chromium', headless: true, viewport: { width: 1280, height: 850 }, locale: 'ar-OM', args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
     await wire(c);
+    // الإضافة عند تثبيتها تُعيد تحميل تبويبات المنصة المفتوحة (onInstalled): ننتظر انتهاءها قبل التصفح
+    await new Promise(r => setTimeout(r, 3000));
     const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await login(p, OLD);   // المعلم مسجّل دخوله على الرابط القديم
     // (بعد بدء التحويل صار الدخول نفسه يتم على النطاق الجديد) نُعيد حالة «لم يرَ الرسالة» لنختبر ظهورها
+    await go(p, NEW + '/version');
     await p.evaluate(() => localStorage.removeItem('kabsula_moved_seen_v1'));
-    // (بعد بدء التحويل صار الدخول نفسه يتم على النطاق الجديد) نُعيد حالة «لم يرَ الرسالة» لنختبر ظهورها
-    await p.evaluate(() => localStorage.removeItem('kabsula_moved_seen_v1'));
-    await p.goto(OLD + '/app', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(6000);
+    await go(p, OLD + '/app'); await p.waitForTimeout(6000);
     ok('كتابة الرابط القديم تفتح النطاق الجديد', p.url() === NEW + '/app', p.url());
     ok('الجلسة انتقلت (بلا صفحة دخول)', !(await p.$('#loginForm')));
     const msg = await p.evaluate(() => { const m = document.getElementById('modal'); return m && !m.hidden ? m.textContent : ''; });
     ok('رسالة «تم نقل المنصة» تظهر', /elkabsula\.site/.test(msg) && /نقل/.test(msg), msg.slice(0, 80));
     await p.screenshot({ path: path.join(__dirname, 'domain_move_msg.png') });
     await p.evaluate(() => document.getElementById('mOk').click());
-    await p.goto(OLD + '/quiz', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
+    await go(p, OLD + '/quiz'); await p.waitForTimeout(1500);
     const again = await p.evaluate(() => { const m = document.getElementById('modal'); return !!(m && !m.hidden && /elkabsula\.site/.test(m.textContent)); });
     ok('الرسالة لا تتكرر', !again && p.url() === NEW + '/quiz', p.url());
-    await p.goto(OLD + '/teqany/login', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1000); await shut(p);
+    await go(p, OLD + '/teqany/login'); await p.waitForTimeout(1000); await shut(p);
     ok('/teqany/login يبقى على الرابط القديم', p.url() === OLD + '/teqany/login', p.url());
     if (await p.$('#loginForm')) { await p.fill('#username', USER); await p.fill('#password', PASS); await p.click('#loginForm button[type=submit], #loginBtn'); await p.waitForTimeout(2500); }
-    await p.goto(OLD + '/teqany/research', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
+    await go(p, OLD + '/teqany/research'); await p.waitForTimeout(1500);
     ok('/teqany/research يبقى على الرابط القديم ويعمل', p.url() === OLD + '/teqany/research' && /تقني حذيفة/.test(await p.title()) && !!(await p.$('.rs-card')), p.url() + ' · ' + await p.title());
-    await p.goto(OLD + '/teqany', { waitUntil: 'domcontentloaded' });
+    await go(p, OLD + '/teqany');
     ok('بطاقة «البحوث الإجرائية» في واجهة تقني', !!(await p.$('a.tq-c[href="/teqany/research"]')));
     await openLesson(p);
     const at = await p.evaluate(() => [document.documentElement.getAttribute('data-tahdir-tool'), document.documentElement.getAttribute('data-tahdir-ext')]);
@@ -139,7 +142,10 @@ const NOUR = '<html><body><h1>نور</h1></body></html>';
     const np = c.waitForEvent('page', { timeout: 10000 }).catch(() => null);
     await p.click('#sendPrepBtn');
     const n = await np; await p.waitForTimeout(2000);
-    const lms = tried.find(u => /lms\.moe\.gov\.om/.test(u)) || (n && n.url());
+    // نسأل الإضافة نفسها عن التبويبات المفتوحة (عنوان التبويب المطلوب حتى لو فشل تحميله هنا)
+    let sw = c.serviceWorkers()[0]; if (!sw) sw = await c.waitForEvent('serviceworker', { timeout: 5000 }).catch(() => null);
+    const tabUrls = sw ? await sw.evaluate(() => new Promise(r => chrome.tabs.query({}, ts => r(ts.map(t => t.pendingUrl || t.url))))) : [];
+    const lms = tried.find(u => /lms\.moe\.gov\.om/.test(u)) || tabUrls.find(u => /lms\.moe\.gov\.om/.test(u || '')) || (n && n.url());
     ok('إضافة كروم: «إرسال إلى نور» يفتح نور', /lms\.moe\.gov\.om/.test(lms || ''), lms);
     ok('بلا أخطاء صفحة (كروم)', !errs.length, errs.join(' | '));
     await c.close();

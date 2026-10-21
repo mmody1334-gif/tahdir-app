@@ -9,7 +9,7 @@ body = tool[tool.index('==/UserScript=='):].split('\n', 1)[1]
 test = '--test' in sys.argv
 if test: body = body.replace("location.hostname === 'tahdir.hudhaifa-bio.workers.dev'", "(location.hostname === 'tahdir.hudhaifa-bio.workers.dev' || location.hostname === 'localhost')")
 run = 'function (GM_getValue, GM_setValue, GM_deleteValue, GM_openInTab, GM_registerMenuCommand, unsafeWindow) {\n' + body + '\n}'
-shim = open(os.path.join(SRC, 'shim.js'), encoding='utf-8').read().replace('__RUN__', '(' + run + ')').replace('__EXTVER__', ver)
+shim = open(os.path.join(SRC, 'shim.js'), encoding='utf-8').read().replace('__RUN__', '(' + run + ')').replace('__EXTVER__', ver).replace('__EXTSRC__', 'zip')
 shutil.rmtree(OUT, ignore_errors=True); os.makedirs(OUT)
 open(os.path.join(OUT, 'main.js'), 'w', encoding='utf-8').write(shim)
 for f in ('bridge.js', 'background.js'): shutil.copy(os.path.join(SRC, f), OUT)
@@ -27,8 +27,10 @@ sites = sorted(set(m for m in re.findall(r'@match\s+(\S+)', hdr) if m.endswith('
 man = {
   'manifest_version': 3, 'name': 'الكبسولة — أداة نور', 'short_name': 'أداة نور', 'version': ver,
   'description': 'ترسل التحضير والواجب من موقع «الكبسولة» إلى منصة نور وتملأ الحقول تلقائيًا. لا تضغط حفظ أبدًا.',
-  'author': 'أ. محمد مجدي', 'homepage_url': 'https://tahdir.hudhaifa-bio.workers.dev/',
+  'author': 'أ. محمد مجدي', 'homepage_url': 'https://elkabsula.site/',
   'permissions': ['storage'],
+  # نفس نطاقات content_scripts (لا صلاحية جديدة): تلزم لإعادة المعلم إلى تبويب المنصة بعد التثبيت
+  'host_permissions': sites,
   'background': {'service_worker': 'background.js'},
   'content_scripts': [
     {'matches': sites, 'js': ['bridge.js'], 'run_at': 'document_start'},
@@ -44,3 +46,26 @@ if not test:
         for f in sorted(os.listdir(OUT)): zf.write(os.path.join(OUT, f), f)
     print(z)
 print('ext', ver, OUT)
+
+# ===== حزم المتاجر (Chrome Web Store · Edge Add-ons · Firefox AMO) =====
+# نفس ملفات الإضافة بالضبط؛ لفايرفوكس فقط: خلفية بالسكربت بدل service_worker،
+# ومعرّف gecko، وإعلان «لا نجمع بيانات» المطلوب في AMO. سكربت Tampermonkey لا يُمسّ.
+if not test:
+    store = os.path.join(ROOT, 'dist', 'store'); os.makedirs(store, exist_ok=True)
+    def _zip(path, manifest):
+        with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for f in sorted(os.listdir(OUT)):
+                if f == 'main.js':  # نسخة المتجر تتحدّث من المتجر تلقائيًا: لا نعرض لها تنبيه «حمّل التحديث»
+                    zf.writestr(f, open(os.path.join(OUT, f), encoding='utf-8').read().replace("'data-tahdir-ext-src', 'zip'", "'data-tahdir-ext-src', 'store'"))
+                elif f != 'manifest.json': zf.write(os.path.join(OUT, f), f)
+            zf.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=1))
+        print(path)
+    _zip(os.path.join(store, f'kabsula-chrome-edge-{ver}.zip'), man)
+    ff = json.loads(json.dumps(man))
+    ff.pop('minimum_chrome_version', None)
+    ff['background'] = {'scripts': ['background.js']}
+    ff['browser_specific_settings'] = {
+        'gecko': {'id': 'noor-tool@elkabsula.site', 'strict_min_version': '140.0',
+                  'data_collection_permissions': {'required': ['none']}},
+        'gecko_android': {'strict_min_version': '142.0'}}
+    _zip(os.path.join(store, f'kabsula-firefox-{ver}.zip'), ff)

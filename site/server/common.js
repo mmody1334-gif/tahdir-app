@@ -123,7 +123,8 @@ function verCmp(a,b){a=String(a||'').split('.');b=String(b||'').split('.');for(v
 function toolVersion(){return document.documentElement.getAttribute('data-tahdir-tool')||'';}
 // إضافة المتصفح الرسمية: مسار تجريبي غير مفعّل. عند تعبئة الروابط يعمل تلقائيًا،
 // وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
-var EXT_STORE={chrome:'',edge:''};
+// ضع رابط صفحة الإضافة في كل متجر بعد نشرها؛ يظهر عندها «مرشد التثبيت» (ضغطتان) بدل Tampermonkey.
+var EXT_STORE={chrome:'',edge:'',firefox:''};
 // كروم وإيدج: إضافة «الكبسولة» الخاصة (نفس كود الأداة) بدل Tampermonkey — تُحمَّل ملف ZIP وتُثبَّت «غير مُجمّعة».
 // فايرفوكس وسافاري والآيفون: لا تغيير (Tampermonkey / Userscripts كما هي).
 var EXT_ZIP='/download/tahdir-ext.zip';
@@ -154,14 +155,106 @@ function tmStoreFor(b){
   if(b==='edge')return 'https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd';
   if(b==='safari')return 'https://apps.apple.com/app/tampermonkey/id1482490089';
   return 'https://chromewebstore.google.com/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo';}
+// ---------- مرشد تثبيت الإضافة من المتجر (كروم · إيدج · فايرفوكس) ----------
+// لا يستطيع أي موقع الرسم فوق صفحة المتجر أو نافذة «إضافة» (صفحات محمية)، فنعرض بدلها
+// صورًا للشاشة القادمة بلغة متصفح المعلم وعليها مربع أحمر على الزر المطلوب:
+//  • كروم/إيدج: داخل نافذة عائمة فوق كل النوافذ (Document Picture-in-Picture).
+//  • فايرفوكس (لا يدعمها): يُفتح المتجر في نافذة جانبية ويبقى المرشد ظاهرًا في المنصة.
+// بعد التثبيت تُعيد الإضافة نفسها المعلم إلى تبويب المنصة وتحدّثه (background.js) فتظهر «تم ✓».
+var GUIDE_KEY='tahdir_ext_guide';
+function guideLang(){var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';return /^ar/i.test(l)?'ar':'en';}
+var GUIDE_CSS='.xg{font-family:inherit;direction:rtl;color:#163;line-height:1.7}'+
+  '.xg h4{margin:4px 0 10px;font-size:17px}.xg-st{display:flex;gap:10px;margin:0 0 14px}'+
+  '.xg-n{flex:none;width:26px;height:26px;border-radius:50%;background:#0e7c66;color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;margin-top:2px}'+
+  '.xg-b{flex:1;min-width:0}.xg-t{font-size:14.5px;margin-bottom:6px}.xg-t b{background:#fff1f1;border-radius:5px;padding:0 4px}'+
+  '.xg-scr{border:1px solid #cfd8d5;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:Segoe UI,Roboto,Arial,sans-serif}'+
+  '.xg-bar{background:#eef1f3;padding:5px 8px;font-size:11px;color:#556;border-bottom:1px solid #dde3e6;display:flex;gap:6px;align-items:center}'+
+  '.xg-bar i{width:7px;height:7px;border-radius:50%;background:#c9d0d4;display:inline-block}.xg-bar span{background:#fff;border-radius:9px;padding:1px 9px;flex:1;direction:ltr;text-align:left;overflow:hidden;white-space:nowrap}'+
+  '.xg-body{padding:10px;display:flex;align-items:center;gap:9px}.xg-ic{width:38px;height:38px;border-radius:9px;flex:none;background:#0e7c66}'+
+  '.xg-nm{flex:1;font-size:12.5px;font-weight:600;color:#222}.xg-nm small{display:block;font-weight:400;color:#777}'+
+  '.xg-btn{position:relative;flex:none;background:#0b57d0;color:#fff;border-radius:18px;padding:6px 13px;font-size:12.5px;font-weight:600;white-space:nowrap}'+
+  '.xg-btn.ghost{background:#fff;color:#0b57d0;border:1px solid #c7d2e0}'+
+  '.xg-hl{outline:3px solid #e01e1e;outline-offset:3px;animation:xgp 1.1s ease-in-out infinite}'+
+  '@keyframes xgp{50%{outline-offset:7px;outline-color:#ff6b6b}}'+
+  '.xg-hl:after{content:"👆";position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);font-size:22px;animation:xga .9s ease-in-out infinite}'+
+  '@keyframes xga{50%{transform:translate(-50%,-6px)}}'+
+  '.xg-dlg{padding:12px 12px 16px;font-size:12.5px;color:#222}.xg-dlg b{display:block;font-size:13px;margin-bottom:4px}.xg-dlg p{margin:0 0 10px;color:#666;font-size:11.5px}'+
+  '.xg-acts{display:flex;gap:8px;justify-content:flex-end;padding-bottom:18px}'+
+  '.xg-ok{background:#e9f7f1;border:1px solid #0e7c66;border-radius:10px;padding:9px 11px;font-size:14px}'+
+  '.xg-go{display:block;text-align:center;background:#0e7c66;color:#fff;border-radius:10px;padding:10px;font-weight:700;text-decoration:none;margin:4px 0 12px}'+
+  '.xg-float{position:fixed;z-index:9999;bottom:14px;left:14px;width:min(370px,calc(100vw - 28px));max-height:calc(100vh - 28px);overflow:auto;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:14px}'+
+  '.xg-x{position:absolute;top:8px;left:10px;border:0;background:none;font-size:20px;cursor:pointer;color:#567}';
+function guideHtml(b,L,storeUrl){
+  var EXT='الكبسولة — أداة نور',ltr=L==='en';
+  var T={chrome:{ar:['إضافة إلى Chrome','إضافة إضافة','إلغاء','هل تريد إضافة «'+EXT+'»؟'],en:['Add to Chrome','Add extension','Cancel','Add "'+EXT+'"?'],host:'chromewebstore.google.com'},
+         edge:{ar:['الحصول على','إضافة ملحق','إلغاء','هل تريد إضافة «'+EXT+'» إلى Microsoft Edge؟'],en:['Get','Add extension','Cancel','Add "'+EXT+'" to Microsoft Edge?'],host:'microsoftedge.microsoft.com'},
+         firefox:{ar:['إضافة إلى Firefox','إضافة','إلغاء','هل تريد إضافة «'+EXT+'»؟'],en:['Add to Firefox','Add','Cancel','Add '+EXT+'?'],host:'addons.mozilla.org'}}[b];
+  var t=T[L],dir=' dir="'+(ltr?'ltr':'rtl')+'"';
+  var ic='<span class="xg-ic" style="background:#0e7c66 url(/icon-512.png) center/cover"></span>';
+  var s1='<div class="xg-scr"'+dir+'><div class="xg-bar"><i></i><i></i><span>'+T.host+'</span></div>'+
+    '<div class="xg-body">'+ic+'<div class="xg-nm">'+EXT+'<small>elkabsula.site</small></div><span class="xg-btn xg-hl">'+esc(t[0])+'</span></div></div>';
+  var s2='<div class="xg-scr"'+dir+'><div class="xg-bar"><i></i><i></i><span>'+T.host+'</span></div>'+
+    '<div class="xg-dlg"><b>'+esc(t[3])+'</b><p>'+(ltr?'It can: Read and change your data on lms.moe.gov.om and elkabsula.site':'يمكنها قراءة بياناتك وتغييرها على lms.moe.gov.om و elkabsula.site')+'</p>'+
+    '<div class="xg-acts" style="justify-content:'+(ltr?'flex-end':'flex-start')+'"><span class="xg-btn xg-hl">'+esc(t[1])+'</span><span class="xg-btn ghost">'+esc(t[2])+'</span></div></div></div>';
+  function st(n,txt,scr){return '<div class="xg-st"><span class="xg-n">'+n+'</span><div class="xg-b"><div class="xg-t">'+txt+'</div>'+(scr||'')+'</div></div>';}
+  return '<div class="xg"><h4>تثبيت أداة نور — ضغطتان فقط</h4>'+
+    (storeUrl?'<a class="xg-go" href="'+esc(storeUrl)+'" target="_blank" rel="noopener">فتح صفحة الإضافة في المتجر ↗</a>':'')+
+    st('١','في صفحة المتجر اضغط الزر <b>«'+esc(t[0])+'»</b>',s1)+
+    st('٢','تظهر نافذة صغيرة أعلى المتصفح: اضغط <b>«'+esc(t[1])+'»</b>',s2)+
+    st('٣','<div class="xg-ok">خلاص! الإضافة ترجعك للمنصة لوحدها، ويظهر الزر <b>«أداة نور ✓»</b>. لا Tampermonkey ولا إعدادات.</div>')+
+    '</div>';
+}
+function extGuide(reason){
+  var b=browserKind(),L=guideLang(),eu=extUrl();
+  var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<style>'+GUIDE_CSS+'</style>'+guideHtml(b,L,'');
+  return dialog({title:'أداة نور',html:h,okText:'افتح المتجر وابدأ',cancelText:'إغلاق'}).then(function(r){
+    if(!r)return;
+    try{sessionStorage.setItem(GUIDE_KEY,'1');}catch(e){}
+    var pip=window.documentPictureInPicture;
+    if(pip&&pip.requestWindow&&b!=='firefox'){
+      // النافذة العائمة أولًا (تحتاج ضغطة المعلم)، ثم المتجر في تبويب جديد
+      pip.requestWindow({width:390,height:640}).then(function(w){
+        var d=w.document;d.title='أداة نور';d.documentElement.setAttribute('dir','rtl');d.documentElement.setAttribute('lang','ar');
+        var stl=d.createElement('style');stl.textContent='body{margin:0;padding:14px;font-family:Tajawal,Segoe UI,Tahoma,Arial,sans-serif;background:#fff}'+GUIDE_CSS;d.head.appendChild(stl);
+        d.body.innerHTML=guideHtml(b,L,eu);
+        if(!window.open(eu,'_blank'))return; // لو حُجب: رابط المتجر داخل النافذة العائمة
+      }).catch(function(){guideFloat(b,L,eu);window.open(eu,'_blank');});
+    }else{
+      guideFloat(b,L,eu);
+      // فايرفوكس: المتجر في نافذة جانبية، والمرشد يبقى ظاهرًا في المنصة بجوارها
+      var W=Math.min(980,Math.round(screen.availWidth*0.6)),H=Math.min(820,screen.availHeight-40);
+      var w2=window.open(eu,'kabsula_store','popup,width='+W+',height='+H+',left='+(screen.availWidth-W)+',top=20');
+      if(!w2)window.open(eu,'_blank');
+    }
+  });
+}
+// لوحة المرشد داخل المنصة (فايرفوكس، أو عند تعذّر النافذة العائمة)
+function guideFloat(b,L,eu){
+  if($('xgFloat'))return;
+  var p=document.createElement('div');p.id='xgFloat';p.className='xg-float';
+  p.innerHTML='<style>'+GUIDE_CSS+'</style><button type="button" class="xg-x" aria-label="إغلاق">×</button>'+guideHtml(b,L,eu)+
+    '<button type="button" class="btn small" id="xgReload" style="width:100%">ثبّتها؟ حدّث الصفحة ↻</button>';
+  document.body.appendChild(p);
+  p.querySelector('.xg-x').onclick=function(){p.remove();};
+  $('xgReload').onclick=function(){location.reload();};
+}
+// بعد عودة المعلم (الإضافة حدّثت التبويب): تأكيد واحد بأن التثبيت تم
+(function(){
+  var g='';try{g=sessionStorage.getItem(GUIDE_KEY)||'';}catch(e){}
+  if(!g)return;
+  setTimeout(function(){
+    if(!hasExt())return;
+    try{sessionStorage.removeItem(GUIDE_KEY);}catch(e){}
+    var f=$('xgFloat');if(f)f.remove();
+    dialog({title:'تم تثبيت أداة نور ✓',message:'كل شيء جاهز: تقدر الآن ترسل التحضير والواجب إلى نور بضغطة. الإضافة تتحدّث تلقائيًا من المتجر.',okText:'تمام',cancelText:false});
+  },1800);
+})();
 function toolDialog(reason){
   if(IN_APP)return dialog({title:'أداة نور',message:'أنت تستخدم تطبيق «الكبسولة»، والأداة مدمجة فيه وتتحدث تلقائيًا. لا تحتاج تثبيت أي شيء.',okText:'تم',cancelText:false});
   var v=toolVersion(),ok=!!v,eu=extUrl();
-  // مسار الإضافة الرسمية (لو فُعّلت لاحقًا): خطوة واحدة
-  if(eu&&!hasExt()){
-    var bn=tmStoreName();
-    return dialog({title:'أداة نور',html:(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<p class="m-msg"><b>خطوة واحدة:</b> اضغط الزر، وفي صفحة المتجر اضغط <b>«إضافة إلى '+bn+'»</b>. بعدها ارجع وحدّث الصفحة.</p>',okText:'تثبيت الإضافة',cancelText:'إغلاق'}).then(function(r){if(r)window.open(eu,'_blank');});
-  }
+  // الأداة تعمل (Tampermonkey أو الإضافة): لا نقترح شيئًا آخر — سكربت Tampermonkey يبقى كما هو.
+  // وإلا، ولو للمتصفح إضافة منشورة في متجره: مرشد التثبيت (ضغطتان).
+  if(!ok&&eu&&!hasExt())return extGuide(reason);
   if(ok)return dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false});
   // التثبيت لأول مرة: تبويبات بحسب المتصفح (كروم · فايرفوكس · إيدج · ماك/سافاري)
   var cur=browserKind()||'chrome';
@@ -208,14 +301,23 @@ function toolDialog(reason){
         '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ تنبيه:</b> لا تستخدم <b>«Tampermonkey Legacy»</b> — فهي لسافاري 6–11 فقط ولن تُثبَّت على سافاري الحديث.</p>';
     }
     if(extBrowser(b)){
+      // كروم وإيدج: Tampermonkey من المتجر + مفتاح واحد يسمح بالسكربتات (شرط جديد من جوجل منذ Chrome 138).
+      // إضافة «الكبسولة» غير المُجمّعة تبقى بديلًا متقدّمًا داخل «طريقة أخرى».
       var en=b==='edge'?'Edge':'Chrome',eu2=b==='edge'?'edge://extensions':'chrome://extensions';
+      var tmId=b==='edge'?'iikmkjmpaadaobahmlepeloendndfphd':'dhdgffkkebhmkfjojejmpbldmpobfkfo',det=eu2+'/?id='+tmId;
+      var step2=b==='edge'
+        ? '<li>افتح صفحة الإضافات: انسخ <code class="ltr" style="user-select:all">'+eu2+'</code> <button type="button" class="btn small" data-copy="'+eu2+'">نسخ</button> والصقه في شريط العنوان ثم Enter، وفعّل <b>«وضع المطوّر» Developer mode</b> من القائمة الجانبية.<br><span class="muted small">في الإصدارات الأحدث قد تجد بدلًا منه مفتاح <b>Allow User Scripts</b> داخل تفاصيل Tampermonkey: فعّله.</span></li>'
+        : '<li>اسمح لـ Tampermonkey بتشغيل السكربتات: <b>كليك يمين</b> على أيقونة Tampermonkey (أو 🧩 ← ⋮ بجانبه) ← <b>«إدارة الإضافة» Manage extension</b> ← فعّل مفتاح <b>«Allow User Scripts»</b>.<br><span class="muted small">أو انسخ <code class="ltr" style="user-select:all">'+det+'</code> <button type="button" class="btn small" data-copy="'+det+'">نسخ</button> والصقه في شريط العنوان. لو لم تجد المفتاح (كروم أقدم): فعّل <b>Developer mode</b> أعلى صفحة <span class="ltr">chrome://extensions</span>.</span></li>';
       return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-        '<li><a class="btn primary small" href="'+EXT_ZIP+'" download>⬇ تحميل إضافة «الكبسولة»</a> ثم <b>فُك الضغط</b> (كليك يمين ← «استخراج الكل») في مكان ثابت مثل «المستندات». <span class="muted small">لا تحذف المجلد بعد التثبيت.</span></li>'+
-        '<li>افتح صفحة الإضافات: انسخ <code class="ltr" style="user-select:all">'+eu2+'</code> <button type="button" class="btn small" data-copy="'+eu2+'">نسخ</button> والصقه في شريط العنوان ثم Enter.</li>'+
-        '<li>فعّل <b>«وضع المطوّر» Developer mode</b> '+(b==='edge'?'(في القائمة الجانبية يسارًا)':'(أعلى الصفحة يمينًا)')+'.</li>'+
-        '<li>اضغط <b>«تحميل الإضافة غير المُجمّعة» Load unpacked</b> واختر المجلد الذي فككته.</li>'+
-        '<li>ارجع هنا وحدّث الصفحة: يظهر الزر <b>«أداة نور ✓»</b>.</li></ol>'+
-        '<p class="m-msg muted small">الإضافة تشتغل بنفس كود الأداة، ومن غير Tampermonkey. لو Tampermonkey متثبّت عندك في '+en+' سيبه أو امسحه، مش هيحصل تعارض: الأداة مش هتشتغل مرتين.</p>';
+        '<li>ثبّت <b>Tampermonkey</b> من متجر '+en+': <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «'+(b==='edge'?'الحصول عليه / Get':'إضافة إلى Chrome')+'».</li>'+
+        step2+
+        '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت» Install</b>.</li></ol>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>💡 لو ثبّت Tampermonkey قبل كده والأداة وقفت فجأة:</b> هي دي المشكلة — نفّذ الخطوة ٢ فقط وحدّث الصفحة.</p>'+
+        '<details class="m-msg"><summary class="muted small" style="cursor:pointer">طريقة أخرى (متقدّمة): إضافة «الكبسولة» بدون Tampermonkey</summary><ol style="line-height:2;padding-inline-start:1.2em;margin-top:6px">'+
+        '<li><a class="btn small" href="'+EXT_ZIP+'" download>⬇ تحميل إضافة «الكبسولة»</a> ثم <b>فُك الضغط</b> في مكان ثابت مثل «المستندات». <span class="muted small">لا تحذف المجلد بعد التثبيت.</span></li>'+
+        '<li>افتح <code class="ltr" style="user-select:all">'+eu2+'</code> <button type="button" class="btn small" data-copy="'+eu2+'">نسخ</button> وفعّل <b>Developer mode</b>.</li>'+
+        '<li>اضغط <b>Load unpacked</b> واختر المجلد الذي فككته، ثم حدّث هذه الصفحة.</li></ol>'+
+        '<p class="muted small">لو الإضافة وTampermonkey الاثنين متثبّتين مش هيحصل تعارض: الأداة مش هتشتغل مرتين.</p></details>';
     }
     var nm=b==='firefox'?'Firefox':(b==='edge'?'Edge':'Chrome');
     return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
@@ -239,11 +341,11 @@ function toolDialog(reason){
     : '';
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+
    andNote+
-   '<p class="m-msg">اختر متصفحك ثم اتبع الخطوتين:</p>'+
+   '<p class="m-msg">اختر متصفحك ثم اتبع الخطوات:</p>'+
    tabbar+panes+
    '<p class="m-msg muted small">هذا كل شيء — مرة واحدة للأبد. بعدها تتحدث الأداة تلقائيًا من الموقع.</p>'+
    '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: ثبّت <b>Userscripts</b> (مجاني) ثم افتح رابط الأداة واضغط Install.</p>';
-  var sel=cur,okLabel=function(k){return extBrowser(k)?'⬇ تحميل الإضافة':'تثبيت الأداة';};
+  var sel=cur,okLabel=function(k){return 'تثبيت الأداة';};
   var pr=dialog({title:'تثبيت أداة نور',html:h,okText:okLabel(cur),cancelText:'إغلاق'});
   Array.prototype.forEach.call(document.querySelectorAll('#modalBox [data-copy]'),function(b){b.onclick=function(){copyText(b.getAttribute('data-copy'));};});
   // ربط التبويبات داخل النافذة (بعد إدراجها في DOM)
@@ -254,7 +356,7 @@ function toolDialog(reason){
       Array.prototype.forEach.call(document.querySelectorAll('.tt-pane'),function(x){x.classList.toggle('on',x.getAttribute('data-pane')===k);});
     };
   });
-  return pr.then(function(r){if(!r)return;if(extBrowser(sel)){var a=document.createElement('a');a.href=EXT_ZIP;a.download='tahdir-ext.zip';document.body.appendChild(a);a.click();a.remove();}else window.open(TOOL_URL,'_blank');});
+  return pr.then(function(r){if(!r)return;window.open(TOOL_URL,'_blank');});
 }
 // تنبيه غير حاجب: نُخبر المعلم أن هناك إصدارًا أحدث، ولا نمنعه من العمل.
 // (الحجب كان يسبب تعطّلًا كاملًا لو تعذّر قراءة الإصدار لأي سبب.)
@@ -264,6 +366,7 @@ function updSave(o){try{localStorage.setItem(UPD_KEY,JSON.stringify(o));}catch(e
 // تحديث إضافة كروم/إيدج: تنبيه واحد غير حاجب لكل إصدار جديد (لا يخص Tampermonkey/فايرفوكس)
 function extUpdateNote(){
   if(IN_APP||!hasExt())return;
+  if(document.documentElement.getAttribute('data-tahdir-ext-src')==='store')return; // المتجر يحدّثها تلقائيًا
     var ev=extVersion();if(!ev||verCmp(ev,TOOL_LATEST)>=0)return;
     var es=updState();if(es.n>0)return;updSave({to:TOOL_LATEST,n:1});
     var bx=browserKind()==='edge'?'edge://extensions':'chrome://extensions';
@@ -402,7 +505,7 @@ function tourSteps(){
   var pg=tourPage();
   if(pg==='app')return [
     {sel:null,title:'أهلًا بك في «الكبسولة» 💊',text:'خطوتان تفصلانك عن تحضير جاهز يُرسل إلى نور بضغطة: ثبّت أداة نور (مرة واحدة)، ثم اختر صفّك. تقدر تعيد هذا الدليل في أي وقت من زر «دليل الاستخدام» أعلى الصفحة.'},
-    {sel:'#toolBtn',step:'tool',title:'١) ثبّت «أداة نور» — مرة واحدة فقط',text:'هذه هي الخطوة الأولى والأهم: هي التي تُرسل التحضير والواجب إلى نور وتصحّح الواجبات تلقائيًا. اضغط الزر واتبع خطوات متصفحك (كروم وإيدج: إضافة «الكبسولة» · فايرفوكس: Tampermonkey). في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.',cta:'كيف أثبّتها؟'},
+    {sel:'#toolBtn',step:'tool',title:'١) ثبّت «أداة نور» — مرة واحدة فقط',text:'هذه هي الخطوة الأولى والأهم: هي التي تُرسل التحضير والواجب إلى نور وتصحّح الواجبات تلقائيًا. اضغط الزر واتبع خطوات متصفحك (كروم وإيدج وفايرفوكس: Tampermonkey). في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.',cta:'كيف أثبّتها؟'},
     {sel:'#subjSel',title:'٢) اختر المادة',text:'بعد تثبيت الأداة: القائمة الأولى للمواد المتاحة لك، والثانية للصفوف. تظهر لك المواد التي سمح بها المدير فقط.'},
     {sel:'.g-btn',title:'٣) اختر الصف',text:'اضغط الصف ليفتح، ثم اختر الوحدة، ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في نور.'},
     {sel:'#sendPrepBtn',title:'٤) أرسل التحضير إلى نور',text:'اضغط «إرسال التحضير إلى نور» ونور مفتوحة: تُفتح «إضافة تحضير» للصف ويُختار الدرس وتُملأ الأركان. يبقى لك التاريخ وزر «إضافة».'},

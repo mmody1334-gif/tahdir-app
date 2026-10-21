@@ -1,29 +1,85 @@
-# بيانات النشر في متجر Chrome و Edge
+# نشر إضافة «الكبسولة — أداة نور» في المتاجر
 
-**الاسم:** التحضير الآلي — أداة نور
+الحزم تُبنى بالأمر `python3 site/tools/build_ext.py` في `site/dist/store/`:
+- `kabsula-chrome-edge-<الإصدار>.zip` ← متجر Chrome **و** متجر Edge (نفس الملف)
+- `kabsula-firefox-<الإصدار>.zip` ← متجر Firefox (AMO)
 
-**الوصف المختصر (Summary):**
-ترسل التحضير والواجب من موقع «التحضير الآلي» إلى منصة نور وتملأ الحقول تلقائيًا للمعلم.
+الإضافة تُبنى من نسخة من سكربت أداة نور (`tahdir-noor.user.js`) **دون أي تعديل عليه**، فسكربت
+Tampermonkey المثبَّت عند المعلمين لا يتأثر. ولو ثبّت معلم الإضافة وTampermonkey معًا لا تعمل الأداة مرتين.
 
-**الوصف الكامل (Description):**
-أداة للمعلمين في سلطنة عُمان تعمل مع موقع «التحضير الآلي» (tahdir.hudhaifa-bio.workers.dev).
-- اضغط «إرسال التحضير إلى نور» في الموقع، فتفتح الأداة صفحة «إضافة تحضير» للصف الصحيح في منصة نور وتملأ الخانات.
-- الواجب الإلكتروني: تملأ نموذج المهمة ثم تضيف الأسئلة في «إضافة مجموعة مفردات دفعة واحدة».
-- لا تضغط «حفظ» أبدًا: المعلم يراجع ويحفظ بنفسه.
-- لا تجمع أي بيانات ولا ترسل شيئًا لأي خادم؛ كل شيء يبقى على جهاز المعلم.
-إعداد: أ. محمد مجدي — معلم الأحياء، مدرسة حذيفة بن محصن.
+بعد النشر: ضع رابط صفحة الإضافة في كل متجر داخل `EXT_STORE` في `site/server/common.js`
+فيظهر للمعلم «مرشد التثبيت» (ضغطتان) بدل خطوات Tampermonkey.
 
-**الفئة (Category):** Education / التعليم
-**اللغة:** العربية
-**الظهور (Visibility):** Unlisted (غير مدرجة — تظهر فقط لمن معه الرابط)
-**سياسة الخصوصية (Privacy policy URL):** https://tahdir.hudhaifa-bio.workers.dev/privacy
+---
 
-**الغرض الوحيد (Single purpose):**
-Transfers a teacher's lesson preparation and homework from the "Tahdir" website into the Nour LMS (lms.moe.gov.om) forms.
+## البيانات المشتركة (لكل المتاجر)
 
-**تبرير الأذونات (Permission justification):**
-- storage: keeps the lesson the teacher just sent from the Tahdir site until the Nour page opens and is filled (stored locally only).
-- Host access (lms.moe.gov.om, tahdir.hudhaifa-bio.workers.dev): needed to receive the "send" action on the Tahdir site and to fill the preparation/homework forms on Nour.
+**الاسم:** الكبسولة — أداة نور
 
-**Remote code:** No — all code is inside the package.
-**Data usage:** Does not collect or transmit any user data. (اختر: لا يجمع أي بيانات)
+**الوصف المختصر (حتى 132 حرفًا):**
+ترسل التحضير والواجب من منصة «الكبسولة» إلى منصة نور وتملأ الحقول تلقائيًا. لا تضغط حفظ أبدًا.
+
+**الوصف الكامل (عربي):**
+أداة مجانية لمعلمي سلطنة عُمان تعمل مع منصة «الكبسولة» (elkabsula.site).
+
+• اختر الدرس في «الكبسولة» واضغط «إرسال التحضير إلى نور»، فتفتح الأداة صفحة «إضافة تحضير» للصف الصحيح في منصة نور وتملأ الخانات تلقائيًا.
+• الواجب الإلكتروني: تملأ نموذج المهمة ثم تضيف الأسئلة دفعة واحدة.
+• لا تضغط «حفظ» أبدًا: المعلم يراجع ويحفظ بنفسه.
+• لا تجمع أي بيانات ولا ترسل شيئًا لأي خادم؛ كل شيء يبقى على جهاز المعلم.
+• تتحدّث تلقائيًا من المتجر.
+
+مبادرة مدرسية من إعداد أ. محمد مجدي — معلم الأحياء، مدرسة حذيفة بن محصن.
+(ليست تطبيقًا رسميًا لوزارة التعليم.)
+
+**Full description (English):**
+A free helper for teachers in Oman that works with the "Elkabsula" lesson-prep platform (elkabsula.site).
+
+• Pick a lesson on Elkabsula and click "Send preparation to Nour": the extension opens the "Add preparation" page for the right class on the Nour LMS (lms.moe.gov.om) and fills in the fields.
+• Homework: fills the assignment form and adds the questions in one batch.
+• It never clicks "Save" — the teacher reviews and saves.
+• Collects no data and sends nothing to any server; everything stays on the teacher's device.
+
+A school initiative by Mohamed Magdy, Biology teacher, Hudhaifa bin Muhsin School. Not an official Ministry of Education app.
+
+**الفئة:** Education / التعليم (فايرفوكس: Other أو Productivity)
+**الموقع (Homepage):** https://elkabsula.site/
+**سياسة الخصوصية:** https://elkabsula.site/privacy
+**الدعم (Support URL):** https://elkabsula.site/support
+**الظهور:** Unlisted (غير مدرجة — تظهر فقط لمن معه الرابط) أو Public حسب رغبتك
+
+**الصور (في مجلد store-images):**
+| الملف | المقاس | أين يُستخدم |
+|---|---|---|
+| icon128.png (داخل الحزمة) | 128×128 | Chrome · Firefox |
+| logo300.png | 300×300 | Edge: Extension Store logo |
+| shot_app.png · shot2.png | 1280×800 | لقطات الشاشة (Chrome · Edge · Firefox) |
+| tile440.png | 440×280 | Chrome: Small promo tile · Edge: Small promotional tile |
+| marquee1400.png | 1400×560 | Chrome: Marquee (اختياري) · Edge: Large promotional tile (اختياري) |
+
+---
+
+## Chrome Web Store — تبويب Privacy practices
+
+**Single purpose:**
+Transfers a teacher's lesson preparation and homework from the Elkabsula website into the Nour LMS (lms.moe.gov.om) forms.
+
+**Permission justification:**
+- storage: keeps the lesson the teacher just sent from Elkabsula until the Nour page opens and is filled (local only).
+- Host permissions (lms.moe.gov.om and the Elkabsula domains): needed to receive the "send" action on the Elkabsula site and to fill the preparation/homework forms on Nour; after installation the extension reloads any open Elkabsula tab so the tool works immediately.
+
+**Remote code:** No, I am not using remote code.
+**Data usage:** لا تختر أي نوع بيانات، ثم فعّل الإقرارات الثلاثة (I do not sell… / I do not use… / I do not use… for creditworthiness).
+
+## Edge Add-ons (Partner Center)
+
+- Availability: Hidden (غير مدرجة) أو Public — الأسواق: كل الأسواق أو Oman على الأقل.
+- Category: Education. Privacy policy: نعم ← الرابط أعلاه.
+- **Notes for certification:** «The extension only works on elkabsula.site (teacher login required) and lms.moe.gov.om (Ministry of Education LMS, teacher login required). It fills web forms with lesson text the teacher sends from the Elkabsula site and never submits them.»
+
+## Firefox (addons.mozilla.org)
+
+- Developer Hub ← Submit a New Add-on ← **On this site** (منشورة على المتجر).
+- ارفع `kabsula-firefox-<الإصدار>.zip`. لا يوجد كود مصغّر، فلن يطلب «source code» (لو سأل: No).
+- Data collection: الحزمة تعلن `data_collection_permissions: none`.
+- Notes to reviewer: نفس نص Edge أعلاه.
+- يعمل على Firefox 140+ للكمبيوتر وFirefox 142+ للأندرويد.
