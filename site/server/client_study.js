@@ -507,6 +507,13 @@ Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   hdr=Object.assign(clone(DEF_HDR),lsGet(hdrKey())||{});
   courses=(r[1].courses||[]).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
+  // قادم من «تحليل النتائج»: نختار الدروس الأضعف ونكوّن الخطة العلاجية مباشرة
+  var hf=null;try{hf=JSON.parse(localStorage.getItem('tahdir_handoff')||'null');}catch(e){}
+  if(REM&&hf&&hf.to==='remedial'&&Date.now()-(hf.at||0)<15*60000){
+    try{localStorage.removeItem('tahdir_handoff');}catch(e){}
+    var hc=courses.filter(function(x){return x.key===hf.course;})[0];
+    if(hc){selectCourse(hc.key).then(function(){sel={};(hf.lessons||[]).forEach(function(id){if(byId[id]&&st(byId[id]))sel[id]=1;});renderSide();if(Object.keys(sel).length){make();toast('خطة علاجية للدروس الأضعف في التحليل ✓');}else toast('لا توجد خطط علاجية جاهزة لهذه الدروس');});return;}
+  }
   var last=lsGet('tahdir_study_course')||lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
   selectCourse(c.key);
 },function(e){$('qmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});

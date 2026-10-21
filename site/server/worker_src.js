@@ -132,7 +132,9 @@ const EVENT_TYPES = new Set([
   // التحضير والدروس
   'view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw',
   // الاختبارات القصيرة ومراجعات الوحدات
-  'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save',
+  'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedy_make',
+  // تحليل النتائج · الأوراق المتمايزة · سجل صعوبات التعلم
+  'analysis_new', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
   // الخطط العلاجية والملخصات
   'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word',
   // الألعاب التعليمية
@@ -1085,6 +1087,7 @@ export default {
       if (p === '/slides') return html('slides');
       if (p === '/cando') return html('cando');
       if (p === '/research') return html('research');
+      if (p === '/analysis') return html('analysis');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);

@@ -184,6 +184,7 @@ function lineCount(it){if(it.type==='mcq')return 0;var m=+it.marks||1;if(it.line
 // ---------- ورقة الاختبار (تُستخدم للشاشة والطباعة وملف Word) ----------
 function titleText(d,key){
   var subj=d.subject,gr=d.grade;
+  if(d.kind==='remedy')return (key?'نموذج إجابة ':'')+'ورقة عمل علاجية — مادة '+subj+' للصف '+gr;
   if(d.kind==='review')return (key?'نموذج إجابة ':'')+'مراجعة نهاية الوحدة '+(d.unit||'')+(d.unit_name?': '+d.unit_name:'')+' — مادة '+subj+' للصف '+gr;
   return (key?'نموذج إجابة ':'')+'الاختبار القصير '+d.quizNo+' لمادة '+subj+' للصف '+gr;
 }
@@ -273,7 +274,7 @@ function ctrlHtml(i){
 function checks(d){
   var out=[],items=d.items,tot=sumMarks(items),mc=items.filter(function(x){return x.type==='mcq';}),lg=items.filter(function(x){return x.type==='long';}),sh=items.filter(function(x){return x.type==='short';});
   var ao={};items.forEach(function(x){ao[x.ao]=(ao[x.ao]||0)+(+x.marks||0);});
-  if(d.kind==='review'){out.push([true,items.length+' مفردة، المجموع '+tot+' درجة']);return out;}
+  if(d.kind==='review'||d.kind==='remedy'){out.push([true,items.length+' مفردة، المجموع '+tot+' درجة'+(d.kind==='remedy'?' — من الدروس والمستويات الأضعف في تحليل النتائج':'')]);return out;}
   var sp=spec();
   out.push([tot===sp.total,'الدرجة الكلية '+tot+' من '+sp.total]);
   aoList().forEach(function(k){var t=sp.targets[k]||0,v=ao[k]||0;out.push([v===t,k+': '+v+' درجة (المطلوب '+t+')']);});
@@ -408,7 +409,7 @@ function renderDoc(){
   if(!doc){welcome();return;}
   var ck=checks(doc),allOk=ck.every(function(c){return c[0];});
   var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title||titleText(doc))+'" aria-label="اسم الاختبار في قائمتك"><div class="muted small">'+(doc.id?'محفوظ في اختباراتي':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
-    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'?'<button type="button" class="btn" id="remakeBtn">🔁 نموذج آخر</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
+    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'?'<button type="button" class="btn" id="remakeBtn">🔁 نموذج آخر</button>':'')+(doc.kind!=='remedy'?'<button type="button" class="btn" id="analBtn" title="أدخل درجات الطلاب واحصل على تقرير تحليل النتائج">📊 تحليل النتائج</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
     '<div class="checks no-print '+(allOk?'ok':'warn')+'"><b>'+(doc.kind==='review'?'المراجعة':(allOk?'✓ مطابق لمواصفات الاختبار القصير في وثيقة التقويم':'⚠ راجع النقاط المعلّمة'))+'</b><ul>'+ck.map(function(c){return '<li class="'+(c[0]?'y':'n')+'">'+(c[0]?'✓':'⚠')+' '+esc(c[1])+'</li>';}).join('')+'</ul></div>'+
     '<div class="ptabs no-print" role="tablist"><button type="button" class="ltab'+(paperView==='quiz'?' on':'')+'" data-pv="quiz">ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+'</button><button type="button" class="ltab'+(paperView==='key'?' on':'')+'" data-pv="key">نموذج الإجابة</button></div>'+
     '<div class="paper" id="paper">'+(paperView==='quiz'?quizHtml(doc,false,true):keyHtml(doc,false))+'</div>';
@@ -419,6 +420,10 @@ function renderDoc(){
   $('docTitle').onchange=function(){doc.title=this.value.trim();dirty=true;};
   $('printBtn').onclick=printDoc;$('wordBtn').onclick=wordDoc;$('saveBtn').onclick=saveDoc;$('addBtn').onclick=addItem;
   if($('remakeBtn'))$('remakeBtn').onclick=remakeDoc;
+  if($('analBtn'))$('analBtn').onclick=function(){
+    var go=function(){location.href=tqUrl('/analysis')+'?quiz='+doc.id;};
+    if(doc.id&&!dirty)go();else saveDoc().then(function(){if(doc.id)go();});
+  };
 }
 function itemAct(a,i){
   var it=doc.items[i];if(!it)return;
@@ -550,6 +555,23 @@ function openSaved(id){
     go();
   },function(e){toast(e.message);});
 }
+// ---------- ورقة عمل علاجية (من «تحليل النتائج»): مفردات جديدة من الدروس والمستويات الأضعف ----------
+function makeRemedy(h){
+  var ids=(h.lessons||[]).map(Number).filter(function(id){return lessonById[id];});
+  if(!ids.length){toast('لم أجد دروس التحليل في هذا الصف');return;}
+  var ex={};(h.exclude||[]).forEach(function(q){ex[q]=1;});
+  var pool=poolFor(ids),fresh=pool.filter(function(x){return !ex[x.qid];});if(fresh.length<4)fresh=pool;
+  var weak=(h.ao||[]).slice(0,2),rank=function(x){var i=weak.indexOf(x.ao);return i<0?9:i;};
+  var by={};shuffle(fresh).sort(function(a,b){return rank(a)-rank(b);}).forEach(function(x){(by[x.lesson_id]=by[x.lesson_id]||[]).push(x);});
+  var out=[],cap=Math.min(10,fresh.length),k=0;
+  while(out.length<cap&&k<50){ids.forEach(function(id){if(by[id]&&by[id].length&&out.length<cap)out.push(by[id].shift());});k++;}
+  var ord={};ids.forEach(function(id,i){ord[id]=i;});
+  out=out.sort(function(a,b){return (ord[a.lesson_id]-ord[b.lesson_id])||(tOrd(a)-tOrd(b));}).map(clone);
+  if(!out.length){toast('لا توجد مفردات كافية في بنك الأسئلة لهذه الدروس');return;}
+  newDoc('remedy',out,{lessons:ids,studentLine:true,title:'ورقة عمل علاجية — '+(h.title||'').replace(/^تحليل\s*/,'')});
+  track('remedy_make',ids.length+' دروس',titleText(doc));toast('ورقة عمل علاجية من الدروس الأضعف ✓');
+}
+function takeHandoff(to){var h=lsGet('tahdir_handoff');if(!h||h.to!==to||Date.now()-(h.at||0)>15*60000)return null;try{localStorage.removeItem('tahdir_handoff');}catch(e){}return h;}
 // ---------- البداية ----------
 window.addEventListener('beforeunload',function(e){if(Date.now()-leavingOk<5000)return;if(doc&&dirty&&doc.items.length){e.preventDefault();e.returnValue='';}});
 Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
@@ -559,6 +581,8 @@ Promise.all([api('/api/me'),api('/api/courses')]).then(function(r){
   if(hdr.dir&&/للتربية والتعليم/.test(hdr.dir)){hdr.dir=hdr.dir.replace(/للتربية والتعليم/g,'للتعليم');lsSet(hdrKey(),hdr);}
   courses=(r[1].courses||[]).filter(function(c){return !/انجليز|إنجليز|English/i.test(c.subject);}).sort(function(a,b){return (gnum(a.grade)-gnum(b.grade))||a.subject.localeCompare(b.subject,'ar');});
   if(!courses.length){$('qmain').innerHTML='<div class="welcome"><h2>لا توجد صفوف متاحة لحسابك</h2><p>تواصل مع أ. محمد مجدي.</p></div>';return;}
+  var hf=takeHandoff('quiz'),hc=hf&&courses.filter(function(x){return x.key===hf.course;})[0];
+  if(hc){selectCourse(hc.key).then(function(){makeRemedy(hf);});return;}
   var last=lsGet('tahdir_quiz_course'),c=courses.filter(function(x){return x.key===last;})[0]||cpDefault(courses);
   selectCourse(c.key);
 },function(e){$('qmain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});

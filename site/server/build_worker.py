@@ -925,6 +925,20 @@ button.lv-opt{cursor:pointer}
 .g-stage:fullscreen .tug-p{min-height:calc(100vh - 160px)}.g-stage:fullscreen .tug-q{font-size:1.35rem}.g-stage:fullscreen .tug-b{font-size:1.2rem;min-height:84px}
 @media (max-width:900px){.tug{grid-template-columns:1fr 1fr}.tug-mid{grid-column:1/-1;order:-1}.tug-p{min-height:0}.tug-ch{grid-template-columns:1fr}}
 @media (max-width:520px){.tug-names{grid-template-columns:1fr}.tug-b{min-height:52px;font-size:.92rem}.tug-q{font-size:1rem}}
+.an-wrap{padding-top:14px;padding-bottom:40px}.an-head h2{margin:0 0 4px}.an-new{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.an-sub{margin:18px 0 6px}.an-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}.an-list li{display:flex;gap:10px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px}.an-list li .x{margin-inline-start:auto}
+.an-pick{display:grid;gap:6px;max-height:50vh;overflow:auto;text-align:right}.an-pick label{display:block;padding:6px 8px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.an-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}.an-bar .title-in{flex:1;min-width:220px}.an-acts{display:flex;gap:8px;margin-inline-start:auto}
+.an-meta{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}.an-meta label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;font-weight:700;color:var(--mute);min-width:120px;flex:1}
+.an-in{border:1px solid var(--line);border-radius:7px;padding:5px 7px;font:inherit;background:#fff;min-width:0}.an-in.num{width:52px;text-align:center}.an-in.sm{padding:3px 4px;font-size:.82rem}.an-in.bad{border-color:#d64545;background:#fdecec}
+.an-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:6px 0}
+.an-t{border-collapse:collapse;width:100%;font-size:.88rem}.an-t th,.an-t td{border:1px solid var(--line);padding:4px 6px;text-align:center;vertical-align:middle}.an-t thead th,.an-t tbody th{background:#e3f1eb;font-weight:800}
+.an-t th small{display:block;font-weight:400;color:var(--mute);font-size:.72rem}.an-grid td.nm,.an-grid th.nm{min-width:160px;text-align:right}.an-grid td.nm .an-in{width:100%}.an-grid td.tot{font-weight:800;white-space:nowrap}
+.an-items .an-in{width:100%;min-width:64px}.an-items .an-in.num{width:52px;min-width:0}
+.an-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.an-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 12px}.an-cards div{background:#e3f1eb;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.an-cards b{font-size:1.5rem;color:var(--main-d)}.an-cards span{font-size:.82rem;color:var(--mute)}.an-cards .warn{background:#fdecec}.an-cards .warn b{color:#b42318}
+.an-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}@media (max-width:760px){.an-two{grid-template-columns:1fr}}
+#anRes h4{margin:16px 0 6px;color:var(--main-d)}.an-note{display:block;font-weight:800;margin:6px 0}.an-note textarea{display:block;width:100%;margin-top:4px;line-height:1.7;resize:vertical}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
@@ -1370,7 +1384,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -1464,6 +1478,9 @@ SLIDES_PAGE = TOP('<div class="stats"><span class="stat">العروض التقد
 
 RESEARCH_PAGE = TOP('<div class="stats"><span class="stat">البحوث الإجرائية</span><span class="stat">بحوث جاهزة للطباعة والتحميل لكل مادة</span></div>').replace('%BTNS%', NAV('research')) + '''
 <main class="wrap rs-wrap" id="rsMain"><div class="empty-state">جارٍ التحميل…</div></main>
+<div id="printArea"></div>'''
+ANALYSIS_PAGE = TOP('<div class="stats"><span class="stat">تحليل نتائج الاختبارات</span><span class="stat">تحليل المفردات ومستويات التعلم وتقرير جاهز للاعتماد</span></div>').replace('%BTNS%', NAV('analysis')) + '''
+<main class="wrap an-wrap" id="anMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
 <div id="printArea"></div>'''
 CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
 <div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
@@ -1608,6 +1625,7 @@ PAGES = {
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
+  'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
   'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
