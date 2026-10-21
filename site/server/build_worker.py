@@ -948,6 +948,8 @@ button.lv-opt{cursor:pointer}
 .apk-help li{margin:4px 0}
 /* ---------- البحوث الإجرائية ---------- */
 .rs-wrap{max-width:1000px;margin:18px auto;padding:0 16px}
+.rs-new{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}.rs-tag{display:inline-block;background:#e0a93b;color:#fff;border-radius:999px;padding:0 9px;font-size:12px;vertical-align:middle}.rs-card.mine{border-color:#e0a93b}
+.rs-form h3{margin:0 0 8px}.rsf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.rsf-grid .wide,.rsf.wide{grid-column:1/-1}.rsf{display:flex;flex-direction:column;gap:3px;font-size:.86rem;font-weight:700;color:var(--mute)}.rsf textarea{line-height:1.7;resize:vertical}
 .rs-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .rs-tabs button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--ink,#0b3b33)}
 .rs-tabs button.on{background:#0b3b33;color:#fff;border-color:#0b3b33}
@@ -1634,7 +1636,7 @@ PAGES = {
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
   'ld': page('سجل صعوبات التعلم · الكبسولة', LD_PAGE, rd('client_ld.js')),
-  'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_research.js')),
+  'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_rsgen.js') + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
 }

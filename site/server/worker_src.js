@@ -134,7 +134,7 @@ const EVENT_TYPES = new Set([
   // الاختبارات القصيرة ومراجعات الوحدات
   'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedy_make',
   // تحليل النتائج · الأوراق المتمايزة · سجل صعوبات التعلم
-  'analysis_new', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
+  'analysis_new', 'research_gen', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
   // الخطط العلاجية والملخصات
   'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word',
   // الألعاب التعليمية
