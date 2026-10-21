@@ -946,6 +946,18 @@ button.lv-opt{cursor:pointer}
 .fm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:12px 0}.fm-card{display:flex;flex-direction:column;gap:4px;text-align:right;font:inherit;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer}.fm-card:hover{border-color:var(--main)}.fm-ic{font-size:1.6rem}.fm-card small{color:var(--mute);line-height:1.5}
 .fm-ph{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}.fm-ph span{position:relative}.fm-ph img{width:110px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}.fm-ph .x{position:absolute;top:2px;left:2px;background:#fff;border-radius:50%}
 .fm-prev{max-height:80vh;overflow:auto}
+.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}.sp-card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px}.sp-h{display:flex;justify-content:space-between;gap:8px;align-items:center}.sp-code{font-family:monospace;font-size:1.05rem;background:#e3f1eb;border-radius:8px;padding:2px 8px;letter-spacing:2px}.sp-n{display:flex;gap:12px;font-size:.85rem;color:var(--mute)}.sp-b{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.sp-b .x{margin-inline-start:auto}
+.sp-share{text-align:center}.sp-big{font-family:monospace;font-size:2.4rem;font-weight:800;letter-spacing:6px;color:var(--main-d)}.sp-qr svg{max-width:220px;height:auto}.sp-ls{display:grid;gap:4px;max-height:40vh;overflow:auto;text-align:right;margin-top:8px}
+.st{max-width:760px;margin:0 auto;padding:0 12px 40px;font-size:17px}.st-top{display:flex;align-items:center;gap:10px;background:#0b3b33;color:#fff;margin:0 -12px 14px;padding:12px 16px}.st-top div{flex:1;display:flex;flex-direction:column}.st-top small{opacity:.8;font-size:.8rem}.st-me{font-size:.85rem;opacity:.9}.st-back{background:#fff2;border:0;color:#fff;font-size:1.3rem;border-radius:10px;width:40px;height:40px;cursor:pointer}
+.st-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin:10px 0}.st-join{max-width:420px;margin:40px auto;text-align:center;display:flex;flex-direction:column;gap:10px}.st-join input{font:inherit;font-size:1.2rem;text-align:center;border:2px solid var(--line);border-radius:12px;padding:10px}.st-logo{font-size:3rem}.st-err{color:#b42318}
+.st-go{font:inherit;background:#1f8a70;color:#fff;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;font-weight:700}.st-go.wide{width:100%;margin-top:6px}.st-go.ok{background:#22a35a}.st-go.half{background:#e39b1b}.st-go.no{background:#d64545}.st-link{background:none;border:0;color:#1f8a70;text-decoration:underline;cursor:pointer;font:inherit;font-size:.85rem}
+.st-hello{margin:6px 0 10px}.st-unit h2{font-size:1rem;color:#0b3b33;margin:16px 0 6px}.st-ls{display:grid;gap:6px}.st-l{display:flex;justify-content:space-between;gap:8px;text-align:right;font:inherit;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}.st-l em{font-style:normal;background:#e3f1eb;border-radius:999px;padding:0 10px;font-weight:700}
+.st-title{font-size:1.3rem;color:#0b3b33;margin:4px 0 10px}.st-tabs{display:flex;gap:6px;flex-wrap:wrap}.st-tabs button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}.st-tabs button.on{background:#0b3b33;color:#fff}
+.st-sum h3{font-size:1rem;color:#0b3b33;margin:14px 0 4px}.st-sum h3 span{background:#e3f1eb;border-radius:6px;padding:0 6px;font-size:.8rem}.st-sum li{margin:3px 0;line-height:1.8}.st-sum dt{font-weight:800;color:#1f8a70;margin-top:6px}.st-sum dd{margin:0 0 4px}.st-intro{background:#fbf0db;border-radius:10px;padding:8px 10px;line-height:1.8}
+.st-prog{height:6px;background:#e2e0d6;border-radius:9px;overflow:hidden;margin:12px 0 0}.st-prog span{display:block;height:100%;background:#1f8a70}.st-qn{color:var(--mute);font-size:.85rem}.st-stem{font-weight:700;line-height:1.9}.st-ch{display:grid;gap:8px}.st-ch button{font:inherit;text-align:right;background:#f6f4ee;border:2px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer}
+.st-ch button.ok{background:#e5f6ec;border-color:#22a35a}.st-ch button.no{background:#fdecec;border-color:#d64545}.st-ch button.dim{opacity:.5}.st-fb{border-radius:12px;padding:10px 12px;margin:10px 0;line-height:1.8}.st-fb.ok{background:#e5f6ec}.st-fb.no{background:#fdecec}.st-fb.key{background:#eef3f1}.st-fb small{display:block;color:#3d554e;margin-top:4px}
+.st-ans{width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;box-sizing:border-box}.st-selfb,.st-nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:8px}.st-t{border-collapse:collapse;margin:6px auto}.st-t td,.st-t th{border:1px solid #999;padding:3px 8px}
+.st-flip{background:#fff;border:2px solid #1f8a70;border-radius:18px;min-height:180px;display:grid;place-items:center;text-align:center;padding:20px;cursor:pointer;margin:12px 0}.st-flip b{font-size:1.4rem;color:#0b3b33;display:block}.st-flip small{color:var(--mute)}.st-flip.on{background:#e3f1eb}.st-end{text-align:center}.st-big{font-size:3rem}.st-end h2{font-size:2.4rem;margin:0;color:#0b3b33}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
@@ -1393,7 +1405,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -1497,6 +1509,9 @@ LD_PAGE = TOP('<div class="stats"><span class="stat">سجل الطلبة ذوي 
 FORMS_PAGE = TOP('<div class="stats"><span class="stat">النماذج الإدارية</span><span class="stat">محاضر · تقارير · إشعارات · شهادات · ملف الإنجاز</span></div>').replace('%BTNS%', NAV('forms')) + '''
 <main class="wrap an-wrap" id="fmMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
 <div id="printArea"></div>'''
+SPACE_PAGE = TOP('<div class="stats"><span class="stat">مساحة الطالب</span><span class="stat">صفوف برمز يتدرب فيها طلابك بلا حساب</span></div>').replace('%BTNS%', NAV('space')) + '''
+<main class="wrap an-wrap" id="spMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
+STUDENT_PAGE = '<main class="st" id="st"></main>'
 CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
 <div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
 <main class="panel" id="panel"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
@@ -1643,6 +1658,8 @@ PAGES = {
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
   'ld': page('سجل صعوبات التعلم · الكبسولة', LD_PAGE, rd('client_ld.js')),
   'forms': page('النماذج الإدارية · الكبسولة', FORMS_PAGE, rd('client_forms.js')),
+  'space': page('مساحة الطالب · الكبسولة', SPACE_PAGE, rd('vendor/qr.js') + chr(10) + rd('client_space.js')),
+  'student': page('مساحة الطالب', STUDENT_PAGE, rd('client_student.js')),
   'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_rsgen.js') + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
