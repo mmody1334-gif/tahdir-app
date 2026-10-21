@@ -943,6 +943,9 @@ button.lv-opt{cursor:pointer}
 .ld-st{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:5px;max-height:60vh;overflow:auto}.ld-st button{width:100%;text-align:right;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;cursor:pointer;font:inherit}.ld-st button small{display:block;color:var(--mute);font-size:.75rem}.ld-st button.on{background:#e3f1eb;border-color:var(--main)}
 .ld-head{display:flex;gap:10px;align-items:end}.ld-name{flex:1;display:flex;flex-direction:column;gap:3px;font-weight:800}.ld-asp{display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 0 8px}.ld-asp label{display:flex;gap:5px;align-items:center;background:#f6f4ee;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
 .ld-main h4{margin:14px 0 6px;color:var(--main-d)}.btn.danger{color:#b42318;border-color:#f1b5b0}
+.fm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:12px 0}.fm-card{display:flex;flex-direction:column;gap:4px;text-align:right;font:inherit;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer}.fm-card:hover{border-color:var(--main)}.fm-ic{font-size:1.6rem}.fm-card small{color:var(--mute);line-height:1.5}
+.fm-ph{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}.fm-ph span{position:relative}.fm-ph img{width:110px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}.fm-ph .x{position:absolute;top:2px;left:2px;background:#fff;border-radius:50%}
+.fm-prev{max-height:80vh;overflow:auto}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
@@ -1390,7 +1393,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -1490,6 +1493,9 @@ ANALYSIS_PAGE = TOP('<div class="stats"><span class="stat">تحليل نتائج
 <div id="printArea"></div>'''
 LD_PAGE = TOP('<div class="stats"><span class="stat">سجل الطلبة ذوي صعوبات التعلم</span><span class="stat">الجوانب والخطة الفردية والمتابعة</span></div>').replace('%BTNS%', NAV('ld')) + '''
 <main class="wrap an-wrap" id="ldMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
+<div id="printArea"></div>'''
+FORMS_PAGE = TOP('<div class="stats"><span class="stat">النماذج الإدارية</span><span class="stat">محاضر · تقارير · إشعارات · شهادات · ملف الإنجاز</span></div>').replace('%BTNS%', NAV('forms')) + '''
+<main class="wrap an-wrap" id="fmMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
 <div id="printArea"></div>'''
 CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
 <div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
@@ -1636,6 +1642,7 @@ PAGES = {
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
   'ld': page('سجل صعوبات التعلم · الكبسولة', LD_PAGE, rd('client_ld.js')),
+  'forms': page('النماذج الإدارية · الكبسولة', FORMS_PAGE, rd('client_forms.js')),
   'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_rsgen.js') + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),

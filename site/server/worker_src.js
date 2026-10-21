@@ -134,7 +134,7 @@ const EVENT_TYPES = new Set([
   // الاختبارات القصيرة ومراجعات الوحدات
   'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedy_make',
   // تحليل النتائج · الأوراق المتمايزة · سجل صعوبات التعلم
-  'analysis_new', 'research_gen', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
+  'analysis_new', 'research_gen', 'form_print', 'form_word', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
   // الخطط العلاجية والملخصات
   'remedial_make', 'remedial_print', 'remedial_word', 'summary_make', 'summary_print', 'summary_word',
   // الألعاب التعليمية
@@ -1089,6 +1089,7 @@ export default {
       if (p === '/research') return html('research');
       if (p === '/analysis') return html('analysis');
       if (p === '/ld') return html('ld');
+      if (p === '/forms') return html('forms');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
