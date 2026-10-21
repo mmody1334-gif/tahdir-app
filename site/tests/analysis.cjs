@@ -39,7 +39,8 @@ const ok = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? '  PASS  ' : '
   // 2) لصق 8 طلاب من Excel (اسم + درجات)
   const names = ['أحمد سالم', 'خالد علي', 'سالم ناصر', 'محمد سعيد', 'يوسف حمد', 'علي راشد', 'ناصر خميس', 'حمد سيف'];
   const rows = names.map((n, k) => [n].concat(maxes.map((m, i) => Math.max(0, Math.min(m, Math.round(m * ((k * 7 + i * 3) % 10) / 9))))).join('\t')).join('\n');
-  await p.evaluate(t => { const el = document.querySelector('[data-name="0"]'); const dt = new DataTransfer(); dt.setData('text', t); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }, rows);
+  await p.evaluate(t => { const el = document.querySelector('[data-r="0"][data-c="-1"]'); const dt = new DataTransfer(); dt.setData('text', t); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }, rows);
+  await p.waitForTimeout(400); await p.click('#mOk');
   await p.waitForTimeout(800);
   const N = await p.evaluate(() => document.querySelector('.an-cards div:nth-child(2) b') && document.querySelector('.an-cards div:nth-child(2) b').textContent);
   ok('اللصق من Excel ملأ 8 طلاب', N === '8', N);
@@ -77,6 +78,20 @@ const ok = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? '  PASS  ' : '
   await p.goto(B + '/analysis', { waitUntil: 'domcontentloaded' }); await settle();
   await p.click('#anManual'); await p.waitForTimeout(500);
   ok('تحليل يدوي بخمس مفردات افتراضية', (await p.$$eval('[data-imax]', x => x.length)) === 5);
+  // لصق جدول فيه أسماء داخل خانة درجة (كما يفعل المعلم): الأسماء تذهب لعمود الاسم، والصف الأخير (المجاميع) يُتجاهل
+  await p.evaluate(() => { const el = document.querySelector('[data-r="0"][data-c="0"]'); const dt = new DataTransfer(); dt.setData('text', 'أحمد سالم\t1\t0\t1\nخالد علي\t0\t1\t1\nسعود ناصر\t1\t1\t0\n\t2\t2\t2'); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await p.waitForTimeout(400); await p.click('#mOk'); await p.waitForTimeout(500);
+  const g = await p.evaluate(() => [document.querySelector('[data-r="0"][data-c="-1"]').value, document.querySelector('[data-r="0"][data-c="0"]').value, document.querySelectorAll('#anSheet tbody tr').length, document.querySelectorAll('[data-imax]').length]);
+  ok('لصق الأسماء في خانة درجة يُصحَّح تلقائيًا', g[0] === 'أحمد سالم' && g[1] === '1' && g[2] === 3 && g[3] === 3, JSON.stringify(g));
+  // رفع ملف Excel حقيقي (RTL، صف عناوين، صف المستويات المدموج، صف الدرجة العظمى، عمود ترقيم، عمود مجموع، صف المعدل)
+  await p.setInputFiles('#anFile', process.env.XLSX || (OUT + '/grades_test.xlsx')); await p.waitForTimeout(1200);
+  const pv = await p.evaluate(() => document.getElementById('modalBox').innerText.slice(0, 160));
+  await p.click('#mOk'); await p.waitForTimeout(600);
+  const x = await p.evaluate(() => [document.querySelectorAll('#anSheet tbody tr').length, [...document.querySelectorAll('[data-imax]')].map(e => e.value).join(','), [...document.querySelectorAll('[data-iao]')].map(e => e.value).join(','), document.querySelector('[data-r="0"][data-c="-1"]').value]);
+  ok('رفع Excel: 6 طلاب و5 مفردات بدرجاتها العظمى ومستوياتها', x[0] === 6 && x[1] === '1,2,1,3,2' && x[2] === 'AO1,AO1,AO1,AO2,AO2' && x[3] === 'حمد مصبح راشد', JSON.stringify(x) + ' | ' + pv.replace(/\n/g, ' '));
+  // التنقل بالأسهم والنسخ لعدة خانات
+  await p.click('[data-r="0"][data-c="0"]'); await p.keyboard.press('ArrowDown'); await p.keyboard.press('Shift+ArrowLeft');
+  ok('تحديد عدة خانات بالأسهم', (await p.$$eval('#anSheet td.sel', x => x.length)) === 2);
   ok('بلا أخطاء صفحة', !errs.length, errs.join(' | '));
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   s.stop(); await b.close(); process.exit(fail ? 1 : 0);

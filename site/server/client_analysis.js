@@ -168,14 +168,17 @@ function itemsTable(){
 }
 function gridTable(){
   var it=A.items;
-  if(!A.students.length)A.students=[1,2,3,4,5].map(function(){return {name:'',s:[]};});
-  var h='<div class="an-scroll"><table class="an-t an-grid"><thead><tr><th>#</th><th class="nm">اسم الطالب</th>'+it.map(function(x,i){return '<th>'+(i+1)+'<small>من '+esc(x.max)+'</small></th>';}).join('')+'<th>المجموع<small>من '+it.reduce(function(s,x){return s+(+x.max||0);},0)+'</small></th><th>%</th><th></th></tr></thead><tbody>';
+  if(!A.students.length)A.students=[1,2,3,4,5,6,7,8,9,10].map(function(){return {name:'',s:[]};});
+  var mx=it.reduce(function(s,x){return s+(+x.max||0);},0);
+  var h='<div class="an-tools"><label class="btn small primary">📥 رفع ملف Excel<input type="file" id="anFile" accept=".xlsx,.csv,.txt,.xls" hidden></label><button type="button" class="btn small" id="anTpl">⬇ نموذج Excel فارغ</button><button type="button" class="btn small" id="anClear">مسح الدرجات</button>'+
+    '<span class="muted small">💡 الجدول يعمل مثل Excel: انسخ من Excel (الأسماء والدرجات) والصق في أي خانة، وتنقّل بالأسهم وEnter وTab، وحدّد عدة خانات بالسحب ثم انسخها أو امسحها.</span></div>'+
+    '<div class="an-scroll"><table class="an-sheet" id="anSheet"><thead><tr><th class="rn"></th><th class="nm">اسم الطالب</th>'+it.map(function(x,i){return '<th>س'+(i+1)+'<small>من '+esc(x.max)+'</small></th>';}).join('')+'<th class="tc">المجموع<small>من '+mx+'</small></th><th class="tc">%</th><th class="rn"></th></tr></thead><tbody>';
   A.students.forEach(function(s,si){
-    h+='<tr><td class="muted">'+(si+1)+'</td><td class="nm"><input class="an-in" data-name="'+si+'" value="'+esc(s.name||'')+'" placeholder="الاسم (اختياري)"></td>'+
-      it.map(function(x,i){var v=s.s[i];return '<td><input class="an-in num" data-r="'+si+'" data-c="'+i+'" value="'+(v==null?'':esc(v))+'" inputmode="decimal"></td>';}).join('')+
-      '<td class="tot" data-tot="'+si+'"></td><td class="tot" data-pc="'+si+'"></td><td><button type="button" class="x" data-rm="'+si+'" aria-label="حذف الطالب">×</button></td></tr>';
+    h+='<tr><th class="rn">'+(si+1)+'</th><td class="nm"><input data-r="'+si+'" data-c="-1" value="'+esc(s.name||'')+'" autocomplete="off"></td>'+
+      it.map(function(x,i){var v=s.s[i];return '<td><input data-r="'+si+'" data-c="'+i+'" value="'+(v==null?'':esc(v))+'" inputmode="decimal" autocomplete="off"></td>';}).join('')+
+      '<td class="tc" data-tot="'+si+'"></td><td class="tc" data-pc="'+si+'"></td><td class="rn"><button type="button" class="x" data-rm="'+si+'" aria-label="حذف الطالب" tabindex="-1">×</button></td></tr>';
   });
-  return h+'</tbody></table></div><div class="an-row"><button type="button" class="btn small" id="anAddSt">+ طالب</button><button type="button" class="btn small" id="anAdd10">+ 10 طلاب</button><span class="muted small">💡 تقدر تنسخ الأسماء والدرجات من Excel وتلصقها في أي خانة (Ctrl+V) فتتوزع على الجدول تلقائيًا.</span></div>';
+  return h+'</tbody></table></div><div class="an-row"><button type="button" class="btn small" id="anAddSt">+ طالب</button><button type="button" class="btn small" id="anAdd10">+ 10 طلاب</button></div>';
 }
 function renderEditor(){
   var h='<div class="an-bar no-print"><button type="button" class="btn small" id="anBack">→ تحليلاتي</button>'+
@@ -203,28 +206,185 @@ function bindEditor(){
   Array.prototype.forEach.call(q('[data-iles]'),function(el){el.oninput=function(){var i=+el.getAttribute('data-iles');A.items[i].lesson=el.value;A.items[i].lid=null;touch();liveRes();};});
   if($('anAddItem'))$('anAddItem').onclick=function(){A.items.push({max:1,ao:'',lesson:'',lid:null});touch();renderEditor();};
   if($('anDelItem'))$('anDelItem').onclick=function(){if(A.items.length>1){A.items.pop();A.students.forEach(function(s){s.s.length=Math.min(s.s.length,A.items.length);});touch();renderEditor();}};
-  Array.prototype.forEach.call(q('[data-name]'),function(el){el.oninput=function(){A.students[+el.getAttribute('data-name')].name=el.value;touch();liveRes();};el.onpaste=pasteAt;});
-  Array.prototype.forEach.call(q('[data-r]'),function(el){
-    el.oninput=function(){var r=+el.getAttribute('data-r'),c=+el.getAttribute('data-c');A.students[r].s[c]=el.value.trim();mark(el,c);touch();liveRes();};
-    el.onpaste=pasteAt;mark(el,+el.getAttribute('data-c'));
-    el.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();var n=document.querySelector('[data-r="'+(+el.getAttribute('data-r')+1)+'"][data-c="'+el.getAttribute('data-c')+'"]');if(n){n.focus();n.select();}}};
-  });
+  bindSheet();
   Array.prototype.forEach.call(q('[data-rm]'),function(b){b.onclick=function(){A.students.splice(+b.getAttribute('data-rm'),1);touch();renderEditor();};});
   $('anAddSt').onclick=function(){A.students.push({name:'',s:[]});touch();renderEditor();};
   $('anAdd10').onclick=function(){for(var i=0;i<10;i++)A.students.push({name:'',s:[]});touch();renderEditor();};
+  $('anFile').onchange=function(){var f=this.files&&this.files[0];this.value='';if(f)importFile(f);};
+  $('anTpl').onclick=downloadTemplate;
+  $('anClear').onclick=function(){dialog({title:'مسح كل الدرجات والأسماء؟',okText:'مسح',danger:true}).then(function(ok){if(!ok)return;A.students=[];touch();renderEditor();});};
 }
-function mark(el,c){var v=num(el.value),mx=+A.items[c].max||0;el.classList.toggle('bad',el.value.trim()!==''&&(v==null||v<0||v>mx));}
-// لصق جدول من Excel: الأسطر = الطلاب، والأعمدة = (الاسم إن بدأ اللصق من خانة الاسم) ثم المفردات
-function pasteAt(e){
+function mark(el,c){if(c<0)return;var v=num(el.value),mx=+A.items[c].max||0;el.parentNode.classList.toggle('bad',el.value.trim()!==''&&(v==null||v<0||v>mx));}
+// ---------- جدول بأسلوب Excel ----------
+var SEL=null,DRAG=false;
+function cellEl(r,c){return document.querySelector('#anSheet input[data-r="'+r+'"][data-c="'+c+'"]');}
+function getV(r,c){var s=A.students[r];if(!s)return '';return c<0?(s.name||''):(s.s[c]==null?'':String(s.s[c]));}
+function setV(r,c,v){while(A.students.length<=r)A.students.push({name:'',s:[]});if(c<0)A.students[r].name=v;else A.students[r].s[c]=v;}
+function rng(){var s=SEL;return {r0:Math.min(s.r0,s.r1),r1:Math.max(s.r0,s.r1),c0:Math.min(s.c0,s.c1),c1:Math.max(s.c0,s.c1)};}
+function multi(){if(!SEL)return false;var g=rng();return g.r0!==g.r1||g.c0!==g.c1;}
+function paint(){
+  Array.prototype.forEach.call(document.querySelectorAll('#anSheet td.sel'),function(td){td.classList.remove('sel');});
+  if(!multi())return;var g=rng();
+  for(var r=g.r0;r<=g.r1;r++)for(var c=g.c0;c<=g.c1;c++){var el=cellEl(r,c);if(el)el.parentNode.classList.add('sel');}
+}
+function go(r,c,extend){
+  var nc=A.items.length;c=Math.max(-1,Math.min(nc-1,c));if(r<0)r=0;
+  if(r>=A.students.length){A.students.push({name:'',s:[]});touch();renderEditor();}
+  var el=cellEl(r,c);if(!el)return;
+  if(extend&&SEL){SEL.r1=r;SEL.c1=c;}else SEL={r0:r,c0:c,r1:r,c1:c};
+  el.focus();el.select();paint();
+}
+function bindSheet(){
+  var t=$('anSheet');if(!t)return;
+  Array.prototype.forEach.call(t.querySelectorAll('input[data-r]'),function(el){
+    var r=+el.getAttribute('data-r'),c=+el.getAttribute('data-c');mark(el,c);
+    el.onfocus=function(){el.dataset.edit='';if(!DRAG&&!(SEL&&SEL.r1===r&&SEL.c1===c)){SEL={r0:r,c0:c,r1:r,c1:c};paint();}};
+    el.oninput=function(){el.dataset.edit='1';setV(r,c,c<0?el.value:el.value.trim());mark(el,c);touch();liveRes();};
+    el.onmousedown=function(e){if(e.shiftKey&&SEL){e.preventDefault();SEL.r1=r;SEL.c1=c;paint();return;}DRAG=true;SEL={r0:r,c0:c,r1:r,c1:c};paint();};
+    el.onmouseenter=function(){if(DRAG&&SEL&&(SEL.r1!==r||SEL.c1!==c)){SEL.r1=r;SEL.c1=c;paint();}};
+    el.ondblclick=function(){el.dataset.edit='1';};
+    el.onkeydown=function(e){
+      var k=e.key,ed=el.dataset.edit==='1',sh=e.shiftKey;
+      if(k==='Enter'){e.preventDefault();go(r+(sh?-1:1),c);return;}
+      if(k==='Tab'){e.preventDefault();go(r,c+(sh?-1:1));return;}
+      if(k==='ArrowDown'){e.preventDefault();go(sh&&SEL?SEL.r1+1:r+1,sh&&SEL?SEL.c1:c,sh);return;}
+      if(k==='ArrowUp'){e.preventDefault();go(sh&&SEL?SEL.r1-1:r-1,sh&&SEL?SEL.c1:c,sh);return;}
+      // الاتجاه من اليمين لليسار: السهم الأيسر للعمود التالي
+      if((k==='ArrowLeft'||k==='ArrowRight')&&(!ed||sh)){e.preventDefault();var d=k==='ArrowLeft'?1:-1;go(sh&&SEL?SEL.r1:r,(sh&&SEL?SEL.c1:c)+d,sh);return;}
+      if((k==='Delete'||k==='Backspace')&&multi()){e.preventDefault();var g=rng();for(var rr=g.r0;rr<=g.r1;rr++)for(var cc=g.c0;cc<=g.c1;cc++){setV(rr,cc,'');var x=cellEl(rr,cc);if(x){x.value='';mark(x,cc);}}touch();liveRes();return;}
+      if(k==='F2'){el.dataset.edit='1';var n=el.value.length;el.setSelectionRange(n,n);}
+    };
+    el.onpaste=function(e){pasteAt(e,r,c);};
+  });
+  document.onmouseup=function(){DRAG=false;};
+  document.oncopy=document.oncut=function(e){
+    var a=document.activeElement;if(!a||!a.closest||!a.closest('#anSheet')||!multi())return;
+    var g=rng(),rows=[];for(var r=g.r0;r<=g.r1;r++){var row=[];for(var c=g.c0;c<=g.c1;c++)row.push(getV(r,c));rows.push(row.join('\t'));}
+    e.clipboardData.setData('text/plain',rows.join('\n'));e.preventDefault();
+    if(e.type==='cut'){for(var r2=g.r0;r2<=g.r1;r2++)for(var c2=g.c0;c2<=g.c1;c2++)setV(r2,c2,'');touch();renderEditor();}
+    toast('نُسخت '+(g.r1-g.r0+1)*(g.c1-g.c0+1)+' خانة');
+  };
+}
+// اللصق: جدول فيه أسماء ← يُتعرّف عليه (الأسماء في عمود الاسم والدرجات بعدها، وتُتجاهل العناوين والمجاميع)،
+// وإلا يُلصق كما هو بدءًا من الخانة المحددة مثل Excel.
+function pasteAt(e,r0,c0){
   var t=(e.clipboardData||window.clipboardData).getData('text');if(!t||(t.indexOf('\t')<0&&t.indexOf('\n')<0))return;
   e.preventDefault();
-  var el=e.target,isName=el.hasAttribute('data-name'),r0=+(el.getAttribute('data-r')||el.getAttribute('data-name')),c0=isName?-1:+el.getAttribute('data-c');
-  var lines=t.replace(/\r/g,'').split('\n').filter(function(l,i,a){return l.length||i<a.length-1;});
-  lines.forEach(function(line,k){
-    var cells=line.split('\t'),r=r0+k;while(A.students.length<=r)A.students.push({name:'',s:[]});
-    cells.forEach(function(v,j){var c=c0+j;v=v.trim();if(c<0)A.students[r].name=v;else if(c<A.items.length)A.students[r].s[c]=v;});
+  var grid=t.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(function(l){return l.split('\t');});
+  var D=detectTable(grid);
+  if(D&&D.names.length){applyTable(D,{start:r0,label:'اللصق'});return;}
+  grid.forEach(function(row,k){row.forEach(function(v,j){var c=c0+j;if(c<A.items.length)setV(r0+k,c,v.trim());});});
+  touch();renderEditor();toast('تم لصق '+grid.length+' صف');
+}
+// ---------- التعرّف على جدول الدرجات (من لصق أو ملف Excel) ----------
+var KW=/^(م|#|ن|الرقم|الاسم|اسم الطالب|اسم|الطالب|المجموع|مجموع|المعدل|معدل|المتوسط|متوسط|النسبة|نسبة|الدرجة|الدرجات|الدرجة العظمى|العظمى|السؤال|الأسئلة|المفردة|المفردات|عدد|التقدير|المستوى|نسبة الإجابات الصحيحة)(?=\s|:|$)/;
+var BAD_COL=/مجموع|المجموع|الكلي|الكلية|المعدل|معدل|النسبة|نسبة|%|التقدير|المستوى|الترتيب|ملاحظ/;
+function normD(v){return String(v==null?'':v).replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}).replace(/[٫,]/g,'.').replace(/‏|‎/g,'').trim();}
+function isN(v){return /^-?\d+(\.\d+)?$/.test(normD(v));}
+function isText(v){v=normD(v);return v.length>=2&&/[؀-ۿA-Za-z]/.test(v)&&!isN(v);}
+function detectTable(grid){
+  grid=grid.map(function(r){return r.map(normD);});
+  var W=grid.reduce(function(m,r){return Math.max(m,r.length);},0);if(!W)return null;
+  // عمود الأسماء: أكثر عمود فيه نصوص (لا عناوين)
+  var best=-1,bestN=0;for(var c=0;c<W;c++){var n=grid.filter(function(r){return isText(r[c])&&!KW.test(r[c])&&!AOS.some(function(a){return r[c]===a;});}).length;if(n>bestN){bestN=n;best=c;}}
+  if(best<0||bestN<1)return null;
+  var studentRows=[];grid.forEach(function(r,i){if(isText(r[best])&&!KW.test(r[best])&&r.some(function(v,j){return j!==best&&isN(v);}))studentRows.push(i);});
+  if(!studentRows.length)return null;
+  var cols=[];for(c=0;c<W;c++){if(c===best)continue;var nn=studentRows.filter(function(i){return isN(grid[i][c]);}).length;if(nn>=Math.max(1,studentRows.length*0.5))cols.push(c);}
+  // عمود الترقيم (1،2،3…) يُستبعد
+  cols=cols.filter(function(c){var seq=0;studentRows.forEach(function(i,k){if(+grid[i][c]===k+1||+grid[i][c]===k)seq++;});return seq<studentRows.length*0.8;});
+  // عناوين الأعمدة فوق أول طالب
+  var first=studentRows[0],head=function(c){for(var i=first-1;i>=0;i--){var v=grid[i][c];if(v&&!isN(v))return v;}return '';};
+  cols=cols.filter(function(c){return !BAD_COL.test(head(c));});
+  // عمود المجموع: يساوي مجموع بقية الأعمدة
+  cols=cols.filter(function(c){if(cols.length<3)return true;var eq=0;studentRows.forEach(function(i){var sum=0;cols.forEach(function(o){if(o!==c)sum+=+grid[i][o]||0;});if(Math.abs(sum-(+grid[i][c]||0))<0.01&&sum>0)eq++;});return eq<studentRows.length*0.8;});
+  if(!cols.length)return null;
+  // صف الدرجات العظمى وصف مستويات التعلم (فوق الطلاب)
+  var max=null,ao=null;
+  for(var i=first-1;i>=0;i--){var row=grid[i];
+    if(!max&&cols.every(function(c){return isN(row[c]);})&&(/الدرجة|العظمى|الدرجات/.test(row.join(' '))||i===first-1&&cols.every(function(c){return +row[c]>0&&+row[c]<=20;})))max=cols.map(function(c){return +row[c];});
+    if(!ao&&row.some(function(v){return AOS.indexOf(v)>=0;})){var cur='',m={};for(var cc=0;cc<row.length;cc++){if(AOS.indexOf(row[cc])>=0)cur=row[cc];m[cc]=cur;}ao=cols.map(function(c){return m[c]||'';});}
+  }
+  // في جداول RTL قد يقع عمود الدرجات قبل الاسم: نرتب الأعمدة كما في الملف
+  var names=studentRows.map(function(i){return grid[i][best];}),scores=studentRows.map(function(i){return cols.map(function(c){return grid[i][c]===''?'':grid[i][c];});});
+  if(!max){max=cols.map(function(c,k){return Math.max(1,Math.ceil(scores.reduce(function(m,s){return Math.max(m,+s[k]||0);},0)));});max.guessed=true;}
+  return {names:names,scores:scores,max:max,ao:ao,heads:cols.map(head)};
+}
+function applyTable(D,o){
+  var n=D.scores[0].length,manual=A.source!=='quiz',items=A.items.length;
+  var pv='<p><b>'+D.names.length+'</b> طالبًا و<b>'+n+'</b> مفردة'+(D.max.guessed?' (الدرجة العظمى لكل مفردة مقدّرة من أعلى درجة — راجعها)':'')+'.</p>'+
+    (!manual&&n!==items?'<p class="st-err" style="color:#b42318">عدد الأعمدة ('+n+') لا يساوي عدد مفردات الاختبار ('+items+')؛ سيُملأ أول '+Math.min(n,items)+' مفردة.</p>':'')+
+    '<div class="an-scroll"><table class="an-t"><thead><tr><th>الطالب</th>'+D.scores[0].map(function(v,k){return '<th>س'+(k+1)+'<small>من '+D.max[k]+(D.ao&&D.ao[k]?' · '+esc(D.ao[k]):'')+'</small></th>';}).join('')+'</tr></thead><tbody>'+
+    D.names.slice(0,6).map(function(nm,i){return '<tr><td style="text-align:right">'+esc(nm)+'</td>'+D.scores[i].map(function(v){return '<td>'+esc(v)+'</td>';}).join('')+'</tr>';}).join('')+(D.names.length>6?'<tr><td colspan="'+(n+1)+'">… و'+(D.names.length-6)+' طالبًا آخرين</td></tr>':'')+'</tbody></table></div>';
+  var hasData=A.students.some(function(s){return s.name||s.s.some(function(v){return v!==''&&v!=null;});});
+  dialog({title:'تم التعرّف على جدول الدرجات ('+o.label+')',html:pv,okText:hasData?'استبدال البيانات الحالية':'إدخال البيانات',cancelText:'إلغاء'}).then(function(ok){
+    if(!ok)return;
+    if(manual){
+      A.items=D.max.map(function(m,k){var old=A.items[k]||{};return {max:m,ao:(D.ao&&D.ao[k])||old.ao||'',lesson:old.lesson||'',lid:old.lid||null};});
+    }else if(D.ao)D.ao.forEach(function(a,k){if(a&&A.items[k]&&!A.items[k].ao)A.items[k].ao=a;});
+    A.students=D.names.map(function(nm,i){return {name:nm,s:D.scores[i].slice(0,A.items.length)};});
+    touch();renderEditor();toast('أُدخلت درجات '+D.names.length+' طالبًا ✓');
   });
-  touch();renderEditor();toast('تم لصق '+lines.length+' صف');
+}
+// ---------- رفع ملف Excel (.xlsx) أو CSV ----------
+function inflate(u8){var ds=new DecompressionStream('deflate-raw');return new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer().then(function(b){return new Uint8Array(b);});}
+function unzip(buf){
+  var u8=new Uint8Array(buf),dv=new DataView(buf),eocd=-1;
+  for(var i=u8.length-22;i>=Math.max(0,u8.length-66000);i--)if(dv.getUint32(i,true)===0x06054b50){eocd=i;break;}
+  if(eocd<0)return Promise.reject(new Error('الملف ليس Excel صالحًا (.xlsx)'));
+  var total=dv.getUint16(eocd+10,true),ptr=dv.getUint32(eocd+16,true),jobs=[],out={};
+  for(var k=0;k<total;k++){
+    if(dv.getUint32(ptr,true)!==0x02014b50)break;
+    var method=dv.getUint16(ptr+10,true),csize=dv.getUint32(ptr+20,true),nl=dv.getUint16(ptr+28,true),xl=dv.getUint16(ptr+30,true),cl=dv.getUint16(ptr+32,true),lho=dv.getUint32(ptr+42,true);
+    var name=new TextDecoder().decode(u8.subarray(ptr+46,ptr+46+nl));ptr+=46+nl+xl+cl;
+    if(!/^xl\/(sharedStrings\.xml|workbook\.xml|worksheets\/sheet\d+\.xml)$/.test(name))continue;
+    (function(name,method,csize,lho){var off=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true),data=u8.subarray(off,off+csize);
+      jobs.push((method===0?Promise.resolve(data):inflate(data)).then(function(d){out[name]=new TextDecoder().decode(d);}));})(name,method,csize,lho);
+  }
+  return Promise.all(jobs).then(function(){return out;});
+}
+function colIdx(ref){var m=/^([A-Z]+)/.exec(ref||''),n=0;if(!m)return 0;for(var i=0;i<m[1].length;i++)n=n*26+(m[1].charCodeAt(i)-64);return n-1;}
+function sheetGrid(xml,ss){
+  var doc=new DOMParser().parseFromString(xml,'application/xml'),rows=[];
+  Array.prototype.forEach.call(doc.getElementsByTagName('row'),function(row){
+    var r=(+row.getAttribute('r')||rows.length+1)-1,arr=rows[r]=rows[r]||[];
+    Array.prototype.forEach.call(row.getElementsByTagName('c'),function(c){
+      var t=c.getAttribute('t'),v=c.getElementsByTagName('v')[0],val='';
+      if(t==='s'&&v)val=ss[+v.textContent]||'';else if(t==='inlineStr'){val=Array.prototype.map.call(c.getElementsByTagName('t'),function(x){return x.textContent;}).join('');}else if(v)val=v.textContent;
+      if(/^-?\d+\.\d{6,}$/.test(val))val=String(Math.round(+val*100)/100);
+      arr[colIdx(c.getAttribute('r'))]=val;
+    });
+  });
+  for(var i=0;i<rows.length;i++)if(!rows[i])rows[i]=[];
+  return rows.map(function(r){for(var j=0;j<r.length;j++)if(r[j]==null)r[j]='';return r;});
+}
+function importFile(f){
+  var nm=f.name.toLowerCase();
+  if(/\.xls$/.test(nm)){dialog({title:'صيغة قديمة (.xls)',message:'افتح الملف في Excel واحفظه بصيغة «مصنف Excel (.xlsx)» ثم ارفعه مرة أخرى.',okText:'حسنًا',cancelText:false});return;}
+  var fr=new FileReader();
+  if(/\.(csv|txt)$/.test(nm)){fr.onload=function(){var t=String(fr.result).replace(/^﻿/,''),d=t.indexOf('\t')>=0?'\t':(t.split(';').length>t.split(',').length?';':',');
+    var grid=t.replace(/\r/g,'').split('\n').map(function(l){return l.split(d).map(function(x){return x.replace(/^"|"$/g,'');});});done(grid);};fr.readAsText(f,'utf-8');return;}
+  if(typeof DecompressionStream==='undefined'){toast('متصفحك لا يدعم قراءة xlsx — احفظ الملف CSV أو انسخ والصق');return;}
+  fr.onload=function(){unzip(fr.result).then(function(files){
+    var ss=[];if(files['xl/sharedStrings.xml']){var d=new DOMParser().parseFromString(files['xl/sharedStrings.xml'],'application/xml');ss=Array.prototype.map.call(d.getElementsByTagName('si'),function(si){return Array.prototype.map.call(si.getElementsByTagName('t'),function(x){return x.textContent;}).join('');});}
+    var sheets=Object.keys(files).filter(function(k){return /worksheets\/sheet\d+\.xml$/.test(k);}).sort(function(a,b){return parseInt(a.replace(/\D/g,''),10)-parseInt(b.replace(/\D/g,''),10);});
+    // نختار الورقة التي يُتعرَّف فيها على أكبر عدد من الطلاب
+    var bestD=null;sheets.forEach(function(k){var D=detectTable(sheetGrid(files[k],ss));if(D&&(!bestD||D.names.length*D.scores[0].length>bestD.names.length*bestD.scores[0].length))bestD=D;});
+    if(!bestD){dialog({title:'لم أتعرّف على جدول الدرجات',message:'تأكد أن الملف فيه عمود لأسماء الطلاب وأعمدة لدرجات كل سؤال. أو حمّل «نموذج Excel الفارغ» واملأه.',okText:'حسنًا',cancelText:false});return;}
+    applyTable(bestD,{label:f.name});
+  },function(e){toast(e.message);});};
+  fr.readAsArrayBuffer(f);
+  function done(grid){var D=detectTable(grid);if(!D){dialog({title:'لم أتعرّف على جدول الدرجات',message:'تأكد أن الملف فيه عمود للأسماء وأعمدة لدرجات الأسئلة.',okText:'حسنًا',cancelText:false});return;}applyTable(D,{label:f.name});}
+}
+// نموذج CSV يفتحه Excel بالعربية (UTF-8 مع BOM): صف للمستويات، صف للدرجة العظمى، ثم الأسماء
+function downloadTemplate(){
+  var it=A.items,q=function(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  var rows=[['اسم الطالب'].concat(it.map(function(x,i){return 'س'+(i+1);})),['المستوى'].concat(it.map(function(x){return x.ao||'';})),['الدرجة العظمى'].concat(it.map(function(x){return x.max;}))];
+  A.students.forEach(function(s){if(s.name||s.s.some(function(v){return v!==''&&v!=null;}))rows.push([s.name||''].concat(it.map(function(x,i){return s.s[i]==null?'':s.s[i];})));});
+  for(var k=rows.length;k<33;k++)rows.push(['']);
+  var blob=new Blob(['﻿'+rows.map(function(r){return r.map(q).join(',');}).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(A.title||'درجات الطلاب').replace(/[\\/:*?"<>|]+/g,'-').slice(0,60)+'.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+  toast('افتح الملف في Excel، اكتب الأسماء والدرجات، ثم ارفعه بزر «رفع ملف Excel»');
 }
 var liveT=null;function liveRes(){clearTimeout(liveT);liveT=setTimeout(renderResults,200);}
 

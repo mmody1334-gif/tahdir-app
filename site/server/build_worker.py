@@ -936,6 +936,14 @@ button.lv-opt{cursor:pointer}
 .an-t th small{display:block;font-weight:400;color:var(--mute);font-size:.72rem}.an-grid td.nm,.an-grid th.nm{min-width:160px;text-align:right}.an-grid td.nm .an-in{width:100%}.an-grid td.tot{font-weight:800;white-space:nowrap}
 .an-items .an-in{width:100%;min-width:64px}.an-items .an-in.num{width:52px;min-width:0}
 .an-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.an-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px}
+.an-sheet{border-collapse:collapse;font-size:.92rem;background:#fff;user-select:none}.an-sheet th,.an-sheet td{border:1px solid #c9d3cf;padding:0;height:30px;text-align:center}
+.an-sheet thead th{background:#eef2f0;font-weight:700;padding:3px 6px;position:sticky;top:0;z-index:1;white-space:nowrap}.an-sheet thead th small{display:block;font-weight:400;color:var(--mute);font-size:.72rem}
+.an-sheet th.rn{background:#eef2f0;color:#6b7b76;font-weight:400;min-width:30px;font-size:.8rem}.an-sheet td.rn{background:#fafbfa}
+.an-sheet input{width:52px;height:30px;border:0;background:transparent;text-align:center;font:inherit;padding:0 4px;box-sizing:border-box;outline:none;user-select:text}
+.an-sheet td.nm{min-width:190px}.an-sheet td.nm input{width:100%;text-align:right;padding:0 8px}
+.an-sheet input:focus{outline:2px solid #1f8a70;outline-offset:-2px;background:#fff}
+.an-sheet td.sel{background:#d6ece3}.an-sheet td.bad{background:#fdecec}.an-sheet td.tc{font-weight:800;background:#f6f8f7;padding:0 8px;white-space:nowrap}
 .an-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 12px}.an-cards div{background:#e3f1eb;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.an-cards b{font-size:1.5rem;color:var(--main-d)}.an-cards span{font-size:.82rem;color:var(--mute)}.an-cards .warn{background:#fdecec}.an-cards .warn b{color:#b42318}
 .an-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}@media (max-width:760px){.an-two{grid-template-columns:1fr}}
 #anRes h4{margin:16px 0 6px;color:var(--main-d)}.an-note{display:block;font-weight:800;margin:6px 0}.an-note textarea{display:block;width:100%;margin-top:4px;line-height:1.7;resize:vertical}
