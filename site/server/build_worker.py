@@ -925,6 +925,29 @@ button.lv-opt{cursor:pointer}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
+/* ---------- البحوث الإجرائية ---------- */
+.rs-wrap{max-width:1000px;margin:18px auto;padding:0 16px}
+.rs-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.rs-tabs button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--ink,#0b3b33)}
+.rs-tabs button.on{background:#0b3b33;color:#fff;border-color:#0b3b33}
+.rs-card{display:block;width:100%;text-align:right;font:inherit;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin:0 0 10px;cursor:pointer}
+.rs-card:hover{border-color:#0b3b33}
+.rs-card h3{margin:0 0 6px;font-size:17px;color:#0b3b33;line-height:1.6}
+.rs-card p{margin:2px 0;color:#5b6b66;font-size:13.5px}
+.rs-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.rs-doc{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 26px;line-height:1.95;font-size:15.5px}
+.rs-doc h1{font-size:22px;color:#0b3b33;text-align:center;line-height:1.7;margin:0 0 6px}
+.rs-doc .rs-by{text-align:center;color:#5b6b66;margin:0 0 14px}
+.rs-doc h2{font-size:19px;color:#0b3b33;border-bottom:2px solid #e2c27a;padding-bottom:4px;margin:26px 0 10px}
+.rs-doc h3{font-size:16.5px;color:#0b3b33;margin:18px 0 8px}
+.rs-doc h4{font-size:15.5px;margin:14px 0 6px}
+.rs-tw{overflow-x:auto}
+.rs-t{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:14px}
+.rs-t th,.rs-t td{border:1px solid #cfd8d4;padding:6px 8px;vertical-align:top}
+.rs-t th{background:#eef4f1}
+.rs-eq{background:#f6f4ee;border-radius:8px;padding:8px 12px;overflow-x:auto;font-size:14px}
+.rs-empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:28px;text-align:center;color:#5b6b66}
+@media (max-width:640px){.rs-doc{padding:16px 14px;font-size:15px}}
 /* ---------- لوحة التحكم الشاملة ---------- */
 .top a.stat-link{text-decoration:none;cursor:pointer;transition:filter .15s,transform .15s}
 .top a.stat-link:hover{filter:brightness(.95);transform:translateY(-1px)}
@@ -1344,7 +1367,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -1436,6 +1459,9 @@ PLAY = '<main class="pl" id="pl"></main>'
 SLIDES_PAGE = TOP('<div class="stats"><span class="stat">العروض التقديمية</span><span class="stat">عروض البوربوينت حسب المادة والصف</span></div>').replace('%BTNS%', NAV('slides')) + '''
 <main class="wrap sl" id="sl"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 
+RESEARCH_PAGE = TOP('<div class="stats"><span class="stat">البحوث الإجرائية</span><span class="stat">بحوث جاهزة للطباعة والتحميل لكل مادة</span></div>').replace('%BTNS%', NAV('research')) + '''
+<main class="wrap rs-wrap" id="rsMain"><div class="empty-state">جارٍ التحميل…</div></main>
+<div id="printArea"></div>'''
 CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
 <div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
 <main class="panel" id="panel"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
@@ -1445,6 +1471,62 @@ ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span><
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
 
+# ===== البحوث الإجرائية: data/research/*.md (رأس بين --- ثم أقسام Markdown) =====
+def _md_inline(t):
+    import html as _h
+    t = _h.escape(t, quote=False)
+    t = re.sub(r'\[([^\]]+)\]\((https?://[^)\s]+)\)', r'<a href="\2" target="_blank" rel="noopener">\1</a>', t)
+    t = re.sub(r'(?<!["=>])(https?://[^\s<)]+)', r'<a href="\1" target="_blank" rel="noopener" dir="ltr">\1</a>', t)
+    t = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', t)
+    t = re.sub(r'(?<![\*\w])\*([^*\n]+?)\*(?!\*)', r'<i>\1</i>', t)
+    return t
+def _md2html(md):
+    out = []; lines = md.split('\n'); i = 0
+    while i < len(lines):
+        ln = lines[i]; st = ln.strip()
+        if not st or st.startswith('<!--'): i += 1; continue
+        if st.startswith('```'):
+            j = i + 1; buf = []
+            while j < len(lines) and not lines[j].strip().startswith('```'): buf.append(lines[j]); j += 1
+            import html as _h
+            out.append('<pre class="rs-eq" dir="ltr">' + _h.escape('\n'.join(buf)) + '</pre>'); i = j + 1; continue
+        m = re.match(r'^(#{2,4})\s+(.*)$', st)
+        if m: lv = len(m.group(1)); out.append('<h%d>%s</h%d>' % (lv, _md_inline(m.group(2)), lv)); i += 1; continue
+        if st.startswith('|'):
+            rows = []
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                cells = [c.strip() for c in lines[i].strip().strip('|').split('|')]
+                if not all(re.fullmatch(r':?-{3,}:?', c) for c in cells if c): rows.append(cells)
+                i += 1
+            h = '<div class="rs-tw"><table class="rs-t"><thead><tr>' + ''.join('<th>%s</th>' % _md_inline(c) for c in rows[0]) + '</tr></thead><tbody>'
+            for r in rows[1:]: h += '<tr>' + ''.join('<td>%s</td>' % _md_inline(c) for c in r) + '</tr>'
+            out.append(h + '</tbody></table></div>'); continue
+        if re.match(r'^(\d+\.|-)\s', st):
+            ol = bool(re.match(r'^\d+\.', st)); items = []
+            while i < len(lines) and re.match(r'^(\d+\.|-)\s', lines[i].strip()):
+                items.append(re.sub(r'^(\d+\.|-)\s+', '', lines[i].strip())); i += 1
+            tg = 'ol' if ol else 'ul'
+            out.append('<%s>%s</%s>' % (tg, ''.join('<li>%s</li>' % _md_inline(x) for x in items), tg)); continue
+        buf = [st]; i += 1
+        while i < len(lines) and lines[i].strip() and not re.match(r'^(#|\||```|\d+\.\s|-\s|<!--)', lines[i].strip()):
+            buf.append(lines[i].strip()); i += 1
+        out.append('<p>%s</p>' % _md_inline(' '.join(buf)))
+    return '\n'.join(out)
+def _research():
+    d = os.path.join(DATA, 'research'); items = []
+    if not os.path.isdir(d): return items
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith('.md'): continue
+        raw = open(os.path.join(d, fn), encoding='utf-8').read()
+        meta = {}; body = raw
+        if raw.startswith('---'):
+            _, head, body = raw.split('---', 2)
+            for l in head.strip().split('\n'):
+                k, _, v = l.partition(':'); meta[k.strip()] = v.strip()
+        meta['html'] = _md2html(body)
+        items.append(meta)
+    return items
+RESEARCH = _research()
 FIN = json.load(open(os.path.join(DATA, 'finals.json'), encoding='utf-8')) if os.path.exists(os.path.join(DATA, 'finals.json')) else {}
 # عروض تقديمية: فهرسها في site/data/slides.json (كل عرض بمعرّف درايف عام) —
 # تُعاين وتُحمَّل بروابط درايف المباشرة، ولا تُخزَّن محليًّا لأن حجمها (2+ GB)
@@ -1519,6 +1601,7 @@ PAGES = {
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
+  'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),
 }

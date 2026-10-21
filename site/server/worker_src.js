@@ -1003,6 +1003,7 @@ export default {
       if (p === '/finals') return html('finals');
       if (p === '/slides') return html('slides');
       if (p === '/cando') return html('cando');
+      if (p === '/research') return html('research');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
