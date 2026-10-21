@@ -1,0 +1,19 @@
+name: domain-check
+# فحص يدوي: هل يعمل النطاق الجديد، وهل يحوّل الرابط القديم إليه (عدا /teqany والموارد)
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check
+        run: |
+          N=https://elkabsula.site; O=https://tahdir.hudhaifa-bio.workers.dev
+          H='-H sec-fetch-dest:document -H accept:text/html'
+          for i in 1 2 3 4 5 6 7 8 9 10; do c=$(curl -s -o /dev/null -w '%{http_code}' $N/version); [ "$c" = 200 ] && break; sleep 30; done
+          echo "::notice::new /version = $c $(curl -s $N/version | head -c 120)"
+          echo "::notice::www → $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://www.elkabsula.site/app)"
+          for p in /app / /quiz /teqany /teqany/research /tool/tahdir-noor.user.js; do
+            echo "::notice::old $p → $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' $H $O$p)"
+          done
+          echo "::notice::app UA /app → $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' $H -A 'x TahdirApp/1' $O/app)"
+          echo "::notice::new / → $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' $N/)"
