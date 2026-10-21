@@ -13,6 +13,12 @@ if(!SUBJECTS.some(function(s){return s[0]===subj;}))subj='العلوم';
 function docHtml(r){
   return '<h1>'+esc(r.title)+'</h1><p class="rs-by">'+esc(r.authors||'')+'</p>'+r.html;
 }
+// للطباعة وWord: نفس ترويسة الأوراق الرسمية (الشعاران والمديرية والمدرسة) بدل العنوان الكبير
+function printDoc(r,word){
+  var H=schoolHdr();
+  return OFFICIAL_HEAD({dir:H.dir,school:H.school,title:'بحث إجرائي: '+r.title,line2:(r.material||r.subject||'')+(r.grade?' · الصف '+r.grade:'')+(r.year?' · العام الدراسي '+r.year:''),word:word})+
+    '<p class="rs-by" style="text-align:center">'+esc(r.authors||'')+'</p>'+r.html;
+}
 function renderList(){
   var list=RS.filter(function(r){return r.subject===subj;});
   var h='<div class="rs-tabs" role="tablist">'+SUBJECTS.map(function(s){
@@ -41,10 +47,10 @@ function openDoc(id){
     '<article class="rs-doc">'+docHtml(r)+'</article>';
   window.scrollTo(0,0);
   $('rsBack').onclick=function(){openId=null;renderList();};
-  $('rsPrint').onclick=function(){$('printArea').innerHTML='<div class="rs-doc">'+docHtml(r)+'</div>';doPrint(r.title);};
+  $('rsPrint').onclick=function(){$('printArea').innerHTML='<div class="rs-doc">'+printDoc(r,false)+'</div>';doPrint(r.title);};
   $('rsWord').onclick=function(){
     toast('جارٍ تجهيز ملف Word…');
-    var html='<div dir="rtl" style="font-family:Arial;font-size:14pt;line-height:1.7">'+docHtml(r).replace(/<table class="rs-t">/g,'<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%">')+'</div>';
+    var html='<div dir="rtl" style="font-family:Arial;font-size:14pt;line-height:1.7">'+printDoc(r,true).replace(/<table class="rs-t">/g,'<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%">')+'</div>';
     api('/api/export',{format:'doc',name:r.title.slice(0,90),html:html}).then(function(x){
       var a=document.createElement('a');a.href=x.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
     },function(e){toast(e.message);});

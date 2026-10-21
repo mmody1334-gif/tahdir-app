@@ -479,8 +479,12 @@ function PR_WRAP(h){var lg=/class="ohead"/.test(h)?'':PR_LOGOS();return '<table 
 // يمين: شعار وزارة التعليم وتحته المديرية والمدرسة · وسط: العنوان في شريط رمادي ثم الفصل/العام ثم مربع اسم الطالب
 // · يسار: شعار رؤية عُمان 2040 بنفس الحجم وتحته مربع الدرجة. تعمل في الطباعة وملف Word.
 // o = {dir, school, title, line2, student:bool|string, box:html, word:bool, en:bool}
+// إعدادات الترويسة المحفوظة من صفحة التقويم (المديرية · المدرسة · العام · الفصل) تُستخدم في كل الأوراق
+var SCHOOL_HDR_DEF={dir:'المديرية العامة للتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
+function schoolHdr(){var o={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(/^tahdir_quiz_hdr_/.test(k)){o=JSON.parse(localStorage.getItem(k)||'{}')||{};break;}}}catch(e){}
+  var r={};Object.keys(SCHOOL_HDR_DEF).forEach(function(k){r[k]=(o&&o[k])||SCHOOL_HDR_DEF[k];});return r;}
 function OFFICIAL_HEAD(o){
-  var w=!!o.word,org=location.origin,img=function(f,alt){return '<img src="'+org+'/brand/'+f+'" alt="'+alt+'"'+(w?' height="54"':'')+' style="height:'+(w?'54px':'15mm')+';width:auto;display:block;margin:0 auto 2px">';};
+  var w=!!o.word,org=location.origin,SRC={'moe.png':o.moeSrc,'vision.png':o.visSrc},img=function(f,alt){return '<img src="'+(SRC[f]||org+'/brand/'+f)+'" alt="'+alt+'"'+(w?' height="54"':'')+' style="height:'+(w?'54px':'15mm')+';width:auto;display:block;margin:0 auto 2px">';};
   var small=w?'9.5pt':'.74em',stu='';
   if(o.student)stu='<div style="border:1px solid #000;border-radius:8px;padding:4px 10px;margin-top:5px;font-size:'+(w?'11pt':'.9em')+';white-space:nowrap;text-align:'+(o.en?'left':'right')+'"'+(o.en?' dir="ltr"':'')+'>'+(typeof o.student==='string'?o.student:'اسم الطالب: ................................ &nbsp; الصف: ........')+'</div>';
   return '<table class="ohead" dir="rtl" style="width:100%;border-collapse:collapse"><tr>'+

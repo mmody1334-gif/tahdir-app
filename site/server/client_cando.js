@@ -81,22 +81,10 @@ function wordAssets(){
   },function(){var a=liveAssets();a.logo='';return a;});
 }
 function sheetHeader(A,C,live){
-  var fs=function(pt,rem){return live?rem+'rem':pt+'pt';};
-  var img=function(src,h,alt){return '<img src="'+src+'" alt="'+alt+'" height="'+h+'" style="height:'+h+'px;width:auto;display:inline-block;vertical-align:middle">';};
-  return '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><tr>'+
-    '<td style="width:24%;text-align:right;vertical-align:middle;border:0;padding:0">'+img(A.moe,62,'وزارة التعليم')+'</td>'+
-    '<td style="text-align:center;vertical-align:middle;border:0;padding:0">'+
-      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11,.82)+'">سلطنة عُمان · وزارة التعليم</div>'+
-      '<div style="font-weight:700;color:'+INK+';font-size:'+fs(11.5,.86)+';margin-top:2px">المديرية العامة للتعليم بمحافظة البريمي</div>'+
-      '<div style="font-weight:800;color:'+INK2+';font-size:'+fs(12.5,.95)+'">مدرسة حذيفة بن محصن</div></td>'+
-    '<td style="width:24%;text-align:left;vertical-align:middle;border:0;padding:0">'+img(A.vis,58,'رؤية عُمان 2040')+'</td></tr></table>'+
-    '<div style="'+PCA+'background:'+INK+';color:#fff;border-radius:14px;padding:8px 14px;display:block;border-bottom:4px solid '+GOLD+'">'+
-      '<table style="width:100%;border-collapse:collapse"><tr>'+
-      '<td style="border:0;padding:0;color:#fff;font-weight:800;font-size:'+fs(17,1.25)+'">✓ مبادرة «أستطيع أن»</td>'+
-      '<td style="border:0;padding:0;text-align:left;color:'+GOLD+';font-weight:700;font-size:'+fs(11,.85)+'">قائمة التقييم الذاتي · الفصل الدراسي الأول</td></tr></table></div>'+
-    '<table style="width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:'+fs(11.5,.88)+'"><tr>'+
-      [['اسم الطالب',38],['الصف / الشعبة',14],['التاريخ',14]].map(function(l,i){return '<td style="border:0;padding:4px 0;white-space:nowrap;'+(i?'width:25%':'')+'"><b style="color:'+INK+'">'+l[0]+':</b> <span style="color:#7a8f88;letter-spacing:1px">'+new Array(l[1]+1).join('.')+'</span></td>';}).join('')+
-    '</tr></table>';
+  // نفس ترويسة الأوراق الرسمية في المنصة (الشعار يمينًا · العنوان وسطًا · رؤية 2040 يسارًا)
+  var H=schoolHdr();
+  return OFFICIAL_HEAD({dir:H.dir,school:H.school,title:'قائمة التقييم الذاتي «أستطيع أن…»',line2:'الفصل الدراسي: '+H.term+' - العام الدراسي: '+H.year+'م',
+    student:'اسم الطالب: ................................ &nbsp; الصف / الشعبة: ........',word:!!A.word,moeSrc:A.moe,visSrc:A.vis});
 }
 function sheetHtml(k,i,opts){
   opts=opts||{};var C=CD[k],u=C.units[i],live=!!opts.live,A=opts.assets||liveAssets();

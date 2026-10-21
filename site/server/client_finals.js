@@ -77,7 +77,9 @@ var MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function finName(title){return (title+' - '+course.subject+' - الصف '+gLabel(course.grade)).replace(/[\\/:*?"<>|]+/g,'-').slice(0,100);}
 function printHtml(qs,title,abs){
   var O=abs?location.origin:'';
-  return '<div class="ppage pg"><h2 style="text-align:center;margin:0 0 4px">'+esc(title)+'</h2><p style="text-align:center;margin:0 0 10px;font-size:11pt">'+esc(course.subject)+' — الصف '+esc(gLabel(course.grade))+'</p>'+
+  var H=schoolHdr(),tot=qs.reduce(function(s,q){return s+(+q.m||0);},0);
+  var box='<table style="border-collapse:collapse;margin:0 auto"><tr><td style="border:1.5px solid #000;width:64px;height:28px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:28px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
+  return '<div class="ppage pg">'+OFFICIAL_HEAD({dir:H.dir,school:H.school,title:title+' — '+course.subject+' للصف '+gLabel(course.grade),line2:'الفصل الدراسي: '+H.term+' - العام الدراسي: '+H.year+'م',student:true,box:box})+
     qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img src="'+O+'/fin/'+esc(q.im)+'" style="max-width:100%"></div>';}).join('')+'</div>'+
     (showAns?'<div class="ppage pg"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+supify(esc(q.a)).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
 }
