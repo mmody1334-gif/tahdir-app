@@ -9,7 +9,7 @@ var TYPE_TXT={mcq:'اختيار من متعدد',short:'إجابة قصيرة',l
 var QNO=['الأول','الثاني','الثالث','الرابع'];
 var DEF_HDR={dir:'المديرية العامة للتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
 var me=null,courses=[],course=null,bank={lessons:[],items:[]},lessonById={},mode='quiz';
-var cfg={quizNo:'الأول',total:10,lessons:{},unit:'',reviewCount:0};
+var cfg={quizNo:'الأول',total:10,lessons:{},unit:'',reviewCount:0,dlv:[true,true,true],dn:6};
 var hdr=null,doc=null,dirty=false,paperView='quiz';
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -184,6 +184,7 @@ function lineCount(it){if(it.type==='mcq')return 0;var m=+it.marks||1;if(it.line
 // ---------- ورقة الاختبار (تُستخدم للشاشة والطباعة وملف Word) ----------
 function titleText(d,key){
   var subj=d.subject,gr=d.grade;
+  if(d.kind==='diff')return (key?'نموذج إجابة ':'')+'أوراق عمل متمايزة — مادة '+subj+' للصف '+gr;
   if(d.kind==='remedy')return (key?'نموذج إجابة ':'')+'ورقة عمل علاجية — مادة '+subj+' للصف '+gr;
   if(d.kind==='review')return (key?'نموذج إجابة ':'')+'مراجعة نهاية الوحدة '+(d.unit||'')+(d.unit_name?': '+d.unit_name:'')+' — مادة '+subj+' للصف '+gr;
   return (key?'نموذج إجابة ':'')+'الاختبار القصير '+d.quizNo+' لمادة '+subj+' للصف '+gr;
@@ -238,6 +239,7 @@ function itemHtml(it,n,tno,word,ctrl){
   return h+'</div>';
 }
 function quizHtml(d,word,withCtrl){
+  if(d.kind==='diff')return diffHtml(d,word,withCtrl,false);
   var h=headerHtml(d,false,word),tno=0,lastL=null;
   d.items.forEach(function(it,i){
     if(d.kind==='review'&&it.lesson_id!==lastL){lastL=it.lesson_id;var L=lessonOf(it);h+='<h4 style="margin:14px 0 8px;font-size:'+(word?'12pt':'1em')+';border-bottom:1px dashed #888">الدرس: '+esc(L.title||'')+'</h4>';}
@@ -247,6 +249,7 @@ function quizHtml(d,word,withCtrl){
   return h+'<p style="text-align:center;font-weight:bold;margin-top:18px">ـ انتهت الأسئلة ـ</p>';
 }
 function keyHtml(d,word){
+  if(d.kind==='diff'&&!d._one)return diffHtml(d,word,false,true);
   var hi=gnum(d.grade)>=11,tno=0;
   var th=function(t){return '<th style="border:1px solid #000;padding:4px;background:#dce9f5;font-size:'+(word?'10pt':'.85em')+'">'+t+'</th>';};
   var td=function(t,al){return '<td style="border:1px solid #000;padding:4px 6px;vertical-align:top;'+(al?'text-align:'+al+';':'')+'font-size:'+(word?'10pt':'.88em')+'">'+t+'</td>';};
@@ -263,6 +266,26 @@ function keyHtml(d,word){
   h+='<tr>'+td('<b>المجموع</b>','center')+td('')+td('<b>'+sumMarks(d.items)+'</b>','center')+(hi?td('')+td(''):'')+td('')+td(aoSummary(d))+(hi?td(''):'')+'</tr>';
   return h+'</tbody></table><p style="text-align:center;font-weight:bold;margin-top:14px">ـ نهاية نموذج الإجابة ـ</p>';
 }
+// كل مستوى ورقة مستقلة بترويستها، وتبدأ في صفحة جديدة عند الطباعة
+function lessonNames(d){var seen={},n=[];d.items.forEach(function(x){var t=(lessonOf(x).title||'');if(t&&!seen[t]){seen[t]=1;n.push(t);}});return n.join('، ');}
+// مفردة أُضيفت يدويًا بلا مستوى تُلحق بآخر مستوى في الأوراق
+function lvOf(d,x){if(x.lv!=null)return x.lv;var m=0;d.items.forEach(function(y){if(y.lv!=null&&y.lv>m)m=y.lv;});return m;}
+function diffHtml(d,word,withCtrl,key){
+  var h='',first=true,H=d.hdr||hdr;
+  DIFF_LV.forEach(function(L,lv){
+    var idx=[];d.items.forEach(function(x,i){if(lvOf(d,x)===lv)idx.push(i);});if(!idx.length)return;
+    if(!first)h+=word?'<br clear="all" style="page-break-before:always">':'<div class="pbreak" style="page-break-before:always;break-before:page;height:0"></div><hr class="no-print" style="border:0;border-top:3px dashed #9bb;margin:26px 0">';
+    first=false;
+    var sub={kind:'remedy',hdr:H,subject:d.subject,grade:d.grade,items:idx.map(function(i){return d.items[i];}),_one:1};
+    var title=(key?'نموذج إجابة ':'')+'ورقة عمل — '+L.name+' — '+d.subject+' للصف '+d.grade;
+    var head=OFFICIAL_HEAD({dir:H.dir,school:H.school,title:title,line2:'الدرس: '+lessonNames(sub),student:!key,word:word});
+    if(key){h+=keyHtml(sub,word).replace(/^[\s\S]*?<hr[^>]*>/,head);return;}
+    h+=head;var tno=0;
+    idx.forEach(function(i,k){var it=d.items[i];if(it.table)tno++;h+=itemHtml(it,k+1,tno,word,withCtrl?ctrlHtml(i):'');});
+    h+='<p style="text-align:center;font-weight:bold;margin-top:14px">ـ انتهت الأسئلة ـ</p>';
+  });
+  return h;
+}
 function aoSummary(d){var s={};d.items.forEach(function(x){s[x.ao]=(s[x.ao]||0)+(+x.marks||0);});return Object.keys(s).map(function(k){return esc(k)+': '+s[k];}).join('<br>');}
 function ctrlHtml(i){
   return '<div class="qctl no-print"><span class="qmeta" data-meta="'+i+'"></span><span class="qbtns">'+
@@ -274,6 +297,7 @@ function ctrlHtml(i){
 function checks(d){
   var out=[],items=d.items,tot=sumMarks(items),mc=items.filter(function(x){return x.type==='mcq';}),lg=items.filter(function(x){return x.type==='long';}),sh=items.filter(function(x){return x.type==='short';});
   var ao={};items.forEach(function(x){ao[x.ao]=(ao[x.ao]||0)+(+x.marks||0);});
+  if(d.kind==='diff'){DIFF_LV.forEach(function(L,lv){var it=items.filter(function(x){return lvOf(d,x)===lv;});if(it.length)out.push([true,L.name+': '+it.length+' مفردة، '+sumMarks(it)+' درجة']);});return out;}
   if(d.kind==='review'||d.kind==='remedy'){out.push([true,items.length+' مفردة، المجموع '+tot+' درجة'+(d.kind==='remedy'?' — من الدروس والمستويات الأضعف في تحليل النتائج':'')]);return out;}
   var sp=spec();
   out.push([tot===sp.total,'الدرجة الكلية '+tot+' من '+sp.total]);
@@ -297,18 +321,22 @@ function checks(d){
 var QX=function(c){return c.quiz_items?'':' (بدون بنك أسئلة)';};
 function renderSide(){
   var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel',QX)+
-    '<div class="seg" role="tablist"><button type="button" class="'+(mode==='quiz'?'on':'')+'" data-mode="quiz">اختبار قصير</button><button type="button" class="'+(mode==='review'?'on':'')+'" data-mode="review">مراجعة نهاية الوحدة</button></div></section>';
+    '<div class="seg" role="tablist"><button type="button" class="'+(mode==='quiz'?'on':'')+'" data-mode="quiz">اختبار قصير</button><button type="button" class="'+(mode==='review'?'on':'')+'" data-mode="review">مراجعة نهاية الوحدة</button><button type="button" class="'+(mode==='diff'?'on':'')+'" data-mode="diff">أوراق متمايزة</button></div></section>';
   if(!course){$('qside').innerHTML=h;bindSide();return;}
   var units=unitsList();
-  if(mode==='quiz'){
-    h+='<section class="qcard"><h3>2. الدروس المشمولة <span class="muted">(من 2 إلى 5)</span></h3><div class="lpick">';
+  if(mode==='quiz'||mode==='diff'){
+    h+='<section class="qcard"><h3>2. الدروس المشمولة <span class="muted">'+(mode==='diff'?'(درس أو أكثر)':'(من 2 إلى 5)')+'</span></h3><div class="lpick">';
     units.forEach(function(u){
       h+='<div class="lp-unit"><div class="lp-uh">الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</div>';
       u.lessons.forEach(function(l){var n=bank.items.filter(function(x){return x.lesson_id===l.id;}).length;
         h+='<label class="lp-l'+(n?'':' dim')+'"><input type="checkbox" data-lid="'+l.id+'"'+(cfg.lessons[l.id]?' checked':'')+(n?'':' disabled')+'> <span>'+esc(l.title)+'</span><span class="muted">'+n+'</span></label>';});
       h+='</div>';
     });
-    h+='</div></section><section class="qcard"><h3>3. الإعدادات</h3><label class="qrow">رقم الاختبار <select id="qnoSel" class="qsel sm">'+QNO.map(function(q){return '<option'+(cfg.quizNo===q?' selected':'')+'>'+q+'</option>';}).join('')+'</select></label>'+
+    if(mode==='diff')h+='</div></section><section class="qcard"><h3>3. المستويات</h3><p class="muted small">ورقة لكل مستوى من نفس الدروس: <b>أساسي</b> (دعم وصعوبات التعلم) · <b>متوسط</b> · <b>إثرائي</b> (للمتفوقين).</p>'+
+      DIFF_LV.map(function(L,i){return '<label class="qrow"><input type="checkbox" data-dlv="'+i+'"'+(cfg.dlv[i]?' checked':'')+'> '+L.name+' <span class="muted small">'+L.hint+'</span></label>';}).join('')+
+      '<label class="qrow">عدد المفردات في كل ورقة <select id="dnSel" class="qsel sm">'+[5,6,8,10].map(function(n){return '<option'+(cfg.dn===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
+      '<button type="button" class="btn primary go-btn" id="makeBtn">كوّن الأوراق</button></section>';
+    else h+='</div></section><section class="qcard"><h3>3. الإعدادات</h3><label class="qrow">رقم الاختبار <select id="qnoSel" class="qsel sm">'+QNO.map(function(q){return '<option'+(cfg.quizNo===q?' selected':'')+'>'+q+'</option>';}).join('')+'</select></label>'+
       '<p class="muted small">'+specText()+'</p>'+
       '<button type="button" class="btn primary go-btn" id="makeBtn">كوّن الاختبار</button></section>';
   }else{
@@ -331,11 +359,13 @@ function unitsList(){
 function bindSide(){
   bindCoursePick(courses,'courseSel',selectCourse,QX);
   Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'),function(b){b.onclick=function(){mode=b.getAttribute('data-mode');renderSide();};});
-  Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)cfg.lessons[id]=1;else delete cfg.lessons[id];var n=Object.keys(cfg.lessons).length;if(n>5)toast('الوثيقة: الاختبار القصير يغطي من 2 إلى 5 دروس');};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)cfg.lessons[id]=1;else delete cfg.lessons[id];var n=Object.keys(cfg.lessons).length;if(n>5&&mode==='quiz')toast('الوثيقة: الاختبار القصير يغطي من 2 إلى 5 دروس');};});
   if($('qnoSel'))$('qnoSel').onchange=function(){cfg.quizNo=this.value;if(doc&&doc.kind==='quiz'){doc.quizNo=this.value;renderDoc();}};
   if($('totSel'))$('totSel').onchange=function(){cfg.total=+this.value;};
   if($('unitSel'))$('unitSel').onchange=function(){cfg.unit=this.value;};
   if($('rcSel'))$('rcSel').onchange=function(){cfg.reviewCount=+this.value;};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-dlv]'),function(b){b.onchange=function(){cfg.dlv[+b.getAttribute('data-dlv')]=b.checked;};});
+  if($('dnSel'))$('dnSel').onchange=function(){cfg.dn=+this.value;};
   if($('makeBtn'))$('makeBtn').onclick=make;
   ['dir','school','year','term'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);if(doc){doc.hdr=clone(hdr);renderDoc();}};});
 }
@@ -384,6 +414,24 @@ function remakeDoc(){
   doc.items=it;doc.lessons=ids;doc.id=null;doc.title='';dirty=true;renderDoc();
   toast(same?'نموذج آخر ('+(it.length-same)+' مفردة جديدة من '+it.length+')':'نموذج آخر بأسئلة جديدة كلها');
 }
+// ---------- أوراق العمل المتمايزة: ثلاثة مستويات من نفس الدروس ----------
+var DIFF_LV=[
+  {name:'المستوى الأساسي',hint:'(دعم · صعوبات التعلم)',score:function(x){return (x.difficulty==='منخفضة'?0:x.difficulty==='متوسطة'?3:8)+(LOW_AOS[x.ao]?0:2)+(x.type==='long'?6:x.type==='short'?1:0)+(+x.marks>2?3:0);}},
+  {name:'المستوى المتوسط',hint:'',score:function(x){return (x.difficulty==='متوسطة'?0:2)+(x.type==='long'?2:0);}},
+  {name:'المستوى الإثرائي',hint:'(للمتفوقين)',score:function(x){return (x.difficulty==='مرتفعة'?0:x.difficulty==='متوسطة'?2:6)+(LOW_AOS[x.ao]?3:0)+(x.type==='mcq'?2:0);}}];
+var LOW_AOS={'معرفة':1,'AO1':1,'تذكر وفهم':1};
+function makeDiff(ids){
+  var pool=shuffle(poolFor(ids)),used={},items=[],ord={};ids.forEach(function(id,i){ord[id]=i;});
+  DIFF_LV.forEach(function(L,lv){
+    if(!cfg.dlv[lv])return;
+    var cand=pool.filter(function(x){return !used[x.qid];}).map(function(x){return [L.score(x)+Math.random()*0.5,x];}).sort(function(a,b){return a[0]-b[0];}).map(function(p){return p[1];});
+    // توزيع متوازن على الدروس المختارة
+    var by={};cand.forEach(function(x){(by[x.lesson_id]=by[x.lesson_id]||[]).push(x);});
+    var pick=[],k=0;while(pick.length<cfg.dn&&k<60){ids.forEach(function(id){if(by[id]&&by[id].length&&pick.length<cfg.dn)pick.push(by[id].shift());});k++;}
+    pick.sort(function(a,b){return (tOrd(a)-tOrd(b))||(ord[a.lesson_id]-ord[b.lesson_id]);}).forEach(function(x){used[x.qid]=1;var c=clone(x);c.lv=lv;items.push(c);});
+  });
+  return items;
+}
 function make(){
   if(!course)return;
   if(mode==='quiz'){
@@ -392,6 +440,12 @@ function make(){
     var items=assemble(poolFor(ids),spec(cfg.total),ids);
     if(!items.length){toast('لا توجد مفردات كافية في الدروس المختارة');return;}
     newDoc('quiz',items);track('quiz_make',ids.length+' دروس',titleText(doc));
+  }else if(mode==='diff'){
+    var idsD=lessonOrder().filter(function(id){return cfg.lessons[id];});
+    if(!idsD.length){toast('اختر درسًا واحدًا على الأقل');return;}
+    if(!cfg.dlv.some(Boolean)){toast('اختر مستوى واحدًا على الأقل');return;}
+    var itD=makeDiff(idsD);if(!itD.length){toast('لا توجد مفردات كافية في الدروس المختارة');return;}
+    newDoc('diff',itD,{lessons:idsD,studentLine:true});track('diff_make',idsD.length+' دروس',titleText(doc));
   }else{
     var u=unitsList().filter(function(x){return x.unit===cfg.unit;})[0];if(!u)return;
     var ids2=u.lessons.map(function(l){return l.id;}),pool=poolFor(ids2),pick2=pool;
@@ -439,7 +493,7 @@ function itemAct(a,i){
     if(!c.length)c=pool.filter(function(x){return x.type===it.type;});
     if(!c.length){toast('لا توجد مفردة بديلة مناسبة في الدروس المختارة');return;}
     var same=c.filter(function(x){return x.lesson_id===it.lesson_id;});
-    doc.items[i]=clone(pick(same.length?same:c));toast(doc.items[i].marks!==it.marks?'استُبدلت (تغيّرت الدرجة)':'استُبدلت المفردة');
+    doc.items[i]=clone(pick(same.length?same:c));if(it.lv!=null)doc.items[i].lv=it.lv;toast(doc.items[i].marks!==it.marks?'استُبدلت (تغيّرت الدرجة)':'استُبدلت المفردة');
   }else if(a==='edit'){editItem(i);return;}
   dirty=true;renderDoc();
 }
@@ -495,7 +549,7 @@ function addItem(){
 // القيمة: 'both' أو 'quiz' أو 'key'، و null يعني أن المعلم ألغى.
 function chooseParts(title){
   return dialog({title:title,cancelText:'إلغاء',okText:'متابعة',group:'pp',
-    html:'<div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div>'})
+    html:'<div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':(doc.kind==='diff'?'العمل':(doc.kind==='remedy'?'العمل العلاجية':'الاختبار')))+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div>'})
     .then(function(v){return (v&&v.length)?v[0]:null;});
 }
 var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
@@ -540,7 +594,7 @@ function saveDoc(){
 }
 function loadSaved(){
   if(!$('savedList'))return;
-  api('/api/quizzes?kind=quiz,review').then(function(r){
+  api('/api/quizzes?kind=quiz,review,diff,remedy').then(function(r){
     var l=r.quizzes||[];var el=$('savedList');if(!el)return;
     el.innerHTML=l.length?l.map(function(q){return '<li><button type="button" class="link-btn" data-open="'+q.id+'"><b>'+esc(q.title)+'</b></button><span class="muted small">'+esc(fmtDate(q.updated_at))+'</span><button type="button" class="x" data-delq="'+q.id+'" aria-label="حذف">×</button></li>';}).join(''):'<li class="muted">لا يوجد. بعد تكوين اختبار اضغط «حفظ».</li>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-open]'),function(b){b.onclick=function(){openSaved(+b.getAttribute('data-open'));};});

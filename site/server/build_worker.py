@@ -939,6 +939,10 @@ button.lv-opt{cursor:pointer}
 .an-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 12px}.an-cards div{background:#e3f1eb;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.an-cards b{font-size:1.5rem;color:var(--main-d)}.an-cards span{font-size:.82rem;color:var(--mute)}.an-cards .warn{background:#fdecec}.an-cards .warn b{color:#b42318}
 .an-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}@media (max-width:760px){.an-two{grid-template-columns:1fr}}
 #anRes h4{margin:16px 0 6px;color:var(--main-d)}.an-note{display:block;font-weight:800;margin:6px 0}.an-note textarea{display:block;width:100%;margin-top:4px;line-height:1.7;resize:vertical}
+.ld-layout{display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:start}@media (max-width:820px){.ld-layout{grid-template-columns:1fr}}
+.ld-st{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:5px;max-height:60vh;overflow:auto}.ld-st button{width:100%;text-align:right;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;cursor:pointer;font:inherit}.ld-st button small{display:block;color:var(--mute);font-size:.75rem}.ld-st button.on{background:#e3f1eb;border-color:var(--main)}
+.ld-head{display:flex;gap:10px;align-items:end}.ld-name{flex:1;display:flex;flex-direction:column;gap:3px;font-weight:800}.ld-asp{display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 0 8px}.ld-asp label{display:flex;gap:5px;align-items:center;background:#f6f4ee;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.ld-main h4{margin:14px 0 6px;color:var(--main-d)}.btn.danger{color:#b42318;border-color:#f1b5b0}
 .apk-help{text-align:right;line-height:1.8}
 .apk-help ol{margin:8px 0;padding-inline-start:22px}
 .apk-help li{margin:4px 0}
@@ -1384,7 +1388,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
 # ملاحظة: «تصحيح الواجبات تلقائيًا» (/grading) مقصود ألّا يظهر في القائمة — الصفحة تعمل برابطها المباشر فقط.
 def NAV(active, extra=''):
@@ -1481,6 +1485,9 @@ RESEARCH_PAGE = TOP('<div class="stats"><span class="stat">البحوث الإج
 <div id="printArea"></div>'''
 ANALYSIS_PAGE = TOP('<div class="stats"><span class="stat">تحليل نتائج الاختبارات</span><span class="stat">تحليل المفردات ومستويات التعلم وتقرير جاهز للاعتماد</span></div>').replace('%BTNS%', NAV('analysis')) + '''
 <main class="wrap an-wrap" id="anMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
+<div id="printArea"></div>'''
+LD_PAGE = TOP('<div class="stats"><span class="stat">سجل الطلبة ذوي صعوبات التعلم</span><span class="stat">الجوانب والخطة الفردية والمتابعة</span></div>').replace('%BTNS%', NAV('ld')) + '''
+<main class="wrap an-wrap" id="ldMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
 <div id="printArea"></div>'''
 CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</span><span class="stat">قوائم التقييم الذاتي لكل وحدة</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%', NAV('cando')) + '''
 <div class="wrap layout cd-layout"><aside class="tree" id="tree" aria-label="المواد والصفوف والوحدات"></aside>
@@ -1626,6 +1633,7 @@ PAGES = {
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
+  'ld': page('سجل صعوبات التعلم · الكبسولة', LD_PAGE, rd('client_ld.js')),
   'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_research.js')),
   'cando': page('أستطيع أن · الكبسولة', CANDO_PAGE, 'window.CANDO=' + json.dumps(CANDO, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_cando.js')),
   'slides': page('العروض التقديمية · الكبسولة', SLIDES_PAGE, 'window.SLIDES=' + json.dumps(SLIDES, ensure_ascii=False) + ';' + chr(10) + rd('client_slides.js')),

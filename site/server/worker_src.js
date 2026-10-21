@@ -1088,6 +1088,7 @@ export default {
       if (p === '/cando') return html('cando');
       if (p === '/research') return html('research');
       if (p === '/analysis') return html('analysis');
+      if (p === '/ld') return html('ld');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
