@@ -473,7 +473,24 @@ function doPrint(name){var a=$('printArea'),t=document.title;document.title=Stri
 // ترويسة الطباعة: شعار وزارة التعليم أعلى اليمين وشعار رؤية عُمان أعلى اليسار.
 // توضع في <thead> فيتكرّر الشعاران في **كل صفحة** من الورقة المطبوعة.
 function PR_LOGOS(){return '<div class="plogo-row"><img class="plogo-moe" src="/brand/moe.png" alt="وزارة التعليم"><img class="plogo-vis" src="/brand/vision.png" alt="رؤية عُمان 2040"></div>';}
-function PR_WRAP(h){return '<table class="prw"><thead><tr><td>'+PR_LOGOS()+'<div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+h+'</td></tr></tbody></table>';}
+// الورقة التي لها ترويسة رسمية (OFFICIAL_HEAD) تحمل الشعارين بنفسها، فلا نكرر صف الشعارات فوقها
+function PR_WRAP(h){var lg=/class="ohead"/.test(h)?'':PR_LOGOS();return '<table class="prw"><thead><tr><td>'+lg+'<div class="prsp"></div></td></tr></thead><tfoot><tr><td><div class="prsp"></div></td></tr></tfoot><tbody><tr><td>'+h+'</td></tr></tbody></table>';}
+// ترويسة الأوراق الرسمية (الاختبار القصير، أوراق العمل والخطط…) بتنسيق نماذج الوزارة:
+// يمين: شعار وزارة التعليم وتحته المديرية والمدرسة · وسط: العنوان في شريط رمادي ثم الفصل/العام ثم مربع اسم الطالب
+// · يسار: شعار رؤية عُمان 2040 بنفس الحجم وتحته مربع الدرجة. تعمل في الطباعة وملف Word.
+// o = {dir, school, title, line2, student:bool|string, box:html, word:bool, en:bool}
+function OFFICIAL_HEAD(o){
+  var w=!!o.word,org=location.origin,img=function(f,alt){return '<img src="'+org+'/brand/'+f+'" alt="'+alt+'"'+(w?' height="54"':'')+' style="height:'+(w?'54px':'15mm')+';width:auto;display:block;margin:0 auto 2px">';};
+  var small=w?'9.5pt':'.74em',stu='';
+  if(o.student)stu='<div style="border:1px solid #000;border-radius:8px;padding:4px 10px;margin-top:5px;font-size:'+(w?'11pt':'.9em')+';white-space:nowrap;text-align:'+(o.en?'left':'right')+'"'+(o.en?' dir="ltr"':'')+'>'+(typeof o.student==='string'?o.student:'اسم الطالب: ................................ &nbsp; الصف: ........')+'</div>';
+  return '<table class="ohead" dir="rtl" style="width:100%;border-collapse:collapse"><tr>'+
+    '<td style="width:28%;vertical-align:top;text-align:center;font-size:'+small+';line-height:1.45;padding:0">'+img('moe.png','وزارة التعليم')+'سلطنة عُمان<br>'+esc(o.dir||'').replace(/ (بمحافظة)/,'<br>$1')+'<br><span style="white-space:nowrap">'+esc(o.school||'')+'</span></td>'+
+    '<td style="width:54%;vertical-align:bottom;text-align:center;padding:0 8px">'+
+      '<div class="ptitle" style="font-weight:bold;font-size:'+(w?'13pt':'.94em')+';background:#e6e6e6;padding:3px 6px">'+esc(o.title||'')+'</div>'+
+      (o.line2?'<div style="font-size:'+(w?'11pt':'.92em')+';margin-top:2px">'+esc(o.line2)+'</div>':'')+stu+'</td>'+
+    '<td style="width:18%;vertical-align:top;text-align:center;padding:0">'+img('vision.png','رؤية عُمان 2040')+(o.box?'<div style="margin-top:4px">'+o.box+'</div>':'')+'</td>'+
+    '</tr></table><hr style="border:0;border-top:2.5px solid #000;margin:8px 0 12px">';
+}
 // الأسس والأيونات: X^2 أو 10^-3 أو Mg^2+ أو ^{...} تُعرض أسًا مرفوعًا
 // كانت الشحنة المنفردة (Cl^- و H3O^+ و HCO3^-) لا تطابق النمط لأنه اشترط رقمًا أو حرفًا
 // بعد الإشارة، فبقيت «^» ظاهرة في الصفحة وفي ملف Word. والآن تُقبل الإشارة وحدها أيضًا.

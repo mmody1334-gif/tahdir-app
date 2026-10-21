@@ -30,11 +30,8 @@ function cb(on){return '<span class="cb" contenteditable="false" style="font-fam
 function H(t,en){return '<h3 style="font-size:1.05em;margin:12px 0 4px;padding:2px 8px;background:#eef3f1;border-inline-start:4px solid #0e7c66">'+t+'</h3>';}
 function sheetHead(title,en,student){
   var h=hdr;
-  var top='<table style="width:100%;border-collapse:collapse" dir="rtl"><tr><td style="width:32%;vertical-align:top;font-size:.8em;line-height:1.5" dir="rtl">سلطنة عُمان<br>وزارة التعليم<br>'+esc(h.dir)+'<br>'+esc(h.school)+'</td>'+
-    '<td style="width:68%;text-align:center;vertical-align:middle"><div style="font-weight:bold;font-size:1.1em;background:#e6e6e6;padding:4px 8px">'+esc(title)+'</div>'+
-    '<div style="font-size:.9em" dir="rtl">الفصل الدراسي: '+esc(h.term)+' - العام الدراسي: '+esc(h.year)+'م</div></td></tr></table>';
-  var st=student?'<table style="width:100%;border-collapse:collapse;margin-top:6px"'+(en?' dir="ltr"':'')+'><tr><td style="border:1px solid #000;padding:4px 10px">'+(en?'Name: ........................................ &nbsp; Class: .......... &nbsp; Date: ..........':'اسم الطالب: ................................................ &nbsp; الصف: .............. &nbsp; التاريخ: ..............')+'</td></tr></table>':'';
-  return top+st+'<hr style="border:0;border-top:2px solid #000;margin:8px 0 10px">';
+  return OFFICIAL_HEAD({dir:h.dir,school:h.school,title:title,line2:'الفصل الدراسي: '+h.term+' - العام الدراسي: '+h.year+'م',en:en,
+    student:student?(en?'Name: ........................................ &nbsp; Class: ..........':true):false});
 }
 function wrap(html,en){return '<div dir="'+(en?'ltr':'rtl')+'" style="text-align:'+(en?'left':'right')+'">'+html+'</div>';}
 function lessonsSel(){var ids=Object.keys(sel).map(Number);return data.lessons.filter(function(l){return ids.indexOf(l.id)>=0;});}

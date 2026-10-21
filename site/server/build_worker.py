@@ -13,7 +13,9 @@ _BR = os.path.join(DATA, 'brand')
 LOGO = open(os.path.join(_BR, 'logo.svg'), encoding='utf-8').read().replace('<svg ', '<svg class="kb-logo" aria-hidden="true" ', 1)
 _img = lambda f: '/brand/' + f
 BRAND_ICONS = {'/brand/' + f: _b64.b64encode(open(os.path.join(_BR, f), 'rb').read()).decode() for f in ('moe.png', 'vision.png')}
-BANNER = f'''<div class="kb-banner"><img class="kb-moe" src="{_img('moe.png')}" alt="وزارة التعليم"><div class="kb-mid"><div class="kb-mark">{LOGO}</div><div class="kb-name"><b>الكبسولة</b><span>مدرسة حذيفة بن محصن</span></div></div><img class="kb-vis" src="{_img('vision.png')}" alt="رؤية عُمان 2040"></div>'''
+# واجهة «الكبسولة»: بلا شعاري الوزارة ورؤية عُمان وبلا اسم المدرسة (الشعارات والمدرسة تبقى في الأوراق المطبوعة،
+# وتبقى كاملة في واجهة «تقني حذيفة» /teqany عبر BANNER_TQ و brand_tq).
+BANNER = f'''<div class="kb-banner kb-solo"><div class="kb-mid"><div class="kb-mark">{LOGO}</div><div class="kb-name"><b>الكبسولة</b></div></div></div>'''
 base_css = base_css.replace('--bg:#f1f7f4; --paper:#ffffff; --ink:#10261f; --mute:#58726a; --line:#d4e5de;', '--bg:#f6f4ee; --paper:#ffffff; --ink:#10261f; --mute:#5b6d67; --line:#e2e0d6;', 1)
 base_css = base_css.replace('--main:#0c7a63; --main-d:#08503f; --main-l:#e1f3ec; --leaf:#5fae3c; --accent:#c4861a; --accent-l:#fbf0db', '--main:#1f8a70; --main-d:#0b3b33; --main-l:#e3f1eb; --leaf:#e0a93b; --accent:#c98a1e; --accent-l:#fbf0db', 1)
 # منع ضبط النص (justify) وتمدد الحروف في الدروس والمربعات: كان يفرّق الكلمات العربية في الأسطر المكسورة
@@ -259,6 +261,7 @@ extra_css = '''
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .kb-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1200px;margin:0 auto;padding:10px 16px;box-sizing:border-box}
 .kb-banner img{height:clamp(44px,8vw,78px);width:auto;display:block}
+.kb-banner.kb-solo{justify-content:center}
 .kb-mid{display:flex;align-items:center;gap:12px;min-width:0}
 .kb-mark .kb-logo{width:clamp(62px,10vw,104px);height:auto;display:block}
 .kb-name{display:flex;flex-direction:column;align-items:center;line-height:1.1}
@@ -1332,7 +1335,7 @@ def auth_shell(card):
     <div class="logo">{LOGO}</div>
     <h1>الكبسولة</h1>
     <p>تحضير الدروس جاهز للإرسال إلى منصة نور، مرتّب حسب فهرس الكتاب المدرسي: العلوم، والأحياء، والكيمياء، والعلوم البيئية، وتقنية المعلومات، واللغة الإنجليزية.</p>
-    <span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>
+    <span class="school">إعداد أ. محمد مجدي · معلم الأحياء</span>
   </div>
   <div class="auth-facts"><span>مواد متعددة</span><span>الفصل الدراسي الأول</span><span>نسخ بضغطة واحدة</span></div>
 </section>
@@ -1362,7 +1365,7 @@ SETUP = auth_shell('''<form class="auth-card" id="setupForm" novalidate>
 
 TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <div class="brand"><div><h1 class="sr-only">الكبسولة</h1>
-  <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>{extra}</div></div>
+  <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
@@ -1617,6 +1620,9 @@ PAGES = {
 _TQ_PAGES = '|'.join(sorted(set(k for k in PAGES if k != 'css') | {'tahdir'}, key=len, reverse=True))
 def brand_tq(h):
     h = h.replace(BANNER, BANNER_TQ)
+    # «تقني حذيفة» يحتفظ باسم المدرسة كما كان (الواجهة الأساسية حُذف منها)
+    h = h.replace('<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>', '<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>')
+    h = h.replace('<span class="school">إعداد أ. محمد مجدي · معلم الأحياء</span>', '<span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>')
     h = h.replace(LOGO, TEQANY_LOGO)
     h = h.replace('<body>', '<body class="tqb">', 1)
     h = h.replace('content="#f6f4ee"', 'content="#ffffff"')

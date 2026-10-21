@@ -189,14 +189,9 @@ function titleText(d,key){
 }
 function headerHtml(d,key,word){
   var h=d.hdr||hdr,tot=sumMarks(d.items);
-  var box=key?'':'<table class="sbox" style="border-collapse:collapse;margin-inline-start:auto"><tr><td style="border:1.5px solid #000;width:64px;height:30px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:30px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
-  return '<table class="phead" style="width:100%;border-collapse:collapse"><tr>'+
-    '<td style="width:30%;vertical-align:top;font-size:'+(word?'10pt':'.78em')+';line-height:1.5">سلطنة عُمان<br>وزارة التعليم<br>'+esc(h.dir)+'<br>'+esc(h.school)+'</td>'+
-    '<td style="width:50%;text-align:center;vertical-align:middle"><div class="ptitle" style="font-weight:bold;font-size:'+(word?'13pt':'1.08em')+';background:#e6e6e6;padding:3px 6px">'+esc(titleText(d,key))+'</div>'+
-    '<div style="font-size:'+(word?'11pt':'.92em')+'">الفصل الدراسي: '+esc(h.term)+' - العام الدراسي: '+esc(h.year)+'م</div></td>'+
-    '<td style="width:20%;vertical-align:middle">'+box+'</td></tr></table>'+
-    (key||d.kind==='review'&&!d.studentLine?'':'<table style="width:100%;border-collapse:collapse;margin-top:6px"><tr><td style="border:1px solid #000;border-radius:8px;padding:4px 10px">اسم الطالب: ................................................ &nbsp; الصف: .............. &nbsp; التاريخ: ..............</td></tr></table>')+
-    '<hr style="border:0;border-top:2px solid #000;margin:8px 0 12px">';
+  var box=key?'':'<table class="sbox" style="border-collapse:collapse;margin:0 auto"><tr><td style="border:1.5px solid #000;width:64px;height:28px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:28px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
+  return OFFICIAL_HEAD({dir:h.dir,school:h.school,title:titleText(d,key),line2:'الفصل الدراسي: '+h.term+' - العام الدراسي: '+h.year+'م',
+    student:!(key||d.kind==='review'&&!d.studentLine),box:box,word:word});
 }
 function sumMarks(items){return items.reduce(function(s,x){return s+(+x.marks||0);},0);}
 function itemHtml(it,n,tno,word,ctrl){
