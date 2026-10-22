@@ -127,12 +127,18 @@ function toolVersion(){return document.documentElement.getAttribute('data-tahdir
 // إضافة المتصفح الرسمية: مسار تجريبي غير مفعّل. عند تعبئة الروابط يعمل تلقائيًا،
 // وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
 // ضع رابط صفحة الإضافة في كل متجر بعد نشرها؛ يظهر عندها «مرشد التثبيت» (ضغطتان) بدل Tampermonkey.
-// إيدج: منشورة رسميًا في Microsoft Edge Add-ons — التثبيت من المتجر بضغطتين (لا Tampermonkey على إيدج).
-var EXT_STORE={chrome:'',edge:'https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd',firefox:''};
+// إيدج: منشورة رسميًا في Microsoft Edge Add-ons — التثبيت من المتجر بضغطتين.
+// فايرفوكس: نسخة Unlisted موقَّعة من موزيلا (رابط ملف .xpi مباشر) فيثبّت المعلم بضغطتين
+// بلا Tampermonkey حتى اعتماد النسخة المدرِجة (Listed). حدّث الرابط مع كل إصدار جديد:
+// ارفع الحزمة لنفس التسجيل Unlisted (تُوقَّع تلقائيًا) وضع رابط ملفها هنا — التحديث يصل
+// لمن ثبّت الإصدار الأقدم تلقائيًا من AMO.
+var EXT_STORE={chrome:'',edge:'https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd',firefox:'https://addons.mozilla.org/firefox/downloads/file/5154465/8b2ac955170c4febb778-3.4.9.xpi'};
 // كروم وإيدج: إضافة «الكبسولة» الخاصة (نفس كود الأداة) بدل Tampermonkey — تُحمَّل ملف ZIP وتُثبَّت «غير مُجمّعة».
 // فايرفوكس وسافاري والآيفون: لا تغيير (Tampermonkey / Userscripts كما هي).
 var EXT_ZIP='/download/tahdir-ext.zip';
 function extBrowser(b){return b==='chrome'||b==='edge';}
+// رابط ملف .xpi موقَّع مباشر (فايرفوكس Unlisted): مرشد «اضغط ← وافق» بدل صفحة متجر كبيرة
+function isXpiUrl(u){return !!u&&u.indexOf('/downloads/file/')>=0&&/\.xpi(?:[?#].*)?$/.test(u);}
 function extVersion(){return document.documentElement.getAttribute('data-tahdir-ext')||'';}
 function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
 function browserKind(){var u=navigator.userAgent;
@@ -208,6 +214,11 @@ function guideHtml(b,L,storeUrl){
       st1:'في صفحة المتجر ('+T.host+') اضغط الزر <b>«'+esc(t[0])+'»</b>',
       st2:'تظهر نافذة صغيرة أعلى المتصفح: اضغط <b>«'+esc(t[1])+'»</b>',
       ok:'خلاص! الإضافة ترجعك للمنصة لوحدها، ويظهر الزر <b>«أداة نور ✓»</b>. لا Tampermonkey ولا إعدادات.'};
+  // رابط .xpi موقَّع (فايرفوكس Unlisted): الضغط عليه يثبّت مباشرة — فنحوّل الخطوة الأولى
+  // من «بطاقة متجر» إلى «افتح الرابط»، وتصبح لقطة الخطوة أولًا نافذة التأكيد نفسها.
+  var isX=isXpiUrl(storeUrl||'');
+  var step1=TX.st1,goLabel=(ltr?'Open the add-on page \u2197':'فتح صفحة الإضافة في المتجر \u2197');
+  if(isX){step1=ltr?'Press <b>\u00ABOpen the tool link\u00BB</b> above \u2014 Firefox starts installing right away.':'اضغط <b>«فتح رابط الأداة»</b> أعلاه — فايرفوكس يبدأ التثبيت فورًا.';goLabel=ltr?'Open the tool link \u2197':'فتح رابط الأداة \u2197';}
   var ic='<span class="xg-ic" style="background:#0e7c66 url(/icon-512.png) center/cover"></span>';
   var s1='<div class="xg-scr"'+dir+'><div class="xg-bar"><i></i><i></i><span>'+T.host+'</span></div>'+
     '<div class="xg-body">'+ic+'<div class="xg-nm">'+EXT+'<small>elkabsula.site</small></div><span class="xg-btn xg-hl">'+esc(t[0])+'</span></div></div>';
@@ -217,8 +228,8 @@ function guideHtml(b,L,storeUrl){
   function st(n,txt,scr){return '<div class="xg-st"><span class="xg-n">'+n+'</span><div class="xg-b"><div class="xg-t">'+txt+'</div>'+(scr||'')+'</div></div>';}
   return '<div class="xg"><h4>'+TX.title+'</h4>'+
     '<div class="xg-drag">'+TX.drag+'</div>'+
-    (storeUrl?'<a class="xg-go" href="'+esc(storeUrl)+'" target="_blank" rel="noopener">'+(ltr?'Open the add-on page \u2197':'فتح صفحة الإضافة في المتجر \u2197')+'</a>':'')+
-    st('1',TX.st1,s1)+
+    (storeUrl?'<a class="xg-go" href="'+esc(storeUrl)+'" target="_blank" rel="noopener">'+goLabel+'</a>':'')+
+    st('1',step1,isX?'':s1)+
     st('2',TX.st2,s2)+
     st('3','<div class="xg-ok">'+TX.ok+'</div>')+
     '</div>';
@@ -226,7 +237,9 @@ function guideHtml(b,L,storeUrl){
 function extGuide(reason){
   var b=browserKind(),L=guideLang(),eu=extUrl();
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+'<style>'+GUIDE_CSS+'</style>'+guideHtml(b,L,'');
-  return dialog({title:'أداة نور',html:h,okText:'افتح المتجر وابدأ',cancelText:'إغلاق'}).then(function(r){
+  // رابط .xpi مباشر: الزر الرئيسي يفتح الأداة لا «المتجر»
+  var isX=isXpiUrl(eu||'');
+  return dialog({title:'أداة نور',html:h,okText:isX?'ابدأ التثبيت':'افتح المتجر وابدأ',cancelText:'إغلاق'}).then(function(r){
     if(!r)return;
     try{sessionStorage.setItem(GUIDE_KEY,'1');}catch(e){}
     var pip=window.documentPictureInPicture;
