@@ -10,6 +10,12 @@ Tampermonkey المثبَّت عند المعلمين لا يتأثر. ولو ث
 بعد النشر: ضع رابط صفحة الإضافة في كل متجر داخل `EXT_STORE` في `site/server/common.js`
 فيظهر للمعلم «مرشد التثبيت» (ضغطتان) بدل خطوات Tampermonkey.
 
+**تم النشر:**
+- **Microsoft Edge Add-ons**: https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd —
+  الرابط موضوع في `EXT_STORE.edge`. معلمو Edge يتثبّتون من المتجر مباشرة (بلا Tampermonkey ولا ZIP)،
+  ومن لديه النسخة القديمة «غير المجمّعة» يُوجَّه في إشعار التحديث إلى نسخة المتجر (كود الإضافة يعلن
+  مصدرها عبر `data-tahdir-ext-src` بـ`store` فيتحدّث تلقائيًا بلا تنبيهات).
+
 ---
 
 ## البيانات المشتركة (لكل المتاجر)

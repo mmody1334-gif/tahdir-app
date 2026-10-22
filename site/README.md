@@ -100,6 +100,8 @@ node site/tests/run_all.cjs fixes quizcard     # الأسماء: fixes, labels, 
 كروم وإيدج: الأداة تُوزَّع كإضافة خاصة مبنية من **نفس** `tahdir-noor.user.js` بلا تعديل
 (`tools/build_ext.py`؛ يبنيها `build_worker.py` تلقائيًا وتُخدم على `/download/tahdir-ext.zip`).
 التثبيت: تحميل ZIP ← فك الضغط ← `chrome://extensions` (أو `edge://extensions`) ← وضع المطوّر ← Load unpacked.
+- **إيدج: منشورة رسميًا في Microsoft Edge Add-ons** (الرابط في `EXT_STORE.edge`) — التثبيت هناك بضغتين
+  وتتحدّث تلقائيًا من المتجر؛ وهو المسار الافتراضي لمستخدمي Edge بدل النسخة غير المجمّعة وبدل Tampermonkey.
 - النطاقات تؤخذ تلقائيًا من سطور `@match` في رأس السكربت (نور + كل نطاقات الموقع).
 - لو Tampermonkey يشغّل الأداة في الصفحة نفسها لا تعمل الإضافة (منعًا للإرسال المكرر).
 - الموقع يقرأ `data-tahdir-ext` (إصدار الإضافة) ويعرض تنبيه تحديث واحدًا عند صدور إصدار أحدث.

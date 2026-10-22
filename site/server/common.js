@@ -124,7 +124,8 @@ function toolVersion(){return document.documentElement.getAttribute('data-tahdir
 // إضافة المتصفح الرسمية: مسار تجريبي غير مفعّل. عند تعبئة الروابط يعمل تلقائيًا،
 // وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
 // ضع رابط صفحة الإضافة في كل متجر بعد نشرها؛ يظهر عندها «مرشد التثبيت» (ضغطتان) بدل Tampermonkey.
-var EXT_STORE={chrome:'',edge:'',firefox:''};
+// إيدج: منشورة رسميًا في Microsoft Edge Add-ons — التثبيت من المتجر بضغطتين (لا Tampermonkey على إيدج).
+var EXT_STORE={chrome:'',edge:'https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd',firefox:''};
 // كروم وإيدج: إضافة «الكبسولة» الخاصة (نفس كود الأداة) بدل Tampermonkey — تُحمَّل ملف ZIP وتُثبَّت «غير مُجمّعة».
 // فايرفوكس وسافاري والآيفون: لا تغيير (Tampermonkey / Userscripts كما هي).
 var EXT_ZIP='/download/tahdir-ext.zip';
@@ -300,16 +301,25 @@ function toolDialog(reason){
         '<li>ارجع واضغط <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b> ثم <b>Allow</b> إن سألك سافاري.</li></ol>'+
         '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>⚠️ تنبيه:</b> لا تستخدم <b>«Tampermonkey Legacy»</b> — فهي لسافاري 6–11 فقط ولن تُثبَّت على سافاري الحديث.</p>';
     }
-    if(extBrowser(b)){
-      // كروم وإيدج: Tampermonkey من المتجر + مفتاح واحد يسمح بالسكربتات (شرط جديد من جوجل منذ Chrome 138).
-      // إضافة «الكبسولة» غير المُجمّعة تبقى بديلًا متقدّمًا داخل «طريقة أخرى».
-      var en=b==='edge'?'Edge':'Chrome',eu2=b==='edge'?'edge://extensions':'chrome://extensions';
-      var tmId=b==='edge'?'iikmkjmpaadaobahmlepeloendndfphd':'dhdgffkkebhmkfjojejmpbldmpobfkfo',det=eu2+'/?id='+tmId;
-      var step2=b==='edge'
-        ? '<li>افتح صفحة الإضافات: انسخ <code class="ltr" style="user-select:all">'+eu2+'</code> <button type="button" class="btn small" data-copy="'+eu2+'">نسخ</button> والصقه في شريط العنوان ثم Enter، وفعّل <b>«وضع المطوّر» Developer mode</b> من القائمة الجانبية.<br><span class="muted small">في الإصدارات الأحدث قد تجد بدلًا منه مفتاح <b>Allow User Scripts</b> داخل تفاصيل Tampermonkey: فعّله.</span></li>'
-        : '<li>اسمح لـ Tampermonkey بتشغيل السكربتات: <b>كليك يمين</b> على أيقونة Tampermonkey (أو 🧩 ← ⋮ بجانبه) ← <b>«إدارة الإضافة» Manage extension</b> ← فعّل مفتاح <b>«Allow User Scripts»</b>.<br><span class="muted small">أو انسخ <code class="ltr" style="user-select:all">'+det+'</code> <button type="button" class="btn small" data-copy="'+det+'">نسخ</button> والصقه في شريط العنوان. لو لم تجد المفتاح (كروم أقدم): فعّل <b>Developer mode</b> أعلى صفحة <span class="ltr">chrome://extensions</span>.</span></li>';
+    if(b==='edge'){
+      // إيدج: إضافة «الكبسولة — أداة نور» منشورة في متجر Edge — تثبيت بضغتين وتحديث تلقائي.
+      // بدل Tampermonkey ووضع المطوّر؛ ولو مثبّتة قديمًا من ZIP تُستبعد بعد تثبيت نسخة المتجر.
+      // الرابط صريح لا عبر extUrl() — فاللوحة قد تُعرض داخل تبويب إيدج لمستخدم متصفح آخر.
+      var eu2='edge://extensions',euS=EXT_STORE.edge;
       return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-        '<li>ثبّت <b>Tampermonkey</b> من متجر '+en+': <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «'+(b==='edge'?'الحصول عليه / Get':'إضافة إلى Chrome')+'».</li>'+
+        '<li>ثبّت إضافة <b>«الكبسولة — أداة نور»</b> مباشرة من متجر Edge: <a href="'+esc(euS)+'" target="_blank" rel="noopener">افتح صفحة الإضافة في المتجر</a> ثم اضغط <b>«الحصول عليه / Get»</b> ووافق على <b>«إضافة ملحق»</b>.</li>'+
+        '<li>خلاص — تتحدّث الإضافة تلقائيًا من المتجر: لا Tampermonkey ولا وضع مطوّر ولا ملفات.</li>'+
+        '<li>ارجع للمنصة وحدّث الصفحة؛ الزر يتحول إلى <b>«أداة نور ✓»</b>.</li></ol>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>💡 لو ثبّتها قديمًا من ملف ZIP (غير مجمّعة):</b> ثبّت نسخة المتجر أعلاه ثم افتح <code class="ltr" style="user-select:all">edge://extensions</code> واحذف بطاقة «الكبسولة» القديمة حتى لا تعمل الأداة مرتين.</p>';
+    }
+    if(b==='chrome'){
+      // كروم: Tampermonkey من المتجر + مفتاح واحد يسمح بالسكربتات (شرط جديد من جوجل منذ Chrome 138).
+      // إضافة «الكبسولة» غير المُجمّعة تبقى بديلًا متقدّمًا داخل «طريقة أخرى» (إيدج أُنتقلت إلى متجرها).
+      var eu2='chrome://extensions';
+      var tmId='dhdgffkkebhmkfjojejmpbldmpobfkfo',det=eu2+'/?id='+tmId;
+      var step2='<li>اسمح لـ Tampermonkey بتشغيل السكربتات: <b>كليك يمين</b> على أيقونة Tampermonkey (أو 🧩 ← ⋮ بجانبه) ← <b>«إدارة الإضافة» Manage extension</b> ← فعّل مفتاح <b>«Allow User Scripts»</b>.<br><span class="muted small">أو انسخ <code class="ltr" style="user-select:all">'+det+'</code> <button type="button" class="btn small" data-copy="'+det+'">نسخ</button> والصقه في شريط العنوان. لو لم تجد المفتاح (كروم أقدم): فعّل <b>Developer mode</b> أعلى صفحة <span class="ltr">chrome://extensions</span>.</span></li>';
+      return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+        '<li>ثبّت <b>Tampermonkey</b> من متجر Chrome: <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى Chrome».</li>'+
         step2+
         '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت» Install</b>.</li></ol>'+
         '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>💡 لو ثبّت Tampermonkey قبل كده والأداة وقفت فجأة:</b> هي دي المشكلة — نفّذ الخطوة ٢ فقط وحدّث الصفحة.</p>'+
@@ -319,7 +329,7 @@ function toolDialog(reason){
         '<li>اضغط <b>Load unpacked</b> واختر المجلد الذي فككته، ثم حدّث هذه الصفحة.</li></ol>'+
         '<p class="muted small">لو الإضافة وTampermonkey الاثنين متثبّتين مش هيحصل تعارض: الأداة مش هتشتغل مرتين.</p></details>';
     }
-    var nm=b==='firefox'?'Firefox':(b==='edge'?'Edge':'Chrome');
+    var nm=b==='firefox'?'Firefox':'Chrome';
     return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
       '<li>ثبّت <b>Tampermonkey</b> من متجر '+nm+': <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى '+nm+'».</li>'+
       '<li>ارجع هنا، اضغط الزر الأخضر <b>«تثبيت الأداة»</b>، وفي الصفحة التي تُفتح اضغط <b>«تثبيت»</b>.</li></ol>';
@@ -370,6 +380,13 @@ function extUpdateNote(){
     var ev=extVersion();if(!ev||verCmp(ev,TOOL_LATEST)>=0)return;
     var es=updState();if(es.n>0)return;updSave({to:TOOL_LATEST,n:1});
     var bx=browserKind()==='edge'?'edge://extensions':'chrome://extensions';
+    if(browserKind()==='edge'&&extUrl()){
+      // إيدج: الإضافة أصبحت في متجر Edge ولا يتحدّث منها تلقائيًا. بدل «حمّل ZIP وفُكه فوق القديم»
+      // ثبت نسخة المتجر بضغتين ثم أزل النسخة غير المجمّعة (حتى لا تعمل الأداة مرتين).
+      dialog({title:'تحديث إضافة «الكبسولة»',html:'<p class="m-msg">عندك الإصدار '+esc(ev)+' والأحدث '+esc(TOOL_LATEST)+'. الإضافة صارت في <b>متجر Edge</b> وتتحدّث تلقائيًا من عنده.</p><ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>ثبّت نسخة المتجر بضغتين: <a href="'+extUrl()+'" target="_blank" rel="noopener">صفحة الإضافة في المتجر</a> ← «الحصول عليه / Get».</li><li>أزل النسخة القديمة: افتح <code class="ltr">'+bx+'</code> واضغط الحذف على بطاقة «الكبسولة» (غير المجمّعة).</li></ol>',okText:'🌊 فتح متجر Edge',cancelText:'لاحقًا'})
+        .then(function(r){if(r)window.open(extUrl(),'_blank');});
+      return;
+    }
     dialog({title:'تحديث إضافة «الكبسولة»',html:'<p class="m-msg">عندك الإصدار '+esc(ev)+' والأحدث '+esc(TOOL_LATEST)+'. التحديث مستحسن لكنه غير إلزامي.</p><ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>حمّل الملف الجديد وفُك ضغطه <b>فوق</b> مجلد الإضافة القديم (استبدال الملفات).</li><li>افتح <code class="ltr">'+bx+'</code> واضغط زر التحديث ↻ على بطاقة «الكبسولة — أداة نور».</li></ol>',okText:'⬇ تحميل التحديث',cancelText:'لاحقًا'})
       .then(function(r){if(r){var a=document.createElement('a');a.href=EXT_ZIP;a.download='tahdir-ext.zip';document.body.appendChild(a);a.click();a.remove();}});
 }
