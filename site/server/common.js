@@ -185,6 +185,7 @@ var GUIDE_CSS='.xg{font-family:inherit;direction:rtl;color:#163;line-height:1.7}
   '.xg-dlg{padding:12px 12px 16px;font-size:12.5px;color:#222}.xg-dlg b{display:block;font-size:13px;margin-bottom:4px}.xg-dlg p{margin:0 0 10px;color:#666;font-size:11.5px}'+
   '.xg-acts{display:flex;gap:8px;justify-content:flex-end;padding-bottom:18px}'+
   '.xg-ok{background:#e9f7f1;border:1px solid #0e7c66;border-radius:10px;padding:9px 11px;font-size:14px}'+
+  '.xg-drag{background:#fff6e0;border:1px solid #e5c26a;border-radius:8px;padding:6px 9px;font-size:12.5px;color:#7a5c00;margin:2px 0 10px}'+
   '.xg-go{display:block;text-align:center;background:#0e7c66;color:#fff;border-radius:10px;padding:10px;font-weight:700;text-decoration:none;margin:4px 0 12px}'+
   '.xg-float{position:fixed;z-index:9999;bottom:14px;left:14px;width:min(370px,calc(100vw - 28px));max-height:calc(100vh - 28px);overflow:auto;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:14px}'+
   '.xg-x{position:absolute;top:8px;left:10px;border:0;background:none;font-size:20px;cursor:pointer;color:#567}';
@@ -194,6 +195,19 @@ function guideHtml(b,L,storeUrl){
          edge:{ar:['الحصول على','إضافة ملحق','إلغاء','هل تريد إضافة «'+EXT+'» إلى Microsoft Edge؟'],en:['Get','Add extension','Cancel','Add "'+EXT+'" to Microsoft Edge?'],host:'microsoftedge.microsoft.com'},
          firefox:{ar:['إضافة إلى Firefox','إضافة','إلغاء','هل تريد إضافة «'+EXT+'»؟'],en:['Add to Firefox','Add','Cancel','Add '+EXT+'?'],host:'addons.mozilla.org'}}[b];
   var t=T[L],dir=' dir="'+(ltr?'ltr':'rtl')+'"';
+  // نصّ المرشد نفسه يتبع لغة المتصفح أيضًا (لا الأزرار وحدها): من متصفحه إنجليزي يقرأ الإرشاد بالإنجليزية
+  // ومنه عربي يقرأها بالعربية — حتى يطابق كل نصّ في المرشد ما يراه فعليًا على شاشته.
+  var TX=ltr
+    ?{title:'Install Nour Tool — just two clicks',
+      drag:'Drag this window downward so it doesn\u2019t cover the store button \uD83D\uDC47',
+      st1:'On the '+T.host+' page press the <b>\u00AB'+esc(t[0])+'\u00BB</b> button',
+      st2:'A small popup appears at the top of the browser: press <b>\u00AB'+esc(t[1])+'\u00BB</b>',
+      ok:'Done! The extension returns you to the platform automatically and you\u2019ll see the <b>\u201CNour Tool \u2713\u201D</b> button. No Tampermonkey, no settings.'}
+    :{title:'تثبيت أداة نور — ضغطتان فقط',
+      drag:'اسحب هذه النافذة إلى الأسفل حتى لا تغطي زر التثبيت في المتجر \uD83D\uDC47',
+      st1:'في صفحة المتجر ('+T.host+') اضغط الزر <b>«'+esc(t[0])+'»</b>',
+      st2:'تظهر نافذة صغيرة أعلى المتصفح: اضغط <b>«'+esc(t[1])+'»</b>',
+      ok:'خلاص! الإضافة ترجعك للمنصة لوحدها، ويظهر الزر <b>«أداة نور ✓»</b>. لا Tampermonkey ولا إعدادات.'};
   var ic='<span class="xg-ic" style="background:#0e7c66 url(/icon-512.png) center/cover"></span>';
   var s1='<div class="xg-scr"'+dir+'><div class="xg-bar"><i></i><i></i><span>'+T.host+'</span></div>'+
     '<div class="xg-body">'+ic+'<div class="xg-nm">'+EXT+'<small>elkabsula.site</small></div><span class="xg-btn xg-hl">'+esc(t[0])+'</span></div></div>';
@@ -201,11 +215,12 @@ function guideHtml(b,L,storeUrl){
     '<div class="xg-dlg"><b>'+esc(t[3])+'</b><p>'+(ltr?'It can: Read and change your data on lms.moe.gov.om and elkabsula.site':'يمكنها قراءة بياناتك وتغييرها على lms.moe.gov.om و elkabsula.site')+'</p>'+
     '<div class="xg-acts" style="justify-content:'+(ltr?'flex-end':'flex-start')+'"><span class="xg-btn xg-hl">'+esc(t[1])+'</span><span class="xg-btn ghost">'+esc(t[2])+'</span></div></div></div>';
   function st(n,txt,scr){return '<div class="xg-st"><span class="xg-n">'+n+'</span><div class="xg-b"><div class="xg-t">'+txt+'</div>'+(scr||'')+'</div></div>';}
-  return '<div class="xg"><h4>تثبيت أداة نور — ضغطتان فقط</h4>'+
-    (storeUrl?'<a class="xg-go" href="'+esc(storeUrl)+'" target="_blank" rel="noopener">فتح صفحة الإضافة في المتجر ↗</a>':'')+
-    st('١','في صفحة المتجر اضغط الزر <b>«'+esc(t[0])+'»</b>',s1)+
-    st('٢','تظهر نافذة صغيرة أعلى المتصفح: اضغط <b>«'+esc(t[1])+'»</b>',s2)+
-    st('٣','<div class="xg-ok">خلاص! الإضافة ترجعك للمنصة لوحدها، ويظهر الزر <b>«أداة نور ✓»</b>. لا Tampermonkey ولا إعدادات.</div>')+
+  return '<div class="xg"><h4>'+TX.title+'</h4>'+
+    '<div class="xg-drag">'+TX.drag+'</div>'+
+    (storeUrl?'<a class="xg-go" href="'+esc(storeUrl)+'" target="_blank" rel="noopener">'+(ltr?'Open the add-on page \u2197':'فتح صفحة الإضافة في المتجر \u2197')+'</a>':'')+
+    st('1',TX.st1,s1)+
+    st('2',TX.st2,s2)+
+    st('3','<div class="xg-ok">'+TX.ok+'</div>')+
     '</div>';
 }
 function extGuide(reason){
@@ -215,7 +230,7 @@ function extGuide(reason){
     if(!r)return;
     try{sessionStorage.setItem(GUIDE_KEY,'1');}catch(e){}
     var pip=window.documentPictureInPicture;
-    if(pip&&pip.requestWindow&&b!=='firefox'){
+    if(pip&&pip.requestWindow){
       // النافذة العائمة أولًا (تحتاج ضغطة المعلم)، ثم المتجر في تبويب جديد
       pip.requestWindow({width:390,height:640}).then(function(w){
         var d=w.document;d.title='أداة نور';d.documentElement.setAttribute('dir','rtl');d.documentElement.setAttribute('lang','ar');
@@ -224,11 +239,28 @@ function extGuide(reason){
         if(!window.open(eu,'_blank'))return; // لو حُجب: رابط المتجر داخل النافذة العائمة
       }).catch(function(){guideFloat(b,L,eu);window.open(eu,'_blank');});
     }else{
-      guideFloat(b,L,eu);
-      // فايرفوكس: المتجر في نافذة جانبية، والمرشد يبقى ظاهرًا في المنصة بجوارها
-      var W=Math.min(980,Math.round(screen.availWidth*0.6)),H=Math.min(820,screen.availHeight-40);
-      var w2=window.open(eu,'kabsula_store','popup,width='+W+',height='+H+',left='+(screen.availWidth-W)+',top=20');
-      if(!w2)window.open(eu,'_blank');
+      // كل متصفح بلا PiP (فايرفوكس · سافاري · إصدارات أقدم): نفس التجربة بنافذة عائمة صغيرة
+      // تُفتح بضغطة المعلم (فلا يحجبها مانع النوافذ)، تحمل المرشد نفسه وبه زر المتجر وزر
+      // تحديث المنصة — تبقى أمام المعلم وهو يثبّت بدل أن يبقى المرشد مدفونًا في تبويب المنصة.
+      var wg=null;
+      try{wg=window.open('about:blank','tahdir_guide','width=390,height=660');}catch(e){}
+      if(wg&&wg.document&&wg.document.body){
+        try{
+          var dg=wg.document;dg.title='أداة نور';dg.documentElement.setAttribute('dir','rtl');dg.documentElement.setAttribute('lang','ar');
+          var stg=dg.createElement('style');stg.textContent='body{margin:0;padding:14px;font-family:Tajawal,Segoe UI,Tahoma,Arial,sans-serif;background:#fff}'+GUIDE_CSS;dg.head.appendChild(stg);
+          dg.body.innerHTML=guideHtml(b,L,eu);
+          var rg=dg.createElement('button');rg.type='button';rg.className='btn small';rg.style.cssText='width:100%;margin-top:10px';
+          rg.textContent='ثبّتها؟ حدّث صفحة المنصة ↻';
+          rg.onclick=function(){try{if(wg.opener)wg.opener.location.reload();}catch(e){}wg.close();};
+          dg.body.appendChild(rg);wg.focus();
+        }catch(e){try{wg.close();}catch(e2){}guideFloat(b,L,eu);window.open(eu,'_blank');}
+      }else{
+        // حُجبت النافذة العائمة: المرشد داخل صفحة المنصة + المتجر بنافذة جانبية (كالسابق)
+        guideFloat(b,L,eu);
+        var W=Math.min(980,Math.round(screen.availWidth*0.6)),H=Math.min(820,screen.availHeight-40);
+        var w2=window.open(eu,'kabsula_store','popup,width='+W+',height='+H+',left='+(screen.availWidth-W)+',top=20');
+        if(!w2)window.open(eu,'_blank');
+      }
     }
   });
 }
