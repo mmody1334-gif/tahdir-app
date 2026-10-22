@@ -81,6 +81,8 @@ function dialog(opts){
     if(opts.input)h+='<input id="mInput" class="m-input" value="'+esc(opts.value||'')+'" placeholder="'+esc(opts.placeholder||'')+'">';
     if(opts.textarea)h+='<textarea id="mText" class="m-text'+(opts.ltr?' ltr':'')+'"'+(opts.readonly?' readonly':'')+' placeholder="'+esc(opts.placeholder||'')+'">'+esc(opts.value||'')+'</textarea>';
     h+='<div class="m-actions">';
+    // opts.left: زر إضافي في أقصى يسار صف الأزرار (نهاية السطر في RTL) — لعمليات ثانوية مثل «مسح الأداة»
+    if(opts.left)h+='<button type="button" class="btn '+(opts.left.danger?'danger':'')+'" id="mLeft" style="margin-inline-start:auto">'+esc(opts.left.text)+'</button>';
     if(opts.cancelText!==false)h+='<button type="button" class="btn" id="mCancel">'+esc(opts.cancelText||'إلغاء')+'</button>';
     h+='<button type="button" class="btn '+(opts.danger?'danger-solid':'primary')+'" id="mOk">'+esc(opts.okText||'موافق')+'</button></div>';
     box.innerHTML=h;ov.hidden=false;
@@ -102,6 +104,7 @@ function dialog(opts){
     DIALOG={close:close,settle:function(){settled=true;}};
     document.addEventListener('keydown',onKey);
     if($('mCancel'))$('mCancel').onclick=function(){close(null);};
+    if($('mLeft'))$('mLeft').onclick=function(){close(null);if(opts.left&&opts.left.onClick)opts.left.onClick();};
     $('mOk').onclick=function(){close(val());};
     ov.onclick=function(e){if(e.target===ov)close(null);};
   });
@@ -256,7 +259,13 @@ function toolDialog(reason){
   // الأداة تعمل (Tampermonkey أو الإضافة): لا نقترح شيئًا آخر — سكربت Tampermonkey يبقى كما هو.
   // وإلا، ولو للمتصفح إضافة منشورة في متجره: مرشد التثبيت (ضغطتان).
   if(!ok&&eu&&!hasExt())return extGuide(reason);
-  if(ok)return dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false});
+  if(ok){
+    var pr=dialog({title:'أداة نور ✓',message:'الأداة مثبتة وتعمل (الإصدار '+v+'). تقدر ترسل التحضير والواجب إلى نور بضغطة.',okText:'تم',cancelText:false,
+      // مسح الأداة: زر أحمر في أقصى يسار الرسالة — يفتح خطوات الإزالة بحسب المتصفح
+      left:{text:'🗑 مسح الأداة',danger:true,onClick:toolRemove}});
+    Array.prototype.forEach.call(document.querySelectorAll('#modalBox [data-copy]'),function(b){b.onclick=function(){copyText(b.getAttribute('data-copy'));};});
+    return pr;
+  }
   // التثبيت لأول مرة: تبويبات بحسب المتصفح (كروم · فايرفوكس · إيدج · ماك/سافاري)
   var cur=browserKind()||'chrome';
   var TABS=[['chrome','Chrome','🌐'],['firefox','Firefox','🦊'],['edge','Edge','🌊'],['safari','ماك / Safari','🧭'],['ios','iPhone','📱']];
@@ -367,6 +376,36 @@ function toolDialog(reason){
     };
   });
   return pr.then(function(r){if(!r)return;window.open(TOOL_URL,'_blank');});
+}
+// ---------- مسح الأداة ----------
+// الموقع لا يستطيع إزالة إضافة المتجر/سكربت Tampermonkey برمجيًا — فنُرشد المعلم بخطوات
+// إزالة قصيرة بحسب متصفحه (أيقونة يمين أو صفحة الإضافات/لوحة Tampermonkey)، مع نواقل
+// نسخ لعنوان صفحة الإضافات لأن المتصفحات لا تسمح بفتح chrome:// وedge:// من صفحات الويب.
+function toolRemove(){
+  var b=browserKind()||'chrome',exUrl=b==='edge'?'edge://extensions':'chrome://extensions',au=b==='firefox'?'about:addons':'about:blank';
+  var h;
+  if(b==='edge'||b==='chrome'){
+    h='<p class="m-msg">أداة نور مثبتة عندك <b>إضافة متصفح</b>. لمسحها كليًا:</p>'+
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+      '<li><b>الأسرع:</b> <b>كليك يمين</b> على أيقونة «الكبسولة — أداة نور» في شريط المتصفح ← <b>«إزالة من المتصفح… / Remove from browser…»</b> ← وافق.</li>'+
+      '<li><b>أو من الصفحة المخصصة:</b> افتح <code class="ltr" style="user-select:all">'+exUrl+'</code> <button type="button" class="btn small" data-copy="'+exUrl+'">نسخ</button> ← بطاقة <b>«الكبسولة — أداة نور»</b> ← <b>حذف / Remove</b>.</li></ol>'+
+      '<p class="m-msg muted small">بعد المسح حدّث الصفحة هنا: علامة «أداة نور ✓» تختفي، ويبقى ممكن إعادة تثبيتها في أي وقت من قائمة «المزيد» ← «أداة نور».</p>';
+  } else if(b==='safari'||b==='ios'){
+    h='<p class="m-msg">أداة نور عندك <b>سكربت داخل تطبيق Userscripts</b>. لمسحها:</p>'+
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+      '<li>افتح تطبيق <b>Userscripts</b> ← قائمة السكربتات ← اتجه إلى <b>«الكبسولة — أداة نور»</b> ← <b>حذف 🗑</b>.</li>'+
+      '<li>ولو أردت إزالة الإضافة كلها: على الآيفون <b>الإعدادات</b> ← <b>Safari</b> ← <b>الإضافات</b> ← Userscripts ← أطفئها أو احذفها. وعلى الماك: <b>سافاري ← الإعدادات ← الإضافات</b> ← Userscripts.</li></ol>'+
+      '<p class="m-msg muted small">بعد المسح حدّث الصفحة — لو أردت الأداة مجددًا ثبّتها من قائمة «المزيد» بضغطتين.</p>';
+  } else { // فايرفوكس (أو كروم مع سكربت Tampermonkey): مسح السكربت من لوحة Tampermonkey
+    h='<p class="m-msg">أداة نور عندك <b>سكربت داخل Tampermonkey</b>. عندك اختياران:</p>'+
+      '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+      '<li><b>مسح السكربت فقط (الأدقَّ):</b> اضغط أيقونة Tampermonkey (خانة الإضافات 🧩) ← <b>لوحة التحكم / Dashboard</b> ← السطر <b>«الكبسولة — أداة نور»</b> ← أيقونة <b>السلة 🗑</b> ← وافق.</li>'+
+      '<li><b>أو إزالة كل شيء مع Tampermonkey:</b> افتح <code class="ltr" style="user-select:all">'+(b==='firefox'?au:exUrl)+'</code> <button type="button" class="btn small" data-copy="'+(b==='firefox'?au:exUrl)+'">نسخ</button> ← حدّد <b>Tampermonkey</b> ← <b>إزالة</b>.</li></ol>'+
+      '<p class="m-msg muted small">بعد المسح حدّث صفحة الموقع. ولو مسحتها بالغلط: «المزيد» ← «أداة نور» ← خطوتان فقط وترجع.</p>';
+  }
+  var pr=dialog({title:'مسح أداة نور',html:h,okText:'تم',cancelText:false});
+  Array.prototype.forEach.call(document.querySelectorAll('#modalBox [data-copy]'),function(b){b.onclick=function(){copyText(b.getAttribute('data-copy'));};});
+  return pr;
 }
 // تنبيه غير حاجب: نُخبر المعلم أن هناك إصدارًا أحدث، ولا نمنعه من العمل.
 // (الحجب كان يسبب تعطّلًا كاملًا لو تعذّر قراءة الإصدار لأي سبب.)
