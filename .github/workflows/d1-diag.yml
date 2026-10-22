@@ -13,21 +13,13 @@ jobs:
           CF_DB: 43c1825c-d8d8-401a-a77b-2ec6897f457a
           CF_TOK: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          q() {
-            echo "===== $1"
-            PAY=$(python3 -c 'import json,sys;print(json.dumps({"sql":sys.argv[1]}))' "$2")
-            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/d1/database/$CF_DB/query" \
-              -H "Authorization: Bearer $CF_TOK" -H "Content-Type: application/json" -d "$PAY" \
-            | python3 -c 'import sys,json
-d=json.load(sys.stdin)
-if not d.get("success"): print("ERR:", json.dumps(d.get("errors", d), ensure_ascii=False)[:1500])
-else:
-    print(json.dumps(d.get("result", {}).get("0", {}).get("results", d.get("result")), ensure_ascii=False)[:4000])'
-          }
-          q "courses-extra rows" "SELECT key, subject, grade FROM courses ORDER BY key"
-          q "overrides-for-arabic-ids" "SELECT COUNT(*) AS n FROM lesson_overrides WHERE lesson_id BETWEEN 860 AND 1141"
+          set -u
+          url=https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/d1/database/$CF_DB/query
+          q() { echo "===== $1"; PAY=$(python3 -c "import json,sys;print(json.dumps({'sql':sys.argv[1]}))" "$2"); curl -sS -X POST "$url" -H "Authorization: Bearer $CF_TOK" -H "Content-Type: application/json" -d "$PAY" | python3 -m json.tool | head -c 5000; echo; }
+          q "courses-extra-rows" "SELECT key, subject, grade FROM courses ORDER BY key LIMIT 60"
+          q "overrides-arabic-count" "SELECT COUNT(*) AS n FROM lesson_overrides WHERE lesson_id BETWEEN 860 AND 1141"
           q "override-samples" "SELECT lesson_id, substr(data,1,220) AS head FROM lesson_overrides WHERE lesson_id BETWEEN 860 AND 1141 LIMIT 6"
           q "custom-lessons-count" "SELECT COUNT(*) AS n FROM custom_lessons"
           q "custom-lessons-sample" "SELECT id, substr(data,1,180) AS head FROM custom_lessons LIMIT 12"
           q "tables" "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-          q "notices-tables" "SELECT name FROM sqlite_master WHERE name LIKE '%notice%'"
+          q "notice-tables" "SELECT name FROM sqlite_master WHERE name LIKE '%notice%'"
