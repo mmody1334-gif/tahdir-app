@@ -462,6 +462,55 @@ function initNav(me){
   if(me&&$('who'))$('who').textContent=me.name;
   watchTool();
   showAnnouncement();
+  initNotices(me);
+}
+// ---------- مركز الإشعارات (الجرس) ----------
+// إعلانات ديناميكية يضيفها المدير من لوحة التحكم. حالة «مقروء» لكل مستخدم مخزّنة في
+// قاعدة البيانات (تبقى حتى لو مسح تخزين المتصفح)، وغير المقروء نقطة حمراء على الجرس.
+// الإعلان الثابت المبني داخل الصفحة (showAnnouncement) باقٍ كما هو؛ هذا complementary.
+function initNotices(me){
+  if(navigator.webdriver)return; // الاختبارات الآلية لا تحتاج الجرس
+  if(!me)return; // الجرس للمسجلين فقط (وإلا فسيرد الخادم 401 ويعيدنا للدخول)
+  var bb=$('bellBtn'),bp=$('bellPanel');if(!bb||!bp)return;
+  var data=[],open=false;
+  // نفس منطق قائمة «المزيد»: ثابت أسفل الزر ولا يتجاوز حواف الشاشة
+  var place=function(){var r=bb.getBoundingClientRect(),top=Math.max(8,r.bottom+8);bp.style.top=top+'px';bp.style.maxHeight=(window.innerHeight-top-12)+'px';bp.style.left=Math.max(8,Math.min(r.left,window.innerWidth-bp.offsetWidth-8))+'px';};
+  var close=function(){open=false;bp.hidden=true;bb.setAttribute('aria-expanded','false');};
+  function load(){
+    return api('/api/notices').then(function(r){data=r.notices||[];paint();},function(){});
+  }
+  function mark(id){
+    api('/api/notices/read',id?{id:id}:{all:1}).then(load,function(){});
+  }
+  function paint(){
+    var unread=data.filter(function(n){return !n.read;}).length;
+    var dot=$('bellDot');if(dot)dot.hidden=!unread;
+    var h='<div class="bp-head"><b>🔔 الإشعارات</b>'+(unread?'<button type="button" class="bp-all" id="bpAll">حدّد الكل مقروءًا</button>':'')+'</div>';
+    h+=data.length?'<ul class="bp-list">'+data.slice(0,15).map(function(n){
+      return '<li class="bp-it'+(n.read?' read':'')+'">'+
+        '<div class="bp-t">'+(n.read?'':'<span class="bp-ndot" aria-hidden="true"></span>')+esc(n.title)+'</div>'+
+        '<div class="bp-b">'+esc(n.body).replace(/\n/g,'<br>')+'</div>'+
+        (n.url?'<a class="bp-link" href="'+esc(n.url)+'" target="_blank" rel="noopener">فتح الرابط ↗</a>':'')+
+        (n.read?'<span class="bp-read">مقروء ✓</span>':'<button type="button" class="btn small primary bp-ok" data-no="'+n.id+'">حسنًا</button>')+
+        '<span class="bp-date">'+fmtDate(n.created_at)+'</span></li>';
+    }).join('')+'</ul>':'<p class="bp-empty">لا توجد إشعارات بعد.</p>';
+    bp.innerHTML=h;
+    Array.prototype.forEach.call(bp.querySelectorAll('.bp-ok'),function(b){b.onclick=function(e){e.stopPropagation();mark(+b.getAttribute('data-no'));};});
+    if($('bpAll'))$('bpAll').onclick=function(e){e.stopPropagation();mark(0);};
+  }
+  bb.onclick=function(e){
+    e.stopPropagation();
+    if(open){close();return;}
+    open=true;bp.hidden=false;bb.setAttribute('aria-expanded','true');
+    place();paint();load();
+  };
+  // نغلق عند الضغط خارج اللوحة، وعند Esc، ونعيد التموضع عند تمرير/تحجيم الصفحة
+  document.addEventListener('click',function(e){if(open&&!bp.contains(e.target))close();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  window.addEventListener('resize',function(){if(open)place();});
+  window.addEventListener('scroll',function(){if(open)place();},{passive:true});
+  // علامة غير المقروء تظهر من أول تحميل الصفحة دون فتح
+  load();
 }
 // اختيار الصف: المادة أولًا (قائمة منبثقة) ثم صفوفها مرتّبة
 var CP_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};

@@ -170,6 +170,11 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS s_attempts(id INTEGER PRIMARY KEY AUTOINCREMENT, class_id INTEGER NOT NULL, name TEXT, lesson_id INTEGER, score REAL, max REAL, n INTEGER, ip TEXT, at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS sa_class ON s_attempts(class_id, at)`,
   `CREATE TABLE IF NOT EXISTS moves(code TEXT PRIMARY KEY, sid TEXT, did TEXT, exp INTEGER NOT NULL)`,
+  // مركز الإشعارات: يضيف المدير الإعلانات من لوحة التحكم، ويتلقاها كل المستخدمين في الجرس بأعلى الشريط.
+  // «مقروء» لكل مستخدم على حدة (جدول منفصل) - تبقى حتى لو مسح المتصفح تخزينه.
+  `CREATE TABLE IF NOT EXISTS notices(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT NOT NULL, url TEXT, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS notice_reads(notice_id INTEGER NOT NULL, user_id INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(notice_id, user_id))`,
+  `CREATE INDEX IF NOT EXISTS nr_user ON notice_reads(user_id)`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
   `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`
@@ -1262,6 +1267,24 @@ export default {
         } catch (e) { lg = 0; }
         return json({ name: me.name, username: me.username, role: me.role, first: lg <= 1 });
       }
+      // ---------- مركز الإشعارات (الجرس) ----------
+      // قائمة الرسائل الموجهة للمعلمين من المدير: الأخيرة أولاً مع حالة «مقروء» الخاصة بهذا المستخدم
+      if (p === '/api/notices') {
+        const N = (await env.DB.prepare('SELECT id,title,body,url,created_at FROM notices ORDER BY id DESC LIMIT 20').all()).results || [];
+        const R = new Set(((await env.DB.prepare('SELECT notice_id FROM notice_reads WHERE user_id = ?').bind(me.id).all()).results || []).map(r => r.notice_id));
+        return json({ notices: N.map(n => ({ ...n, read: R.has(n.id) })) });
+      }
+      if (p === '/api/notices/read' && m === 'POST') {
+        const b = await body(req);
+        if (b.all) {
+          const N = (await env.DB.prepare('SELECT id FROM notices').all()).results || [];
+          await env.DB.batch(N.map(x => env.DB.prepare('INSERT OR IGNORE INTO notice_reads(notice_id,user_id,at) VALUES(?,?,?)').bind(x.id, me.id, now())));
+          return json({ ok: true });
+        }
+        const id = +b.id || 0; if (!id) return json({ error: 'مطلوب رقم الإشعار' }, 400);
+        await env.DB.prepare('INSERT OR IGNORE INTO notice_reads(notice_id,user_id,at) VALUES(?,?,?)').bind(id, me.id, now()).run();
+        return json({ ok: true });
+      }
       if (p === '/quiz') return html('quiz');
       if (p === '/games') return html('games');
       if (p === '/grading') return html('grading');
@@ -1388,6 +1411,23 @@ export default {
       if (p === '/api/admin/stats') return json(await adminStats(env, VAULT));
       if (p === '/api/admin/activity') return json(await adminActivity(env, VAULT));
       if (p === '/api/admin/report') return json(await adminReport(env, Math.max(0, Math.min(3650, +url.searchParams.get('days') || 0)), VAULT));
+      // ---------- إدارة الإشعارات: يكتب المدير الإعلان فيتلقاه كل المعلمين في الجرس ----------
+      if (p === '/api/admin/notices' && m === 'GET') {
+        const N = (await env.DB.prepare('SELECT n.id, n.title, n.body, n.url, n.created_at, (SELECT COUNT(*) FROM notice_reads r WHERE r.notice_id = n.id) reads FROM notices n ORDER BY n.id DESC LIMIT 50').all()).results || [];
+        return json({ notices: N });
+      }
+      if (p === '/api/admin/notices' && m === 'POST') {
+        const b = await body(req);
+        const t = String(b.title || '').trim().slice(0, 120), bd = String(b.body || '').trim().slice(0, 4000), u = String(b.url || '').trim().slice(0, 300);
+        if (!t || !bd) return json({ error: 'اكتب العنوان والنص.' }, 400);
+        await env.DB.prepare('INSERT INTO notices(title,body,url,created_at) VALUES(?,?,?,?)').bind(t, bd, u || null, now()).run();
+        return json({ ok: true });
+      }
+      { const no = p.match(/^\/api\/admin\/notices\/(\d+)$/);
+        if (no && m === 'DELETE') {
+          await env.DB.batch([env.DB.prepare('DELETE FROM notices WHERE id = ?').bind(+no[1]), env.DB.prepare('DELETE FROM notice_reads WHERE notice_id = ?').bind(+no[1])]);
+          return json({ ok: true });
+        } }
       if (p === '/api/admin/courses' && m === 'GET') return json({ courses: await coursesList(env), build: BUILD });
       if (p === '/api/admin/courses' && m === 'POST') {
         const b = await body(req), subject = String(b.subject || '').trim().slice(0, 40), grade = String(b.grade || '').trim().slice(0, 30);

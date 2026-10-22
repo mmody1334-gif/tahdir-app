@@ -1134,6 +1134,24 @@ extra_css += '''
 .menu-list .mi{width:22px;text-align:center}
 .menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 .menu-list #logoutBtn{color:var(--danger,#b23a2b)}
+.bell-btn{position:relative}
+.bell-dot{position:absolute;top:-4px;inset-inline-start:-4px;min-width:17px;height:17px;border-radius:999px;background:#e03131;color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;padding:0 4px;box-shadow:0 0 0 2px var(--paper,#fff)}
+.bell-panel{min-width:300px;max-width:360px;display:block}
+.bp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper,#fff);z-index:1}
+.bp-all{font:inherit;font-size:.78rem;font-weight:700;border:0;background:none;color:var(--main-d,#07493b);cursor:pointer;padding:0}
+.bp-all:hover{text-decoration:underline}
+.bp-list{list-style:none;margin:0;padding:0}
+.bp-it{padding:10px 12px;border-bottom:1px solid var(--line);font-size:.86rem;line-height:1.6}
+.bp-it:last-child{border-bottom:0}
+.bp-it.read{opacity:.62}
+.bp-t{font-weight:700;display:flex;align-items:center;gap:6px}
+.bp-ndot{flex:none;width:8px;height:8px;border-radius:50%;background:#e0861a}
+.bp-b{margin:3px 0;color:var(--mute,#5d7168);overflow-wrap:anywhere}
+.bp-link{font-weight:700;font-size:.8rem}
+.bp-ok{padding:4px 10px !important}
+.bp-read{font-size:.75rem;font-weight:700;color:var(--mute,#5d7168)}
+.bp-date{display:block;font-size:.72rem;color:var(--mute,#5d7168);margin-top:2px}
+.bp-empty{margin:0;padding:18px 12px;text-align:center;color:var(--mute,#5d7168);font-size:.86rem}
 .modal.locked{backdrop-filter:blur(3px)}
 /* ---------- grading page ---------- */
 .gr{padding-block:22px 60px;display:grid;gap:14px}
@@ -1428,6 +1446,9 @@ def NAV(active, extra=''):
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
     # دليل الاستخدام: يُعاد فتحه متى شاء المعلم (يظهر تلقائيًّا في أول دخول)
     h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام">دليلك للاستخدام!</button>'
+    # جرس الإشعارات: إعلانات ديناميكية يضيفها المدير من لوحة التحكم، بنقطة حمراء على غير المقروء.
+    # يُرفق داخل .navmenu ليحصل على نفس موضع قائمة «المزيد» (position:fixed يضبطه common.js)
+    h += '<div class="navmenu"><button type="button" class="btn ghost small bell-btn" id="bellBtn" aria-haspopup="true" aria-expanded="false" title="الإشعارات">🔔<span class="bell-dot" id="bellDot" hidden></span></button><div class="menu-list bell-panel" id="bellPanel" role="dialog" aria-label="الإشعارات" hidden></div></div>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
         ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''

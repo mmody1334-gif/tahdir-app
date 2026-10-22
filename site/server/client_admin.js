@@ -4,7 +4,7 @@ guard();
 // «الشاملة»: نفس اللوحة على /elkabsula، تعرض فقط المعلمين المنقولين إليها (مخفية عن اللوحة الأساسية)
 var VAULT=/^\/elkabsula/.test(location.pathname),VQ=VAULT?'vault=1':'';
 function vq(u){return VQ?u+(u.indexOf('?')>=0?'&':'?')+VQ:u;}
-var data=null,act=null,tab='teachers',q='',rep=null,repDays=30,crs=null,lessonsAll=null,openCourse=null;
+var data=null,act=null,tab='teachers',q='',rep=null,repDays=30,crs=null,lessonsAll=null,openCourse=null,ntc=null;
 var GRADES=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
 function gn(g){var i=GRADES.indexOf(g);return i<0?99:i;}
 var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جهاز إضافي مرفوض',disabled:'حساب موقوف',locked:'محاولات كثيرة'};
@@ -12,7 +12,7 @@ var REASONS={wrong_password:'كلمة مرور خاطئة',device_limit:'جها�
 // وإلا ظهر الحدث في السجل بنصه الإنجليزي الخام.
 var TYPES={login:'دخول',view:'فتح درس',copy_all:'نسخ التحضير كاملًا',copy_json:'نسخ لأداة نور',copy_field:'نسخ خانة',copy_hw:'نسخ الواجب',send_prep:'إرسال تحضير إلى نور',send_hw:'إرسال واجب إلى نور',quiz_make:'تكوين اختبار قصير',review_make:'تكوين مراجعة وحدة',quiz_print:'طباعة اختبار',quiz_word:'تحميل اختبار Word',quiz_save:'حفظ اختبار',remedial_make:'تكوين خطة علاجية / نشاط صفي',remedial_print:'طباعة خطة علاجية',remedial_word:'تحميل خطة علاجية Word',summary_make:'تكوين ملخص',summary_print:'طباعة ملخص',summary_word:'تحميل ملخص Word',finals_open:'فتح الاختبارات النهائية',finals_print:'طباعة أسئلة وزارية',game_play:'تشغيل لعبة',game_live:'تحدٍّ مباشر بالجوالات',grade_start:'بدء تصحيح واجب',tasks_fetch:'جلب مهام نور',device_stale_removed:'إزالة جهاز مهمل تلقائيًا'};
 function load(){
-  return Promise.all([api(vq('/api/admin/stats')),api(vq('/api/admin/activity')),api('/api/admin/courses'),api('/api/lessons'),api(vq('/api/admin/report?days='+repDays))]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];render();},function(e){if(e.message==='vault_locked')return vaultLock();toast(e.message);});
+  return Promise.all([api(vq('/api/admin/stats')),api(vq('/api/admin/activity')),api('/api/admin/courses'),api('/api/lessons'),api(vq('/api/admin/report?days='+repDays)),api(vq('/api/admin/notices'))]).then(function(r){data=r[0];act=r[1];crs=r[2];lessonsAll=r[3].lessons;rep=r[4];ntc=r[5];render();},function(e){if(e.message==='vault_locked')return vaultLock();toast(e.message);});
 }
 // «الشاملة» محمية بكلمة مرور خاصة تُطلب مرة لكل جلسة دخول
 function vaultLock(){
@@ -229,12 +229,40 @@ function activityView(){
   return '<div class="two"><section class="card"><h3>آخر النشاطات</h3><ul class="feed">'+(ev||'<li class="muted">لا يوجد نشاط بعد.</li>')+'</ul></section>'+
     '<section class="card"><h3>محاولات دخول مرفوضة</h3><p class="muted">الصف الأحمر يعني أن أحدًا حاول الدخول بحساب معلم من جهاز ثالث.</p><ul class="feed">'+(fa||'<li class="muted">لا توجد محاولات مرفوضة.</li>')+'</ul></section></div>';
 }
+// ---------- الإشعارات (الجرس) ----------
+// الإعلان الذي يكتبه المدير هنا يظهر لكل المعلمين في جرس أعلى الشريط، مع عدد القراءات.
+function noticesView(){
+  var list=(ntc&&ntc.notices)||[];
+  var h='<div class="toolbar"><p class="muted" style="flex:1;margin:0">الإعلان الذي تضيفه يظهر لكل المعلمين في جرس 🔔 أعلى الشريط. يستطيع كل معلم تعليمه «مقروء» بنفسه، وتشاهد هنا كم شخصًا قرأه.</p><button type="button" class="btn primary" id="addNotice">+ إعلان جديد</button></div>';
+  h+=list.length?'<div class="t-wrap"><table class="tbl" style="min-width:640px"><thead><tr><th>العنوان والنص</th><th>الرابط</th><th>قرأه</th><th>التاريخ</th><th></th></tr></thead><tbody>'+list.map(function(n){
+    return '<tr><td><b>'+esc(n.title)+'</b><div class="sub">'+esc(n.body.length>140?n.body.slice(0,140)+'…':n.body)+'</div></td>'+
+      '<td>'+(n.url?'<a href="'+esc(n.url)+'" target="_blank" rel="noopener" class="sub ltr">رابط ↗</a>':'<span class="muted">—</span>')+'</td>'+
+      '<td class="num">'+n.reads+'</td><td>'+esc(fmtDate(n.created_at))+'</td>'+
+      '<td><button type="button" class="btn small danger" data-delno="'+n.id+'">حذف</button></td></tr>';
+  }).join('')+'</tbody></table></div>':'<div class="empty-state">لا توجد إعلانات بعد. اضغط «إعلان جديد» وسيظهر في جرس كل معلم.</div>';
+  return h;
+}
+function addNotice(){
+  var h='<div class="ed"><label>العنوان<input id="n_title" maxlength="120" placeholder="مثال: صيانة نور مساء اليوم"></label>'+
+    '<label>النص<textarea id="n_body" rows="5" maxlength="4000" placeholder="اكتب نص الإعلان…"></textarea></label>'+
+    '<label>رابط (اختياري)<input id="n_url" dir="ltr" placeholder="https://…"></label></div>';
+  var ov=$('modal'),box=$('modalBox');
+  box.innerHTML='<h3 id="mTitle">إعلان جديد للمعلمين</h3>'+h+'<div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">نشر</button></div>';ov.hidden=false;
+  var close=function(){ov.hidden=true;box.innerHTML='';};
+  $('mCancel').onclick=close;
+  $('mOk').onclick=function(){
+    var b={title:$('n_title').value.trim(),body:$('n_body').value.trim(),url:$('n_url').value.trim()};
+    if(!b.title||!b.body){toast('اكتب العنوان والنص');return;}
+    api('/api/admin/notices',b).then(function(){close();toast('نُشر الإعلان — يظهر في جرس كل المعلمين');load();},function(e){toast(e.message);});
+  };
+}
 function render(){
-  var T=[['teachers','المعلمون'],['report','تقرير الاستخدام'],['courses','المواد والدروس'],['activity','النشاط والتنبيهات']];
+  var T=[['teachers','المعلمون'],['report','تقرير الاستخدام'],['courses','المواد والدروس'],['activity','النشاط والتنبيهات'],['notices','الإشعارات']];
   var h=(tab==='report'?'':kpis())+'<div class="tabs" role="tablist">'+T.map(function(t){return '<button type="button" role="tab" class="tab'+(tab===t[0]?' on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   if(tab==='teachers')h+='<div class="toolbar"><input id="search" placeholder="ابحث باسم المعلم" value="'+esc(q)+'">'+(VAULT?'':'<button type="button" class="btn primary" id="addBtn">إضافة معلمين</button>')+'</div>'+teacherRows();
   else if(tab==='report')h+=reportView();
   else if(tab==='courses')h+=coursesView();
+  else if(tab==='notices')h+=noticesView();
   else h+=activityView();
   $('dash').innerHTML=h;
   Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'),function(b){b.onclick=function(){tab=b.getAttribute('data-tab');render();};});
@@ -249,6 +277,8 @@ function render(){
   if($('delCourse'))$('delCourse').onclick=function(){api('/api/admin/courses?key='+encodeURIComponent(openCourse),null,'DELETE').then(function(){openCourse=null;load();toast('حُذف');},function(e){toast(e.message);});};
   Array.prototype.forEach.call(document.querySelectorAll('[data-editl]'),function(b){b.onclick=function(){var l=lessonsAll.filter(function(x){return x.id===+b.getAttribute('data-editl');})[0];if(l)lessonForm(openCourse,l);};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-dell]'),function(b){b.onclick=function(){dialog({title:'حذف هذا الدرس؟',message:'يُحذف من صفحة الدروس لكل المعلمين.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/custom_lessons/'+b.getAttribute('data-dell'),null,'DELETE').then(function(){toast('حُذف الدرس');load();});});};});
+  if($('addNotice'))$('addNotice').onclick=addNotice;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-delno]'),function(b){b.onclick=function(){dialog({title:'حذف هذا الإعلان؟',message:'يُحذف من جرس كل المعلمين.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/notices/'+b.getAttribute('data-delno'),null,'DELETE').then(function(){toast('حُذف الإعلان');load();},function(e){toast(e.message);});});};});
 }
 function addTeachers(){
   // قوائم منسدلة بدل شبكة ضخمة بكل المقررات: مادة واحدة تُفتح لتُظهر صفوفها،
