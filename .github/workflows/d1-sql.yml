@@ -26,11 +26,6 @@ jobs:
         run: |
           set -u
           url=https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/d1/database/$CF_DB/query
-          for i in 1 2; do
-            v=$(printf '%s' "$SQL$i" 2>/dev/null)
-            case $i in 1) v="$SQL1";; 2) v="$SQL2";; esac
-            [ -z "$v" ] && continue
-            echo "===== SQL$i: $v"
-            PAY=$(python3 -c "import json,sys;print(json.dumps({'sql':sys.argv[1]}))" "$v")
-            curl -sS -X POST "$url" -H "Authorization: Bearer $CF_TOK" -H "Content-Type: application/json" -d "$PAY" | python3 -m json.tool | head -c 4000; echo
-          done
+          runq() { echo "===== SQL: ${1:0:80}"; PAY=$(python3 -c "import json,sys;print(json.dumps({'sql':sys.argv[1]}))" "$1"); curl -sS -X POST "$url" -H "Authorization: Bearer $CF_TOK" -H "Content-Type: application/json" -d "$PAY" | python3 -m json.tool | head -c 4000; echo; }
+          [ -n "$SQL1" ] && runq "$SQL1"
+          [ -n "$SQL2" ] && runq "$SQL2"
