@@ -330,7 +330,8 @@ function toolDialog(reason){
           (link?'<div class="iosg-l"><a href="'+link+'" target="_blank" rel="noopener">افتحه الآن ←</a></div>':'')+
         '</div></div>';
       }
-      return '<div class="iosg">'+
+      return '<button type="button" class="btn primary" id="iosPlayBtn" style="width:100%;margin:2px 0 6px">🎬 عرض تفاعلي — ٤٠ ثانية</button>'+
+      '<div class="iosg">'+
         step('١','ثبّت <b>Userscripts</b> — مجاني',[
           ['App Store','بحث','@Userscripts','احصل']
         ],'https://apps.apple.com/app/userscripts/id1463298887')+
@@ -420,6 +421,8 @@ function toolDialog(reason){
       Array.prototype.forEach.call(document.querySelectorAll('.tt-pane'),function(x){x.classList.toggle('on',x.getAttribute('data-pane')===k);});
     };
   });
+  // زر «العرض التفاعلي» في تبويب iPhone (دالة iosPlay معرفة لاحقًا — الربط برفعها ينجح)
+  if($('iosPlayBtn'))$('iosPlayBtn').onclick=iosPlay;
   return pr.then(function(r){if(!r)return;window.open(TOOL_URL,'_blank');});
 }
 // ---------- مسح الأداة ----------
@@ -452,6 +455,81 @@ function toolRemove(){
   Array.prototype.forEach.call(document.querySelectorAll('#modalBox [data-copy]'),function(b){b.onclick=function(){copyText(b.getAttribute('data-copy'));};});
   return pr;
 }
+// ---------- عرض تفاعلي لخطوات تثبيت الآيفون ----------
+// بديل الفيديو: يشتغل على أي جهاز بلا استضافة ولا يوتيوب، ومشاهده من نفس أنماط المرشد
+// (iosg-*) فيبقى متزامنًا مع نصه عند أي تحديث. تقديم تلقائي بين الخطوات مع تشغيل/إيقاف
+// وتنقّل يدوي وشريط تقدّم، وزر إغلاق وEscape.
+function iosPlay(){
+  if($('tvOv'))return;
+  // لكل مشهد: العنوان، محتوى محاكاة (نفس أنماط iosg)، مدة العرض
+  function row(parts){return '<div class="iosg-row">'+parts+'</div>';}
+  function el(x,tap){return '<span class="iosg-el'+(tap?' iosg-tap':'')+'">'+esc(x)+'</span>';}
+  var S=[
+    {t:'١ · ثبّت تطبيق <b>Userscripts</b> — مجاني',ms:7000,h:
+      '<div class="iosg-t">متجر التطبيقات — App Store</div>'+
+      row(el('App Store')+el('بحث')+el('Userscripts',1)+el('احصل',1))+
+      '<div class="tos-n">أيقونته سوداء. التثبيت مجاني، ومرة واحدة فقط.</div>'},
+    {t:'٢ · فعّل الإضافة وامنح الإذن',ms:9000,h:
+      '<div class="iosg-t">الإعدادات » Safari » الإضافات</div>'+
+      row(el('الإعدادات',1)+el('Safari')+el('الإضافات'))+
+      row(el('Userscripts','مفتاح: شغّل')+el('كل المواقع: سماح',1))+
+      '<div class="tos-n">iOS 26+: الإعدادات ← التطبيقات ← Safari ← الإضافات.</div>'},
+    {t:'٣ · افتح نافذة التثبيت من المنصة',ms:8000,h:
+      '<div class="iosg-t">elkabsula.site</div>'+
+      row(el('زر «أداة نور»',1)+el('تبويب iPhone 📱')+el('تثبيت الأداة',1))+
+      '<div class="tos-n">تفتح صفحة الأداة في سافاري — هذا سليم.</div>'},
+    {t:'٤ · ثبّت الأداة في سافاري',ms:10000,h:
+      '<div class="iosg-t">صفحة الأداة في سافاري</div>'+
+      row(el('شريط العنوان')+el('aA',1)+el('Userscripts')+el('Install',1)+el('تم'))+
+      '<div class="tos-n">⚠️ لو ظهر «كود نصّي» بلا زر Install: <b>Userscripts غير مفعّل</b> — أكمل الخطوة ٢.</div>'},
+    {t:'٥ · حدّث صفحة المنصة وبدّأ',ms:7000,h:
+      '<div class="iosg-t">elkabsula.site بعد التحديث</div>'+
+      row(el('تحديث الصفحة')+el('أداة نور ✓',1))+
+      '<div class="tos-n">من هنا: كل درس فيه زر «إرسال التحضير إلى نور» يملأ كل شيء تلقائيًا.</div>'}
+  ];
+  var i=0,playing=true,tm=null,tLeft=0,last=0;
+  var ov=document.createElement('div');ov.id='tvOv';ov.className='tv-ov';
+  ov.innerHTML='<div class="tv-card">'+
+    '<div class="tv-bar"><b id="tvT"></b><button type="button" class="tv-x" id="tvX" aria-label="إغلاق">✕</button></div>'+
+    '<div class="tv-stage" id="tvStage"></div>'+
+    '<div class="tv-foot"><button type="button" class="tv-btn" id="tvPrev" aria-label="السابق">‹</button>'+
+    '<button type="button" class="tv-btn pri" id="tvPlay" aria-label="تشغيل/إيقاف">⏸</button>'+
+    '<button type="button" class="tv-btn" id="tvNext" aria-label="التالي">›</button>'+
+    '<span class="tv-prog"><span class="tv-fill" id="tvFill"></span></span></div>'+
+    '<div class="tv-n" id="tvN"></div></div>';
+  document.body.appendChild(ov);
+  function cleanup(){clearTimeout(tm);document.removeEventListener('keydown',onkey);}
+  function close(){cleanup();if(ov.parentNode)ov.parentNode.removeChild(ov);}
+  function onkey(e){if(e.key==='Escape')close();else if(e.key==='ArrowRight')show(i+1);else if(e.key==='ArrowLeft')show(i-1);}
+  function show(n){
+    i=(n+S.length)%S.length;
+    $('tvT').innerHTML=S[i].t;
+    $('tvStage').innerHTML='<div class="iosg">'+S[i].h+'</div>';
+    $('tvN').textContent='الخطوة '+(i+1)+' من '+S.length;
+    $('tvFill').style.width='0%';
+    play();
+  }
+  function play(){
+    playing=true;if($('tvPlay'))$('tvPlay').textContent='⏸';
+    tLeft=S[i].ms;last=Date.now();tick();
+  }
+  function tick(){
+    if(!playing)return;
+    tLeft=Math.max(0,tLeft-(Date.now()-last));last=Date.now();
+    var p=1-tLeft/S[i].ms;if($('tvFill'))$('tvFill').style.width=Math.round(p*100)+'%';
+    if(tLeft<=0){show(i+1);return;}
+    tm=setTimeout(tick,200);
+  }
+  function pause(){playing=false;clearTimeout(tm);if($('tvPlay'))$('tvPlay').textContent='▶';}
+  $('tvX').onclick=close;
+  $('tvPrev').onclick=function(){pause();show(i-1);};
+  $('tvNext').onclick=function(){pause();show(i+1);};
+  $('tvPlay').onclick=function(){playing?pause():play();};
+  $('tvStage').onclick=function(){pause();show(i+1);};
+  document.addEventListener('keydown',onkey);
+  show(0);
+}
+
 // تنبيه غير حاجب: نُخبر المعلم أن هناك إصدارًا أحدث، ولا نمنعه من العمل.
 // (الحجب كان يسبب تعطّلًا كاملًا لو تعذّر قراءة الإصدار لأي سبب.)
 var UPD_KEY='tahdir_tool_upd';

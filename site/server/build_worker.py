@@ -1196,6 +1196,22 @@ extra_css += '''
 .iosg-el.iosg-tap:after{content:'←';position:absolute;inset-inline-end:5px;top:50%;transform:translateY(-50%);font-size:.95rem;animation:iosgArrow .9s ease-in-out infinite}
 @keyframes iosgArrow{0%,100%{transform:translateY(-50%) translateX(0);opacity:1}50%{transform:translateY(-50%) translateX(-4px);opacity:.6}}
 .iosg-l{margin-top:4px}
+/* ---------- مشغّل «عرض خطوات التثبيت» التفاعلي (الآيفون) ---------- */
+/* بديل كامل عن الفيديو: يشتغل على أي جهاز، بلا استضافة ولا يوتيوب، ويبقى متزامنًا
+   مع نص المرشد لأنه من نفس كود المنصة. تقديمًا تلقائي مع تشغيل/إيقاف وتنقل يدوي. */
+.tv-ov{position:fixed;inset:0;z-index:120;background:rgba(8,24,18,.74);display:grid;place-items:center;padding:14px}
+.tv-card{width:min(480px,100%);max-height:min(88vh,760px);overflow-y:auto;overscroll-behavior:contain;background:var(--paper,#fff);color:var(--ink,#10261f);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.45);padding:0 0 10px}
+.tv-bar{display:flex;align-items:center;gap:8px;padding:12px 14px 8px}
+.tv-bar b{flex:1;font-size:.95rem;line-height:1.5}
+.tv-x{flex:none;border:0;background:#eef3f1;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;color:#374b45}
+.tv-stage{padding:10px 14px 4px;border-top:1px solid var(--line);min-height:190px}
+.tv-foot{display:flex;align-items:center;gap:8px;padding:10px 14px 0}
+.tv-btn{flex:none;border:0;background:#eef3f1;border-radius:50%;width:34px;height:34px;font-size:14px;cursor:pointer;color:#374b45;font-family:inherit}
+.tv-btn.pri{background:var(--main,#1f8a70);color:#fff;font-weight:800}
+.tv-prog{flex:1;height:5px;border-radius:99px;background:#e8e6df;overflow:hidden}
+.tv-fill{display:block;height:100%;width:0;background:var(--main,#1f8a70);transition:width .25s linear}
+.tv-n{font-size:.76rem;color:var(--mute,#5b6d67);text-align:center;padding-top:7px}
+.tos-n{font-size:.78rem;color:var(--mute,#5b6d67);margin-top:4px;line-height:1.6}
 .iosg-l a{font-size:.78rem;font-weight:700;color:var(--main,#1f8a70)}
 @media(prefers-reduced-motion:reduce){.iosg-el.iosg-tap:after{animation:none}}
 @media(max-width:640px){.iosg-el{font-size:.72rem;padding:4px 7px}.iosg-el.iosg-tap{padding-inline-end:20px}}
