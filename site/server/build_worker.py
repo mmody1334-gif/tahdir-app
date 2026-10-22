@@ -1127,6 +1127,8 @@ extra_css += '''
 .menu-btn:hover{background:#eafff6}
 .menu-list{position:fixed;z-index:80;min-width:250px;background:var(--paper,#fff);color:var(--ink,#10261f);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.22);padding:6px;display:grid;gap:2px}
 .menu-list[hidden]{display:none}
+.menu-list{overflow-y:auto;overscroll-behavior:contain;max-height:calc(100vh - 80px)}
+@media (min-width:701px){.menu-list{grid-template-columns:1fr 1fr;min-width:520px;column-gap:4px}.menu-list hr{grid-column:1/-1}.menu-list #logoutBtn{grid-column:1/-1}}
 .menu-list a,.menu-list button{display:flex;align-items:center;gap:10px;width:100%;text-align:start;font:inherit;font-size:.92rem;font-weight:600;color:inherit;text-decoration:none;background:none;border:0;border-radius:10px;padding:9px 12px;cursor:pointer}
 .menu-list a:hover,.menu-list button:hover,.menu-list a[aria-current]{background:var(--main-l,#e6f4ef);color:var(--main-d,#07493b)}
 .menu-list .mi{width:22px;text-align:center}
@@ -1248,7 +1250,7 @@ extra_css += '''
 .chk-tbl th,.chk-tbl td{border:1px solid var(--line);padding:5px 8px;text-align:right;vertical-align:top}
 .chk-tbl th{background:#eef5f1}
 .chk-q{font-size:.8rem;color:#333;line-height:1.6}
-@media (max-width:700px){.menu-list{top:auto!important;left:0!important;right:0!important;margin:6px!important}}
+@media (max-width:700px){.menu-list{top:auto!important;bottom:0;left:0!important;right:0!important;margin:6px!important;max-height:78vh;border-radius:16px}}
 '''
 extra_css += '''
 /* ===== «تقني حذيفة»: هوية فاتحة (أبيض + أزرق ملكي + لمسة برتقالية) وشعار نصّي بخط كوفي ===== */

@@ -428,9 +428,10 @@ function initNav(me){
   var mb=$('menuBtn'),ml=$('menuList');
   if(mb&&ml){
     var close=function(){ml.hidden=true;mb.setAttribute('aria-expanded','false');};
-    var place=function(){if(window.innerWidth<=700){ml.style.top=ml.style.left='';return;}var r=mb.getBoundingClientRect();ml.style.top=(r.bottom+8)+'px';ml.style.left=Math.max(8,Math.min(r.left,window.innerWidth-ml.offsetWidth-8))+'px';};
+    // القائمة لا تتجاوز الشاشة: لها ارتفاع أقصى وتتمرر من داخلها، فتبقى كل عناصرها في المتناول
+    var place=function(){if(window.innerWidth<=700){ml.style.top=ml.style.left=ml.style.maxHeight='';return;}var r=mb.getBoundingClientRect(),top=Math.max(8,r.bottom+8);ml.style.top=top+'px';ml.style.maxHeight=(window.innerHeight-top-12)+'px';ml.style.left=Math.max(8,Math.min(r.left,window.innerWidth-ml.offsetWidth-8))+'px';};
     mb.onclick=function(e){e.stopPropagation();var o=ml.hidden;ml.hidden=!o;mb.setAttribute('aria-expanded',o?'true':'false');if(o)place();};
-    window.addEventListener('resize',function(){if(!ml.hidden)place();});window.addEventListener('scroll',function(){if(!ml.hidden)close();},{passive:true});
+    window.addEventListener('resize',function(){if(!ml.hidden)place();});window.addEventListener('scroll',function(){if(!ml.hidden)place();},{passive:true});
     document.addEventListener('click',function(e){if(!ml.hidden&&(!ml.contains(e.target)||(e.target.closest&&e.target.closest('button,a'))))close();});
     document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
   }
