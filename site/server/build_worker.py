@@ -1135,7 +1135,16 @@ extra_css += '''
 .menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 .menu-list #logoutBtn{color:var(--danger,#b23a2b)}
 .bell-btn{position:relative}
+.bell-ic{display:inline-block}
 .bell-dot{position:absolute;top:-4px;inset-inline-start:-4px;min-width:17px;height:17px;border-radius:999px;background:#e03131;color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;padding:0 4px;box-shadow:0 0 0 2px var(--paper,#fff)}
+/* إضاءة الجرس: لهب حول الزر + اهتزاز الجرس نفسه فيتعرّف المعلم من بعيد أن إعلانًا جديدًا
+   وصل، وتنطفئ الإضاءة فور فتح اللوحة (aria-expanded) أو تعليمها مقروءة. */
+@keyframes bellGlow{0%,100%{box-shadow:0 0 0 0 rgba(224,49,49,.45)}50%{box-shadow:0 0 0 9px rgba(224,49,49,0)}}
+@keyframes bellShake{0%,100%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-11deg)}45%{transform:rotate(7deg)}60%{transform:rotate(-5deg)}75%{transform:rotate(2deg)}}
+.bell-btn.unread{color:#c92a2a;font-weight:700;border-color:rgba(224,49,49,.6);animation:bellGlow 2.2s ease-in-out infinite}
+.bell-btn.unread .bell-ic{transform-origin:50% 0;animation:bellShake 2.2s ease-in-out infinite}
+.bell-btn[aria-expanded="true"]{animation:none;box-shadow:none}
+.bell-btn[aria-expanded="true"] .bell-ic{animation:none}
 .bell-panel{min-width:300px;max-width:360px;display:block}
 .bp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper,#fff);z-index:1}
 .bp-all{font:inherit;font-size:.78rem;font-weight:700;border:0;background:none;color:var(--main-d,#07493b);cursor:pointer;padding:0}
@@ -1448,7 +1457,7 @@ def NAV(active, extra=''):
     h += '<button type="button" class="btn ghost small" id="tourBtn" title="دليل الاستخدام">دليلك للاستخدام!</button>'
     # جرس الإشعارات: إعلانات ديناميكية يضيفها المدير من لوحة التحكم، بنقطة حمراء على غير المقروء.
     # يُرفق داخل .navmenu ليحصل على نفس موضع قائمة «المزيد» (position:fixed يضبطه common.js)
-    h += '<div class="navmenu"><button type="button" class="btn ghost small bell-btn" id="bellBtn" aria-haspopup="true" aria-expanded="false" title="الإشعارات">🔔<span class="bell-dot" id="bellDot" hidden></span></button><div class="menu-list bell-panel" id="bellPanel" role="dialog" aria-label="الإشعارات" hidden></div></div>'
+    h += '<div class="navmenu"><button type="button" class="btn ghost small bell-btn" id="bellBtn" aria-haspopup="true" aria-expanded="false" title="الإشعارات"><span class="bell-ic" aria-hidden="true">🔔</span><span class="bell-dot" id="bellDot" hidden></span></button><div class="menu-list bell-panel" id="bellPanel" role="dialog" aria-label="الإشعارات" hidden></div></div>'
     h += '<div class="navmenu"><button type="button" class="btn small menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">☰ المزيد</button><div class="menu-list" id="menuList" role="menu" hidden>'
     for k, href, ic, t in MENU_ITEMS:
         ext = ' target="_blank" rel="noopener"' if href.startswith('http') else ''

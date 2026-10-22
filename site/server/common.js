@@ -485,6 +485,8 @@ function initNotices(me){
   function paint(){
     var unread=data.filter(function(n){return !n.read;}).length;
     var dot=$('bellDot');if(dot)dot.hidden=!unread;
+    // إضاءة توهج واهتزاز على الجرس طالما هناك غير مقروء — تتوقف آخر فتح اللوحة (CSS)
+    bb.classList.toggle('unread',!!unread);
     var h='<div class="bp-head"><b>🔔 الإشعارات</b>'+(unread?'<button type="button" class="bp-all" id="bpAll">حدّد الكل مقروءًا</button>':'')+'</div>';
     h+=data.length?'<ul class="bp-list">'+data.slice(0,15).map(function(n){
       return '<li class="bp-it'+(n.read?' read':'')+'">'+

@@ -231,29 +231,45 @@ function activityView(){
 }
 // ---------- الإشعارات (الجرس) ----------
 // الإعلان الذي يكتبه المدير هنا يظهر لكل المعلمين في جرس أعلى الشريط، مع عدد القراءات.
+// الجرس يُضيء وتهتز أيقونته لكافة المعلمين ما دام الإعلان غير مقروء عندهم.
 function noticesView(){
   var list=(ntc&&ntc.notices)||[];
-  var h='<div class="toolbar"><p class="muted" style="flex:1;margin:0">الإعلان الذي تضيفه يظهر لكل المعلمين في جرس 🔔 أعلى الشريط. يستطيع كل معلم تعليمه «مقروء» بنفسه، وتشاهد هنا كم شخصًا قرأه.</p><button type="button" class="btn primary" id="addNotice">+ إعلان جديد</button></div>';
+  var h='<div class="toolbar"><p class="muted" style="flex:1;margin:0">أرسل إشعارًا لكل المعلمين: ما تنشره هنا يصل إلى جرس 🔔 أعلى الشريط عند كل معلم، ويضيء الجرس وتهتز أيقونته حتى يفتحه. كل معلم يعلم الإعلان «مقروء» بنفسه، وتشاهد هنا كم شخصًا قرأ كل إعلان.</p><button type="button" class="btn primary" id="addNotice">+ إرسال إشعار</button></div>';
+  h+='<div class="kpis"><div class="kpi"><span class="kpi-n">'+list.length+'</span><span class="kpi-l">إعلان منشور</span></div><div class="kpi"><span class="kpi-n">'+list.reduce(function(s,n){return s+n.reads;},0)+'</span><span class="kpi-l">مجموع القراءات</span></div><div class="kpi"><span class="kpi-n">'+list.reduce(function(s,n){return s+(n.reads>0?1:0);},0)+'</span><span class="kpi-l">إعلان قرأه أحدهم</span></div></div>';
   h+=list.length?'<div class="t-wrap"><table class="tbl" style="min-width:640px"><thead><tr><th>العنوان والنص</th><th>الرابط</th><th>قرأه</th><th>التاريخ</th><th></th></tr></thead><tbody>'+list.map(function(n){
     return '<tr><td><b>'+esc(n.title)+'</b><div class="sub">'+esc(n.body.length>140?n.body.slice(0,140)+'…':n.body)+'</div></td>'+
       '<td>'+(n.url?'<a href="'+esc(n.url)+'" target="_blank" rel="noopener" class="sub ltr">رابط ↗</a>':'<span class="muted">—</span>')+'</td>'+
       '<td class="num">'+n.reads+'</td><td>'+esc(fmtDate(n.created_at))+'</td>'+
       '<td><button type="button" class="btn small danger" data-delno="'+n.id+'">حذف</button></td></tr>';
-  }).join('')+'</tbody></table></div>':'<div class="empty-state">لا توجد إعلانات بعد. اضغط «إعلان جديد» وسيظهر في جرس كل معلم.</div>';
+  }).join('')+'</tbody></table></div>':'<p class="muted">لا توجد إعلانات منشورة بعد.</p>';
   return h;
 }
+// قوالب جاهزة: أكثر ما يرسله المدير «إضافة» و«تحديث» و«صيانة» — بضغطة تُعبّأ ثم يعدّل النص ويجري
+var NO_TPL=[
+  ['add','إضافة جديدة','إضافة جديدة على الموقع 🔔','أُضيفت إضافات جديدة إلى الموقع — افتح صفحة الدروس واستكشف الجديد، والجرس في أعلى الشريط يخبرك بكل إضافة قادمة.'],
+  ['up','تحديث الموقع','تحديث الموقع 🔔','حُدّث الموقع بميزات جديدة. التحديث يتم تلقائيًا — أعد فتح الصفحة فقط لتحصل على الأحدث.'],
+  ['mtn','صيانة مسائية','تنبيه صيانة مسائية','سيكون هناك فترة صيانة الليلة قد تتعطل خلالها بعض الخدمات مؤقتًا. أعد فتح الصفحة بعدها واعمل كالعادة.']];
 function addNotice(){
-  var h='<div class="ed"><label>العنوان<input id="n_title" maxlength="120" placeholder="مثال: صيانة نور مساء اليوم"></label>'+
-    '<label>النص<textarea id="n_body" rows="5" maxlength="4000" placeholder="اكتب نص الإعلان…"></textarea></label>'+
+  var h='<p class="muted small" style="margin:4px 0 8px">اختر قالبًا جاهزًا بضغطة ثم عدّل نصه، أو اكتب إشعارك مباشرة. ينشر بمجرد الضغط «نشر الإشعار» ويضيء الجرس لكل المعلمين.</p>'+
+    '<div class="n-tp" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+NO_TPL.map(function(t){return '<button type="button" class="btn small" data-tpl="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>'+
+    '<div class="ed"><label>العنوان<input id="n_title" maxlength="120" placeholder="مثال: صيانة نور مساء اليوم"></label>'+
+    '<label>النص<textarea id="n_body" rows="5" maxlength="4000" placeholder="اكتب نص الإشعار…"></textarea></label>'+
     '<label>رابط (اختياري)<input id="n_url" dir="ltr" placeholder="https://…"></label></div>';
   var ov=$('modal'),box=$('modalBox');
-  box.innerHTML='<h3 id="mTitle">إعلان جديد للمعلمين</h3>'+h+'<div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">نشر</button></div>';ov.hidden=false;
+  box.innerHTML='<h3 id="mTitle">إرسال إشعار لكل المعلمين</h3>'+h+'<div class="m-actions"><button type="button" class="btn" id="mCancel">إلغاء</button><button type="button" class="btn primary" id="mOk">نشر الإشعار</button></div>';ov.hidden=false;
+  Array.prototype.forEach.call(box.querySelectorAll('[data-tpl]'),function(b){
+    b.onclick=function(){
+      var t=NO_TPL.filter(function(x){return x[0]===b.getAttribute('data-tpl');})[0];
+      $('n_title').value=t[2];$('n_body').value=t[3];
+      var f=$('n_body');f.focus();f.setSelectionRange(f.value.length,f.value.length);
+    };
+  });
   var close=function(){ov.hidden=true;box.innerHTML='';};
   $('mCancel').onclick=close;
   $('mOk').onclick=function(){
     var b={title:$('n_title').value.trim(),body:$('n_body').value.trim(),url:$('n_url').value.trim()};
     if(!b.title||!b.body){toast('اكتب العنوان والنص');return;}
-    api('/api/admin/notices',b).then(function(){close();toast('نُشر الإعلان — يظهر في جرس كل المعلمين');load();},function(e){toast(e.message);});
+    api('/api/admin/notices',b).then(function(){close();toast('نُشر الإشعار — وصل لجرس كل المعلمين مع إضاءة 🔔');load();},function(e){toast(e.message);});
   };
 }
 function render(){

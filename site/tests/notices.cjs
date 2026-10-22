@@ -89,9 +89,15 @@ async function post(u, b, body, method) {
   const counts = (adm2.j.notices || []).map(n => n.reads);
   ok('العدّاد يظهر 1 للإعلان الذي قرأته نورة', adm2.status === 200 && (counts[1] === 1 || counts[0] === 1), JSON.stringify(counts));
 
-  // ---------- الجرس في الصفحة: يوجد ويفتح ويُظهر الإعلان ----------
-  await pT.goto(B + '/app', { waitUntil: 'domcontentloaded' });
-  await pT.waitForTimeout(2600);
+  // ---------- الجرس في الصفحة: يوجد ويضيء للغير مقروء ويفتح ويُعرض ----------
+  await pT2.goto(B + '/app', { waitUntil: 'domcontentloaded' });
+  await pT2.waitForTimeout(2600);
+  const glow = await pT2.evaluate(() => {
+    const bb = document.getElementById('bellBtn'), dot = document.getElementById('bellDot');
+    if (!bb || !dot) return { found: false };
+    return { found: true, unread: bb.classList.contains('unread'), dotVisible: !dot.hidden };
+  });
+  ok('الجرس يضيء عند وجود غير مقروء', glow.found === true && glow.unread === true && glow.dotVisible === true, JSON.stringify(glow).slice(0, 100));
   const bell = await pT.evaluate(() => {
     const bb = document.getElementById('bellBtn'), bp = document.getElementById('bellPanel');
     if (!bb || !bp) return { found: false };
@@ -104,6 +110,23 @@ async function post(u, b, body, method) {
   });
   ok('زر الجرس موجود في /app', bell.found === true, '');
   ok('الجرس يفتح ويعرض الإعلان «مقروء»', bell.open === true && bell.hasTitle && bell.hasItem, JSON.stringify(bell).slice(0, 140));
+
+  // ---------- لوحة الأدمن: زر الإرسال + قوالب جاهزة بضغطة ----------
+  await pA.goto(B + '/admin', { waitUntil: 'domcontentloaded' });
+  await pA.waitForTimeout(2800);
+  const tabs = await pA.evaluate(() => Array.prototype.map.call(document.querySelectorAll('[data-tab]'), function (b) { return b.getAttribute('data-tab'); }));
+  ok('تبويب «الإشعارات» موجود في اللوحة', tabs.indexOf('notices') >= 0, tabs.join(','));
+  const tpl = await pA.evaluate(() => {
+    const btn = document.getElementById('addNotice');
+    if (!btn) return { found: false };
+    btn.click();
+    return new Promise(res => setTimeout(() => {
+      const tps = document.querySelectorAll('[data-tpl]');
+      const filled = tps.length ? (function () { tps[0].click(); return document.getElementById('n_title').value.length > 0 && document.getElementById('n_body').value.length > 20; })() : false;
+      res({ found: true, n: tps.length, filled });
+    }, 350));
+  });
+  ok('نافذة الإرسال فيها 3 قوالب جاهزة تُعبّئ الحقول', tpl.found === true && tpl.n === 3 && tpl.filled === true, JSON.stringify(tpl).slice(0, 100));
 
   // ---------- الحذف يزيل الإعلان وقراءاته ----------
   const del = await post(pA, '/api/admin/notices/' + id2, null, 'DELETE');
