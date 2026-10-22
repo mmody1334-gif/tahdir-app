@@ -69,3 +69,9 @@ if not test:
                   'data_collection_permissions': {'required': ['none']}},
         'gecko_android': {'strict_min_version': '142.0'}}
     _zip(os.path.join(store, f'kabsula-firefox-{ver}.zip'), ff)
+    # نسخة فايرفوكس «توزيع ذاتي» (Unlisted): تُوقَّع تلقائيًا بمجرد الرفع فتصبح جاهزة للتوزيع
+    # الفوري بلا انتظار المراجعة (نفس الحزمة ولو معرّف gecko مختلف — فالمعرّف لا يتكرر على AMO).
+    # هكذا يثبّت المعلم الإضافة بضغطتين من رابط الملف الموقَّع، ثم ينتقل المتجر الرئيسي لاحقًا.
+    ff2 = json.loads(json.dumps(ff))
+    ff2['browser_specific_settings']['gecko']['id'] = 'noor-tool-unlisted@elkabsula.site'
+    _zip(os.path.join(store, f'kabsula-firefox-unlisted-{ver}.zip'), ff2)
