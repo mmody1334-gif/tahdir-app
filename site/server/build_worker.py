@@ -1457,7 +1457,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
               ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
@@ -1538,6 +1538,10 @@ GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب الت�
 <main class="panel" id="gmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>'''
 REMEDIAL = TOP('<div class="stats"><span class="stat">الخطط العلاجية والأنشطة الصفية</span><span class="stat">للطلاب دون المستوى</span></div>').replace('%BTNS%', NAV('remedial')) + '''
 <div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الخطة"></aside>
+<main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
+<div id="printArea"></div>'''
+DIAG = TOP('<div class="stats"><span class="stat">الاختبار التشخيصي: العلوم والرياضيات</span><span class="stat">يقيس مستوى المادة كاملة</span></div>').replace('%BTNS%', NAV('diag')) + '''
+<div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الاختبار"></aside>
 <main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
 SUMMARIES = TOP('<div class="stats"><span class="stat">ملخصات الدروس والوحدات</span><span class="stat">وفق مخرجات التعلم</span></div>').replace('%BTNS%', NAV('summaries')) + '''
@@ -1710,6 +1714,7 @@ PAGES = {
   'play': page('تحدي الكبسولة', PLAY, rd('client_play.js')),
   'grading': page('تصحيح الواجبات · الكبسولة', GRADING, rd('client_grading.js')),
   'remedial': page('الخطط العلاجية · الكبسولة', REMEDIAL, "window.PAGE_KIND='remedial';" + chr(10) + rd('client_study.js')),
+  'diag': page('الاختبار التشخيصي · الكبسولة', DIAG, rd('client_diag.js')),
   'finals': page('الاختبارات النهائية · الكبسولة', FINALS_PAGE, 'window.FIN_INDEX=' + json.dumps({k: len(v['q']) for k, v in FIN.items()}, ensure_ascii=False) + ';' + chr(10) + rd('client_finals.js')),
   'summaries': page('ملخصات الدروس · الكبسولة', SUMMARIES, "window.PAGE_KIND='summaries';" + chr(10) + rd('client_study.js')),
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),

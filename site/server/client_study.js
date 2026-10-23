@@ -272,6 +272,59 @@ function loadBank(key){
   if(bankCache[key])return Promise.resolve(bankCache[key]);
   return api('/api/quiz/bank?key='+encodeURIComponent(key)).then(function(r){bankCache[key]=r.items||[];return bankCache[key];});
 }
+// ---------- واجب سريع (مواد العلوم): 5 أسئلة عشوائية من عدد دروس أو الوحدة كاملة ----------
+var HW_SUBJ=/علوم|أحياء|فيزياء|كيمياء|بيئ/; // مواد العلوم التي تظهر لها بطاقة الواجب السريع
+var hwUnit='',hwCount='5';
+function isSciC(){return HW_SUBJ.test((course||{}).subject||'');}
+function hwHtml(items,key){
+  var LET='أبجدهوزح',tot=0;
+  var h=sheetHead('واجب منزلي — مادة '+course.subject+' للصف '+course.grade,false,!key);
+  if(!key)h+='<p style="margin:2px 0 8px;font-size:.95em">أجب عن جميع الأسئلة الآتية في الفراغات المخصصة (أو في دفتر الواجب). راجع الدرس قبل البدء، وتحقّق من صياغة إجابتك.</p>';
+  items.forEach(function(q,i){
+    tot+=q.marks||1;
+    var isMcq=q.type==='mcq'&&q.choices&&q.choices.length>=2;
+    var ans=isMcq?q.choices[q.correct]!=null?q.choices[q.correct]:'':String(q.answer||'');
+    h+='<div style="margin:10px 0 12px;page-break-inside:avoid"><div><b>س'+(i+1)+'. </b><span style="font-size:.78em;border:1px solid #888;border-radius:8px;padding:0 6px">'+(q.ao||'معرفة')+' · '+(q.marks||1)+' درجة</span>'+
+      '<span style="font-size:.82em;color:#555"> الدرس: '+esc((byId[q.lesson_id]||{}).title||'')+'</span></div>'+
+      '<div style="margin-top:3px" dir="auto">'+esc(q.stem).replace(/\*\*/g,'').replace(/\n/g,'<br>')+'</div>';
+    if(q.img)h+='<img src="'+location.origin+'/fin/'+esc(q.img)+'" alt="" style="display:block;max-width:100%;margin:6px auto">';
+    if(isMcq)h+='<div style="margin:4px 0">'+q.choices.map(function(c,k){return '<span style="display:inline-block;min-width:45%;margin:2px 0">'+LET[k]+') '+esc(c)+'</span>';}).join('')+'</div>';
+    if(key)h+='<div style="border:1px solid #0e7c66;background:#f1f8f5;border-radius:6px;padding:5px 9px;margin-top:4px"><b>الإجابة: </b><span dir="auto">'+esc(ans).replace(/\n/g,'<br>')+'</span></div>';
+    else if(!isMcq)h+='<div style="border-bottom:1px dotted #999;height:'+Math.min((q.marks||1)*22+12,60)+'px;margin-top:4px"></div>';
+    h+='</div>';
+  });
+  h+='<table style="'+TB+';margin-top:14px"><tr><td style="'+TD+';width:34%"><b>مجموع الدرجات:</b> ........ / '+tot+'</td><td style="'+TD+';width:33%"><b>توقيع ولي الأمر:</b> ..............</td><td style="'+TD+'"><b>ملاحظات المعلم:</b> ...........................</td></tr></table>';
+  return wrap(h,false);
+}
+function makeHw(){
+  if(!course||!data)return;
+  var units=unitsList(),u=units.filter(function(x){return x.unit===hwUnit;})[0]||units[0];
+  if(!u){toast('لا توجد وحدات لهذا الصف');return;}
+  var ls=hwCount==='all'?u.lessons.slice():u.lessons.slice(0,Math.max(1,Math.min(15,parseInt(hwCount,10)||5)));
+  toast('جارٍ سحب الأسئلة…');
+  loadBank(course.key).then(function(items){
+    var ids={};ls.forEach(function(l){ids[l.id]=1;});
+    var mine=items.filter(function(q){return ids[q.lesson_id]&&q.stem&&q.type!=='long'&&answersOk(q);});
+    if(!mine.length){toast('لا توجد أسئلة قابلة للسحب في هذه الدروس');return;}
+    // توزيع عادل على الدروس: دورة من كل درس حتى إكمال 5
+    var byL={};
+    mine.forEach(function(q){(byL[q.lesson_id]=byL[q.lesson_id]||[]).push(q);});
+    var lids=shuffle(Object.keys(byL).map(Number));
+    var picked=[];
+    while(picked.length<5&&lids.some(function(k){return byL[k].length;})){
+      lids.forEach(function(k){var g=byL[k];if(g.length&&picked.length<5)picked.push(g.pop());});
+    }
+    if(picked.length<5)toast('الأسئلة المتاحة أقل من 5 ('+picked.length+' سؤالًا)');
+    var sheet=hwHtml(picked,false),key=hwHtml(picked,true);
+    if(doc&&doc.kind===KIND&&doc.course===course.key){curPaper();doc.parts.hw=sheet;doc.parts.hwkey=key;}
+    else doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:('واجب سريع — '+course.subject+' '+course.grade+' — الوحدة '+u.unit).slice(0,150),parts:{hw:sheet,hwkey:key},lessons:ls.map(function(l){return l.id;}),id:null,en:false};
+    dirty=true;part='hw';track('remedial_make','واجب سريع '+picked.length+' أسئلة',doc.title);renderDoc();
+  },function(e){toast(e.message);});
+}
+function answersOk(q){
+  if(q.type==='mcq')return (q.choices||[]).length>=2&&q.choices[q.correct]!=null;
+  return String(q.answer||'').trim().length>0;
+}
 function makeGroup(){
   if(!course||!data)return;
   var ls=lessonsSel();if(!ls.length){toast('اختر درسًا واحدًا على الأقل');return;}
@@ -309,6 +362,7 @@ function renderSide(){
     if(REM)h+='<label class="qrow">عدد صفوف الطلاب <input id="rowsIn" type="number" min="1" max="30" value="'+rows+'" class="qsel sm" style="width:80px"></label>';
     h+='<button type="button" class="btn primary go-btn" id="makeBtn">'+(REM?'كوّن الخطة والأنشطة':'اعرض الملخص')+'</button></section>';
     if(REM)h+='<section class="qcard"><h3>👥 نشاط جماعي</h3><label class="qrow">عدد أفراد المجموعة <select id="gSize" class="qsel sm">'+[2,3,4,5,6].map(function(n){return '<option'+(n===gsize?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label><label class="qrow">أسئلة كل طالب <select id="gPer" class="qsel sm"><option value="1"'+(gper===1?' selected':'')+'>سؤال واحد</option><option value="2"'+(gper===2?' selected':'')+'>سؤالان</option></select></label><label class="qrow" style="flex-direction:column;align-items:stretch">أسماء الأعضاء (اختياري، اسم في كل سطر — الأول يأخذ الأسهل)<textarea id="gNames" class="qsel" rows="4" placeholder="الطالب الأول&#10;الطالب الثاني">'+esc(gnames)+'</textarea></label><button type="button" class="btn primary go-btn" id="grpBtn">كوّن النشاط الجماعي</button><div class="muted small" style="margin-top:6px">أسئلة سهلة ومتوسطة وتحدٍّ خفيف، بالأشكال والجداول ونموذج إجابة.</div></section>';
+    if(REM&&isSciC())h+='<section class="qcard"><h3>🎯 واجب سريع (علوم)</h3><label class="qrow">الوحدة <select id="hwUnit" class="qsel sm">'+units.map(function(u){return '<option value="'+esc(u.unit)+'"'+(u.unit===hwUnit?' selected':'')+'>الوحدة '+esc(u.unit)+(u.name?' — '+esc(u.name):'')+'</option>';}).join('')+'</select></label><label class="qrow">تُسحب الأسئلة من <select id="hwCount" class="qsel sm">'+[['1','الدرس الأول'],['3','أول 3 دروس'],['5','أول 5 دروس'],['10','أول 10 دروس'],['all','الوحدة كاملة']].map(function(o){return '<option value="'+o[0]+'"'+(hwCount===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label><button type="button" class="btn primary go-btn" id="hwBtn">كوّن الواجب (5 أسئلة عشوائية)</button><div class="muted small" style="margin-top:6px">أسئلة عشوائية موزّعة على الدروس المختارة مع نموذج إجابة؛ كل ضغطة تولّد تركيبة جديدة.</div></section>';
   }
   h+='<section class="qcard"><h3>بيانات الورقة</h3><div class="hdr-f">'+(REM?'<label>اسم معلم المادة<input id="h_teacher" value="'+esc(hdr.teacher)+'"></label>':'')+
     '<label>المديرية<input id="h_dir" value="'+esc(hdr.dir)+'"></label><label>المدرسة<input id="h_school" value="'+esc(hdr.school)+'"></label>'+
@@ -327,6 +381,9 @@ function bindSide(){
   if($('gPer'))$('gPer').onchange=function(){gper=this.value==='2'?2:1;};
   if($('gNames'))$('gNames').onchange=function(){gnames=this.value;};
   if($('grpBtn'))$('grpBtn').onclick=function(){if($('gNames'))gnames=$('gNames').value;makeGroup();};
+  if($('hwUnit'))$('hwUnit').onchange=function(){hwUnit=this.value;};
+  if($('hwCount'))$('hwCount').onchange=function(){hwCount=this.value;};
+  if($('hwBtn'))$('hwBtn').onclick=makeHw;
   ['dir','school','year','term','teacher'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);};});
 }
 var studySeq=0; // رقم طلب حزمة الدراسة: يمنع نتيجة صف قديم من الكتابة فوق الصف الحالي
@@ -404,8 +461,8 @@ function make(){
   doc={kind:KIND,course:course.key,subject:course.subject,grade:course.grade,title:title.slice(0,150),parts:parts,lessons:ls.map(function(l){return l.id;}),id:null,en:isEnC()};
   dirty=true;renderDoc();
 }
-var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',mm:'خريطة ذهنية بالعرض',grp:'النشاط الجماعي',grpkey:'إجابات النشاط الجماعي',main:'الملخص'};
-function partKeys(){return REM?['plan','sheet','key','cls','clskey','grp','grpkey']  :['mm','main'];}
+var PART_TXT={plan:'نموذج الخطة العلاجية',sheet:'ورقة الأنشطة للطالب',key:'نموذج الإجابة',cls:'الأنشطة الصفية',clskey:'إجابات الأنشطة الصفية',mm:'خريطة ذهنية بالعرض',grp:'النشاط الجماعي',grpkey:'إجابات النشاط الجماعي',hw:'الواجب السريع',hwkey:'إجابات الواجب السريع',main:'الملخص'};
+function partKeys(){return REM?['plan','sheet','key','cls','clskey','grp','grpkey','hw','hwkey']:['mm','main'];}
 function presentKeys(){var k=partKeys().filter(function(x){return doc&&doc.parts&&doc.parts[x];});return k.length?k:partKeys();}
 function renderDoc(){
   if(!doc){welcome();return;}

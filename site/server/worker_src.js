@@ -133,6 +133,8 @@ const EVENT_TYPES = new Set([
   'view', 'copy_all', 'copy_json', 'copy_field', 'copy_hw', 'send_prep', 'send_hw',
   // الاختبارات القصيرة ومراجعات الوحدات
   'quiz_make', 'review_make', 'quiz_print', 'quiz_word', 'quiz_save', 'remedy_make',
+  // الاختبار التشخيصي
+  'diag_run', 'diag_print',
   // تحليل النتائج · الأوراق المتمايزة · سجل صعوبات التعلم
   'analysis_new', 'research_gen', 'ai_research', 'ai_game', 'form_print', 'form_word', 'analysis_print', 'analysis_word', 'diff_make', 'diff_print', 'ld_print',
   // الخطط العلاجية والملخصات
@@ -1299,6 +1301,7 @@ export default {
         return json({ tasks: r ? JSON.parse(r.data) : {}, updated_at: r ? r.updated_at : null });
       }
       if (p === '/remedial') return html('remedial');
+      if (p === '/diag') return html('diag');
       if (p === '/summaries') return html('summaries');
       if (p === '/finals') return html('finals');
       if (p === '/slides') return html('slides');

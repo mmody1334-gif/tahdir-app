@@ -10,6 +10,9 @@ function isEn(l){return /انجليز|إنجليز|English/i.test(l.subject||'')
 var SUBJ_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};
 var SUBJ_ORDER=['العلوم','الأحياء','الكيمياء','الفيزياء','العلوم البيئية','الرياضيات','الرياضيات الأساسية','الرياضيات المتقدمة','اللغة العربية','اللغة الإنجليزية','الدراسات الاجتماعية','التربية الإسلامية','تقنية المعلومات'];
 var subj=null;try{subj=localStorage.getItem('tahdir_subject');}catch(e){}
+var searchQ='';
+// تطبيع عربي خفيف للبحث: همزات/تاء مربوطة/ألف مقصورة/همزة وصل تبدل، ويطوّع التشكيل والمسافات
+function normAr(t){return String(t||'').replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/[ىئي]/g,'ي').replace(/ؤ/g,'و').replace(/\s+/g,' ').trim().toLowerCase();}
 function subjOf(l){return l.subject||'';}
 function subjIcon(s){return SUBJ_ICON[s]||'📘';}
 function subjects(){var s={};lessons.forEach(function(l){s[subjOf(l)]=1;});return Object.keys(s).sort(function(a,b){var x=SUBJ_ORDER.indexOf(a),y=SUBJ_ORDER.indexOf(b);return (x<0?99:x)-(y<0?99:y)||a.localeCompare(b,'ar');});}
@@ -97,9 +100,17 @@ function isEmpty(l){return !(l.pre_learning||l.outcomes||l.activities_teach);}
 function renderTree(){
   var tree=$('tree'),ss=subjects();
   if(ss.length>1&&ss.indexOf(subj)<0)subj=ss[0];
-  tree.innerHTML=(ss.length>1?'<label class="subj-pick"><span class="subj-ic" aria-hidden="true">'+subjIcon(subj)+'</span><span class="subj-l">المادة</span><select id="subjSel" aria-label="اختر المادة">'+ss.map(function(x){return '<option value="'+esc(x)+'"'+(x===subj?' selected':'')+'>'+esc(x)+' · '+esc(gradeRange(x))+'</option>';}).join('')+'</select></label>':'')+'<h2 class="tree-h">'+(ss.length>1?subjIcon(subj)+' '+esc(subj):'الكتاب المدرسي')+'</h2>';
+  tree.innerHTML='<div class="srch" style="margin:2px 0 10px"><input id="lesSearch" type="search" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--line,#d4e5de);border-radius:10px;font:inherit;background:var(--paper,#fff)" placeholder="🔎 ابحث بدرس… (عنوان أو كلمة أو رقم)" value="'+esc(searchQ)+'" aria-label="البحث في الدروس"></div>'+(ss.length>1?'<label class="subj-pick"><span class="subj-ic" aria-hidden="true">'+subjIcon(subj)+'</span><span class="subj-l">المادة</span><select id="subjSel" aria-label="اختر المادة">'+ss.map(function(x){return '<option value="'+esc(x)+'"'+(x===subj?' selected':'')+'>'+esc(x)+' · '+esc(gradeRange(x))+'</option>';}).join('')+'</select></label>':'')+'<h2 class="tree-h">'+(ss.length>1?subjIcon(subj)+' '+esc(subj):'الكتاب المدرسي')+'</h2>';
+  if($('lesSearch')){
+    $('lesSearch').oninput=function(){
+      searchQ=this.value;renderTree();
+      var n=$('lesSearch');
+      if(n){try{n.focus();n.setSelectionRange(n.value.length,n.value.length);}catch(e){}}
+    };
+  }
   if($('subjSel'))$('subjSel').onchange=function(){subj=this.value;try{localStorage.setItem('tahdir_subject',subj);}catch(e){}renderTree();};
-  grades().forEach(function(g){
+  // أثناء البحث: نعرض نتائج البحث وحدها بدل الشجرة الكاملة، حتى لا يشتّت الشاشة
+  if(!searchQ.trim()){grades().forEach(function(g){
     var gDiv=document.createElement('div');gDiv.className='g-block';
     var count=lessons.filter(function(l){return ckey(l)===g;}).length,gp=g.split('|');
     var gBtn=document.createElement('button');gBtn.className='g-btn';gBtn.type='button';
@@ -126,6 +137,20 @@ function renderTree(){
     gBtn.onclick=function(){openGrades[g]=!gBody.classList.contains('open');gBody.classList.toggle('open');};
     gDiv.appendChild(gBtn);gDiv.appendChild(gBody);tree.appendChild(gDiv);
   });
+  }
+  // نتائج البحث: دروس مطابقة من كل المواد والصفوف، بفتح الدرس مباشرة بضغطة واحدة
+  if(searchQ.trim()){
+    var q=normAr(searchQ),hits=lessons.filter(function(l){return normAr((l.title||'')+' '+(l.unit_name||'')+' درس '+(l.lesson_no||'')).indexOf(q)>=0;}).slice(0,40);
+    var res=document.createElement('div');res.className='tree-res';
+    res.innerHTML='<div style="font-weight:800;margin:14px 2px 6px;color:var(--mute,#58726a);font-size:.88em">'+(hits.length?('نتائج البحث: '+hits.length+' درسًا'+(hits.length===40?' (الحد الأقصى للعرض)':'')):'لا توجد دروس بهذا البحث — جرّب كلمة قصيرة')+'</div>'+
+      hits.map(function(l){return '<button type="button" class="l-item" data-sid="'+esc(l.id)+'"><span>'+esc(l.title||'(بدون عنوان)')+'</span><span style="color:var(--mute,#58726a);font-size:.78em;white-space:nowrap">'+esc(gradeLabel(l.grade))+(l.unit?' · و '+esc(l.unit):'')+'</span></button>';}).join('');
+    tree.appendChild(res);
+    Array.prototype.forEach.call(res.querySelectorAll('[data-sid]'),function(b){b.onclick=function(){
+      var l=lessons.filter(function(x){return String(x.id)===b.getAttribute('data-sid');})[0];if(!l)return;
+      subj=subjOf(l)||subj;try{localStorage.setItem('tahdir_subject',subj);}catch(e){}
+      selectLesson(l.id);
+    };});
+  }
 }
 function linksOf(t){
   var m=String(t||'').match(/https?:\/\/[^\s)<>"]+/g);if(!m)return '';

@@ -56,7 +56,8 @@ var GAMES=[
  {id:'case',icon:'🕵️',name:'ملف القضية',desc:'سؤال تحليلي ببيانات. كل دليل تكشفه يقلل النقاط: 400 ثم 300 ثم 200… حلّوا القضية بأقل الأدلة.',grades:[10,12],need:'case',min:2,teen:1},
  {id:'bet',icon:'🎯',name:'رهان الثقة',desc:'أسئلة متقدمة. كل فريق يختار إجابته ويراهن من 1 إلى 3 حسب ثقته: الصح يكسب الرهان والخطأ يخسره.',grades:[10,12],need:'hard',min:4,teen:1},
  {id:'links',icon:'🔗',name:'ما العلاقة؟',desc:'مفهومان من الدرس. الفرق تشرح العلاقة بينهما خلال دقيقة، ثم تظهر العلاقة النموذجية للمقارنة.',grades:[10,12],need:'links',min:2,teen:1},
- {id:'cards',icon:'🗂️',name:'بطاقات المراجعة',desc:'سؤال على الوجه والإجابة على الظهر، تشمل أسئلة البيانات والتحليل. مناسبة لمراجعة سريعة قبل الاختبار.',grades:[9,12],best:[10,12],need:'any',min:3}
+ {id:'cards',icon:'🗂️',name:'بطاقات المراجعة',desc:'سؤال على الوجه والإجابة على الظهر، تشمل أسئلة البيانات والتحليل. مناسبة لمراجعة سريعة قبل الاختبار.',grades:[9,12],best:[10,12],need:'any',min:3},
+ {id:'draw',icon:'🎰',name:'قرعة عشوائية بالأرقام',desc:'اكتب عدد طلاب الصف واقرع: يظهر رقم طالب عشوائي بتدوير سريع، مع إمكانية استبعاد الأرقام الخارجة. بلا أسئلة ولا تحضير — تنفع لاختيار الملقي والدور والسؤال الشفهي.',grades:[5,12],need:'none',min:0}
 ];
 function fits(g){var n=gnum();return n>=g.grades[0]&&n<=g.grades[1];}
 function bestFor(g){var n=gnum(),b=g.best||g.grades;return n>=b[0]&&n<=b[1];}
@@ -112,6 +113,7 @@ function selectCourse(key){
   return api('/api/games/data?key='+encodeURIComponent(key)).then(function(r){data=r;lessonById={};data.lessons.forEach(function(l){lessonById[l.id]=l;});renderSide();renderHome();},function(e){toast(e.message);});
 }
 function enough(g){
+  if(g.need==='none')return true; // قرعة الأرقام لا تحتاج أسئلة
   var p=pool();
   if(g.need==='mcq')return p.filter(function(x){return x.type==='mcq';}).length>=g.min;
   if(g.need==='words')return wordList().length>=g.min;
@@ -128,7 +130,9 @@ function renderHome(){arena(false);
   if(!data.items.some(playableItem)){
     $('gmain').innerHTML='<div class="g-none"><div class="g-none-ic">🎲</div><h2>لا توجد ألعاب لهذه المادة بعد</h2>'+
       '<p>الألعاب تُبنى من بنك الأسئلة ومن واجبات الدروس. هذه المادة/الصف لا تحتوي أسئلة اختيار من متعدد قابلة للعب حتى الآن، فلم نعرض لوحة فارغة.</p>'+
-      '<p class="muted small">المواد المتاحة للألعاب حاليًا: العلوم · الفيزياء · الكيمياء · تقنية المعلومات (وبعض الواجبات في مواد أخرى).</p></div>';
+      '<p class="muted small">المواد المتاحة للألعاب حاليًا: العلوم · الفيزياء · الكيمياء · تقنية المعلومات (وبعض الواجبات في مواد أخرى).</p>'+
+      '<p><button type="button" class="btn primary" id="quickDraw">🎰 قرعة عشوائية بالأرقام (تعمل بلا أسئلة)</button></p></div>';
+    var qd=$('quickDraw');if(qd)qd.onclick=function(){startGame(GAMES.filter(function(x){return x.id==='draw';})[0]);};
     return;
   }
   var h='<div class="g-home"><div class="g-intro"><h2>🎲 ركن الألعاب التعليمية</h2><p>اختر الدروس من القائمة، ثم اللعبة. الأسئلة تُسحب من بنك الأسئلة وواجبات الدروس'+(isEn()?' والمفردات':' والمصطلحات')+'، ومستواها يناسب الصف. اعرضها على السبورة بملء الشاشة.</p></div><div class="g-cards">';
@@ -166,7 +170,7 @@ function resetScores(){teams.forEach(function(t){t.score=0;});}
 // @@TUG@@
 function startGame(g){
   stopAll();game=g.id;track('game_play',g.id);
-  ({tug:gTug,runner:gRunner,ball:gBall,rocket:gRocket,balloon:gBalloon,live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks})[g.id](g);
+  ({tug:gTug,runner:gRunner,ball:gBall,rocket:gRocket,balloon:gBalloon,live:gLive,jeopardy:gJeopardy,millionaire:gMillion,escape:gEscape,memory:gMemory,words:gWords,wheel:gWheel,cards:gCards,myth:gMyth,seq:gSeq,case:gCase,bet:gBet,links:gLinks,draw:gDraw})[g.id](g);
 }
 function timerHtml(id){return '<div class="g-timer" id="'+id+'"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" class="tr-bg"/><circle cx="18" cy="18" r="16" class="tr-fg" id="'+id+'C" stroke-dasharray="100 100"/></svg><span id="'+id+'T"></span></div>';}
 function runTimer(id,secs,onEnd){
@@ -526,6 +530,45 @@ function gCase(g){
   $('gmain').innerHTML=stage(g.name,'');bindStage();show();
 }
 function bindScoreBtns(v){Array.prototype.forEach.call(document.querySelectorAll('[data-plus]'),function(b){b.onclick=function(){teams[+b.getAttribute('data-plus')].score+=v;beep('ok');renderScore(true,v);bindScoreBtns(v);};});Array.prototype.forEach.call(document.querySelectorAll('[data-minus]'),function(b){b.onclick=function(){teams[+b.getAttribute('data-minus')].score-=v;beep('bad');renderScore(true,v);bindScoreBtns(v);};});}
+// ========== قرعة عشوائية بالأرقام: المعلم يكتب عدد الطلاب ويقرع رقماً عشوائياً ==========
+function gDraw(g){
+  stopAll();
+  var defN=Math.max(2,Math.min(99,+(lsGet('tahdir_draw_n')||30)||30));
+  var h='<div class="g-setup dw"><h3>🎰 '+esc(g.name)+'</h3><p class="muted">اكتب عدد طلاب الصف ثم اقرع: يدور الرقم بسرعة ثم يستقر على طالب عشوائي. اختر أن يُستبعد كل رقم خرج ليبقى الحظ موزّعًا على الجميع.</p>'+
+    '<label class="qrow">عدد الطلاب <input type="number" id="dwN" min="2" max="99" value="'+defN+'"></label>'+
+    '<label class="qrow small"><input type="checkbox" id="dwNR"> لا يخرج الرقم مرتين حتى تصفّر السجل</label>'+
+    '<div id="dwVal" style="font-size:64px;font-weight:900;text-align:center;color:#1f8a70;border:3px dashed #1f8a70;border-radius:14px;margin:16px 0;padding:6px;min-height:84px;line-height:1.3;user-select:none">؟</div>'+
+    '<button type="button" class="btn primary go-btn" id="dwGo">اقرع 🎰</button>'+
+    '<div style="margin-top:14px"><span class="muted small">سجل القرعات: </span><span id="dwHist" style="display:inline-flex;flex-wrap:wrap;gap:5px"></span> <button type="button" class="btn small" id="dwZero">تصفير السجل</button></div></div>';
+  $('gmain').innerHTML=stage(g.name,h);bindStage();
+  var hist=lsGet('tahdir_draw_used_'+(course?course.key:'*'))||[],nr=!!lsGet('tahdir_draw_nr');
+  $('dwNR').checked=nr;
+  function chips(){var el=$('dwHist');if(el)el.innerHTML=hist.length?hist.map(function(x){return '<span style="border:1px solid #1f8a70;border-radius:9px;padding:1px 9px;font-weight:800;background:#e3f1eb">'+x+'</span>';}).join(''):'<span class="muted small">(فارغ)</span>';}
+  $('dwZero').onclick=function(){hist=[];lsSet('tahdir_draw_used_'+(course?course.key:'*'),[]);chips();toast('صُفِّر السجل');};
+  $('dwGo').onclick=function(){
+    if($('dwVal').textContent==='…')return; // أثناء الدوران لا قرعة جديدة
+    var N=Math.max(2,Math.min(99,+$('dwN').value||30));lsSet('tahdir_draw_n',N);
+    nr=$('dwNR').checked;lsSet('tahdir_draw_nr',nr);
+    var res,free=[];
+    if(nr){for(var x=1;x<=N;x++)if(hist.indexOf(x)<0)free.push(x);
+      if(!free.length){toast('كل الأرقام خرجت — صفِّر السجل أولًا');return;}
+      res=free[Math.floor(Math.random()*free.length)];}
+    else res=1+Math.floor(Math.random()*N);
+    $('dwGo').disabled=true;$('dwVal').textContent='…';
+    var iv=every(60,function(){var v=$('dwVal');if(!v){stopAll();return;}v.textContent=1+Math.floor(Math.random()*N);});
+    setTimeout(function(){
+      var v=$('dwVal');stopAll();
+      if(!v)return; // رجعنا للرئيسية قبل نزول الدوران
+      v.textContent=res;
+      if(nr&&hist.indexOf(res)<0)hist.push(res);
+      lsSet('tahdir_draw_used_'+(course?course.key:'*'),hist);
+      chips();$('dwGo').disabled=false;
+      beep('ok');var r=v.getBoundingClientRect();fxBurst(r.left+r.width/2,r.top+r.height/2,['#1f8a70','#ffd400','#fff'],16);
+      track('game_play','draw');
+    },1100);
+  };
+  chips();
+}
 // ---- رهان الثقة
 function gBet(g){
   resetScores();var qs=shuffle(hardMcq()).slice(0,8).map(mixMcq),i=0;
