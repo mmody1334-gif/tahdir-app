@@ -1,0 +1,27 @@
+name: trial-apk-preview
+on:
+  push:
+    branches: [preview/responsive-home]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview/responsive-home
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build debug APK (trial only)
+        run: gradle assembleDebug --no-daemon && cp app/build/outputs/apk/debug/app-debug.apk trial-debug.apk && ls -lh trial-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trial-apk-debug
+          path: trial-debug.apk
+          if-no-files-found: error
