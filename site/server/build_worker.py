@@ -1459,8 +1459,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة'),
-              ('searcher', 'https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة')]
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
 # «تصحيح الواجبات تلقائيًا» (/grading) يظهر في قائمة «الكبسولة» فقط، ولا يظهر في «تقني حذيفة» (يُحذف في brand_tq).
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
@@ -1679,14 +1678,19 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
   ('/teqany/finals', '🗂', 'الاختبارات النهائية', 'أسئلة الوزارة حسب الدرس'), ('/teqany/remedial', '🩹', 'الخطط العلاجية', 'للطلاب دون المستوى'),
   ('/teqany/summaries', '📚', 'ملخصات الدروس', 'وفق مخرجات التعلم'), ('/teqany/cando', '☑️', 'أستطيع أن ✓', 'قوائم التقييم الذاتي'),
   ('/teqany/research', '🔬', 'البحوث الإجرائية', 'العلوم، اللغة العربية، الرياضيات')]
-# أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا
-TQ_SECTIONS += [('/teqany' + h, ic, t, '') for _k, h, ic, t in MENU_ITEMS
-                if h.startswith('/') and _k != 'grading' and '/teqany' + h not in {x[0] for x in TQ_SECTIONS}]
+# أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا.
+# الروابط الخارجية (مثل باحث المدرسة) لا تُبنى ببادئة /teqany ولا تُستبعد:
+# شرط h.startswith('/') القديم كان يحذفها، فغابت من كروت الواجهة رغم وجودها في «المزيد».
+TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, '') for _k, h, ic, t in MENU_ITEMS
+                if _k != 'grading' and (h if h.startswith('http') else '/teqany' + h) not in {x[0] for x in TQ_SECTIONS}]
+# باحث المدرسة خاص بـ «تقني حذيفة» فقط: غير موجود في MENU_ITEMS (أُخفي من الكبسولة)،
+# فيُضاف هنا صراحةً إلى كروت تقني وقائمة «المزيد» الخاصة بها، لا إلى الكبسولة.
+TQ_SECTIONS.append(('https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة', ''))
 TEQANY = tq_shell('<section class="tq-hero"><span class="tq-kicker">منصة مدرسة حذيفة بن محصن</span>'
   '<h1 class="tq-h1">' + TEQANY_LOGO + '</h1>'
   '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
   '<div class="tq-cta"><a class="tq-btn" href="/teqany/login">دخول المنصة <span aria-hidden="true">←</span></a><a class="tq-btn ghost" href="/teqany/tahdir">التحضير مباشرة</a></div></section>'
-  '<section class="tq-cards" aria-label="الأقسام">' + ''.join(f'<a class="tq-c" href="{h}" style="animation-delay:{i*.06:.2f}s"><span class="tq-ci">{ic}</span><b>{t}</b><small>{d}</small></a>' for i, (h, ic, t, d) in enumerate(TQ_SECTIONS)) + '</section>')
+  '<section class="tq-cards" aria-label="الأقسام">' + ''.join(f'<a class="tq-c" href="{h}"' + (' target="_blank" rel="noopener"' if h.startswith('http') else '') + f' style="animation-delay:{i*.06:.2f}s"><span class="tq-ci">{ic}</span><b>{t}</b><small>{d}</small></a>' for i, (h, ic, t, d) in enumerate(TQ_SECTIONS)) + '</section>')
 TQ_LOGIN = tq_shell('<section class="tq-auth"><form class="tq-card" id="loginForm" novalidate>'
   '<div class="tq-card-mark">' + TEQANY_LOGO + '</div><h2>تسجيل الدخول</h2><p class="tq-sub">ادخل بحسابك في المنصة.</p>'
   '<div class="err" id="loginErr" role="alert" hidden></div>'
@@ -1736,6 +1740,8 @@ def brand_tq(h):
     h = h.replace(BANNER, BANNER_TQ)
     # «تصحيح الواجبات تلقائيًا» خاص بالكبسولة: لا يظهر في قائمة «تقني حذيفة»
     h = re.sub(r'<a role="menuitem" href="/grading"[^>]*>.*?</a>', '', h)
+    # باحث المدرسة خاص بـ «تقني حذيفة» فقط: يُدرج في «المزيد» هنا، ولا يوجد في قائمة الكبسولة.
+    h = h.replace('<hr><button type="button" role="menuitem" id="logoutBtn">', '<a role="menuitem" href="https://hudhifa-searcher.onrender.com/" target="_blank" rel="noopener"><span class="mi">🔎</span>باحث المدرسة</a><hr><button type="button" role="menuitem" id="logoutBtn">', 1)
     # «تقني حذيفة» يحتفظ باسم المدرسة كما كان (الواجهة الأساسية حُذف منها)
     h = h.replace('<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>', '<p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء، مدرسة حذيفة بن محصن</p>')
     h = h.replace('<span class="school">إعداد أ. محمد مجدي · معلم الأحياء</span>', '<span class="school">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</span>')
