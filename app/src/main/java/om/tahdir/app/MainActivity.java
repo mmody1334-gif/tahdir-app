@@ -103,8 +103,8 @@ public class MainActivity extends Activity {
         root.addView(progress, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(4)));
 
         FrameLayout frame = new FrameLayout(this);
-        site = makeWebView();
-        nour = makeWebView();
+        site = makeWebView(false);
+        nour = makeWebView(true);
         frame.addView(site);
         frame.addView(nour);
         root.addView(frame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -146,14 +146,14 @@ public class MainActivity extends Activity {
         tabNour.setBackgroundColor(w == nour ? Color.parseColor("#1F8A70") : Color.TRANSPARENT);
     }
 
-    WebView makeWebView() {
+    WebView makeWebView(boolean wide) {
         WebView w = new WebView(this);
         WebSettings s = w.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
-        s.setLoadWithOverviewMode(true);
-        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(wide);
+        s.setUseWideViewPort(wide);
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
         s.setSupportMultipleWindows(false);

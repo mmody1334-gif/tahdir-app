@@ -100,7 +100,7 @@ function isEmpty(l){return !(l.pre_learning||l.outcomes||l.activities_teach);}
 function renderTree(){
   var tree=$('tree'),ss=subjects();
   if(ss.length>1&&ss.indexOf(subj)<0)subj=ss[0];
-  tree.innerHTML='<div class="srch" style="margin:2px 0 10px"><input id="lesSearch" type="search" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--line,#d4e5de);border-radius:10px;font:inherit;background:var(--paper,#fff)" placeholder="🔎 ابحث بدرس… (عنوان أو كلمة أو رقم)" value="'+esc(searchQ)+'" aria-label="البحث في الدروس"></div>'+(ss.length>1?'<label class="subj-pick"><span class="subj-ic" aria-hidden="true">'+subjIcon(subj)+'</span><span class="subj-l">المادة</span><select id="subjSel" aria-label="اختر المادة">'+ss.map(function(x){return '<option value="'+esc(x)+'"'+(x===subj?' selected':'')+'>'+esc(x)+' · '+esc(gradeRange(x))+'</option>';}).join('')+'</select></label>':'')+'<h2 class="tree-h">'+(ss.length>1?subjIcon(subj)+' '+esc(subj):'الكتاب المدرسي')+'</h2>';
+  tree.innerHTML='<button type="button" class="btn small home-back" id="homeBackBtn">🏠 الرئيسية</button>'+'<div class="srch" style="margin:2px 0 10px"><input id="lesSearch" type="search" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--line,#d4e5de);border-radius:10px;font:inherit;background:var(--paper,#fff)" placeholder="🔎 ابحث بدرس… (عنوان أو كلمة أو رقم)" value="'+esc(searchQ)+'" aria-label="البحث في الدروس"></div>'+(ss.length>1?'<label class="subj-pick"><span class="subj-ic" aria-hidden="true">'+subjIcon(subj)+'</span><span class="subj-l">المادة</span><select id="subjSel" aria-label="اختر المادة">'+ss.map(function(x){return '<option value="'+esc(x)+'"'+(x===subj?' selected':'')+'>'+esc(x)+' · '+esc(gradeRange(x))+'</option>';}).join('')+'</select></label>':'')+'<h2 class="tree-h">'+(ss.length>1?subjIcon(subj)+' '+esc(subj):'الكتاب المدرسي')+'</h2>';
   if($('lesSearch')){
     $('lesSearch').oninput=function(){
       searchQ=this.value;renderTree();
@@ -109,6 +109,7 @@ function renderTree(){
     };
   }
   if($('subjSel'))$('subjSel').onchange=function(){subj=this.value;try{localStorage.setItem('tahdir_subject',subj);}catch(e){}renderTree();};
+  if($('homeBackBtn'))$('homeBackBtn').onclick=function(){showHome();};
   // أثناء البحث: نعرض نتائج البحث وحدها بدل الشجرة الكاملة، حتى لا يشتّت الشاشة
   if(!searchQ.trim()){grades().forEach(function(g){
     var gDiv=document.createElement('div');gDiv.className='g-block';
@@ -285,6 +286,7 @@ function renderLesson(l){
   Array.prototype.forEach.call(p.querySelectorAll('[data-save]'),function(b){b.onclick=function(){var k=b.getAttribute('data-save');saveField(l,k,$('f_'+k).value.trim?$('f_'+k).value:$('f_'+k).value,b);};});
 }
 function selectLesson(id){
+  var _lay=document.querySelector('.wrap.layout');if(_lay)_lay.classList.remove('home-view');
   currentId=id;var l=lessons.filter(function(x){return x.id===id;})[0];if(!l)return;
   renderTree();renderLesson(l);
   if(!viewed[id]){viewed[id]=1;track('view',l);}
@@ -337,6 +339,57 @@ function openSettings(){
   // «القيم الثابتة» انتقلت إلى داخل تحضير كل درس (الاستراتيجيات + الوسائل ومصادر التعلم)
   showWelcome('القيم الثابتة صارت داخل الدرس','افتح أي درس من القائمة، وستجد حقلَي «الاستراتيجيات» و«الوسائل ومصادر التعلم» جاهزين بقيم المادة، وتقدر تعدّلها لكل درس على حدة.');
 }
+
+// ===== الرئيسية: قائمة مرتبة كتقني حذيفة، بنفس ألوان/خطوط الكبسولة =====
+// التحضير يعيد شجرة الدروس الحالية؛ باقي البطاقات تنتقل لمساراتها الحالية.
+// لا شيء هنا يغيّر درسًا أو بحثًا أو إرسالًا إلى نور.
+var HOME_CARDS=[
+  {key:'prep',title:'التحضير',icon:'📋',sub:'دروس جاهزة للإرسال إلى نور',route:''},
+  {key:'quiz',title:'التقويم والاختبارات',icon:'📝',sub:'اختبارات قصيرة وفق الوثيقة',route:'/quiz'},
+  {key:'games',title:'الألعاب التعليمية',icon:'🎲',sub:'شد الحبل، العداء، كرة القدم…',route:'/games'},
+  {key:'slides',title:'العروض التقديمية',icon:'📽️',sub:'عروض كل مادة وصف',route:'/slides'},
+  {key:'finals',title:'الاختبارات النهائية',icon:'🗂',sub:'أسئلة الوزارة حسب الدرس',route:'/finals'},
+  {key:'remedial',title:'الخطط العلاجية',icon:'🩹',sub:'للطلاب دون المستوى',route:'/remedial'},
+  {key:'summaries',title:'ملخصات الدروس',icon:'📚',sub:'وفق مخرجات التعلم',route:'/summaries'},
+  {key:'cando',title:'أستطيع أن',icon:'☑️',sub:'قوائم التقييم الذاتي',route:'/cando'},
+  {key:'research',title:'البحوث الإجرائية',icon:'🔬',sub:'العلوم، اللغة العربية، الرياضيات',route:'/research'},
+  {key:'diag',title:'الاختبار التشخيصي',icon:'🧪',sub:'قياس مستوى الطالب قبل الدرس',route:'/diag'},
+  {key:'analysis',title:'تحليل نتائج الاختبارات',icon:'📊',sub:'نتائج وتقارير سريعة',route:'/analysis'},
+  {key:'ld',title:'سجل صعوبات التعلم',icon:'🧩',sub:'متابعة الطلاب المتعثرين',route:'/ld'},
+  {key:'forms',title:'النماذج الإدارية',icon:'🗂',sub:'نماذج جاهزة للطباعة',route:'/forms'},
+  {key:'space',title:'مساحة الطالب',icon:'🎒',sub:'أنشطة ومراجعات للطلاب',route:'/space'}
+];
+var homeQ='';
+function renderHomeCards(){
+  var g=$('homeGrid');if(!g)return;
+  var q=normAr(homeQ);
+  var list=HOME_CARDS.filter(function(c){return !q||normAr(c.title+' '+c.sub).indexOf(q)>=0;});
+  g.innerHTML=list.length?list.map(function(c){
+    return '<button type="button" class="home-card" data-home="'+esc(c.key)+'"><span class="home-ic" aria-hidden="true">'+c.icon+'</span><span class="home-title">'+esc(c.title)+'</span><span class="home-sub">'+esc(c.sub)+'</span></button>';
+  }).join(''):'<div class="home-empty">لا توجد أقسام مطابقة للبحث.</div>';
+  Array.prototype.forEach.call(g.querySelectorAll('[data-home]'),function(b){
+    b.onclick=function(){
+      var k=b.getAttribute('data-home');
+      var c=HOME_CARDS.filter(function(x){return x.key===k;})[0];if(!c)return;
+      if(c.key==='prep'){showPrep();return;}
+      location.href=c.route;
+    };
+  });
+}
+function showHome(){
+  var lay=document.querySelector('.wrap.layout');if(lay)lay.classList.add('home-view');
+  $('panel').innerHTML='<div class="home"><div class="home-hero"><h2>'+esc('أهلًا '+(me&&me.name?me.name:''))+'</h2><p>اختر قسمًا من القائمة، أو ابحث باسم القسم.</p><input id="homeSearch" class="home-search" type="search" placeholder="🔎 ابحث في القائمة…" value="'+esc(homeQ)+'" aria-label="البحث في أقسام الرئيسية"></div><div class="home-grid" id="homeGrid"></div></div>';
+  renderHomeCards();
+  var inp=$('homeSearch');
+  if(inp)inp.oninput=function(){homeQ=this.value;renderHomeCards();};
+}
+function showPrep(){
+  var lay=document.querySelector('.wrap.layout');if(lay)lay.classList.remove('home-view');
+  renderTree();
+  $('panel').innerHTML='<div class="welcome">'+morphHtml()+'<h2>'+esc('أهلًا '+me.name)+'</h2><p>'+esc('اختر الصف ثم الوحدة ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في منصة نور.')+'</p></div>';
+  runMorph();
+}
+
 function init(){
   // لا يوجد زر «قيم ثابتة» في الشريط: الاستراتيجيات والوسائل صارت حقولًا في كل درس.
   if(IN_APP){if($('appBar'))$('appBar').hidden=true;}
@@ -352,7 +405,7 @@ function init(){
     if(location.hash==='#settings'){history.replaceState(null,'','/app');setTimeout(openSettings,50);}
     if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
     $('statLessons').textContent=lessons.length;$('statFilled').textContent=lessons.filter(function(l){return !isEmpty(l);}).length;
-    renderTree();$('panel').innerHTML='<div class="welcome">'+morphHtml()+'<h2>'+esc('أهلًا '+me.name)+'</h2><p>'+esc('اختر الصف ثم الوحدة ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في منصة نور.')+'</p></div>';runMorph();
+    renderTree();showHome();
   },function(e){showWelcome('تعذّر تحميل الدروس',e.message);});
 }
 init();
