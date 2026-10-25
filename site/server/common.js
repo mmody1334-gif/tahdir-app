@@ -128,16 +128,16 @@ function toolVersion(){return document.documentElement.getAttribute('data-tahdir
 // وبدونها المسار الوحيد هو Tampermonkey (أبسط للمعلم: إضافة + سكربت وخلاص).
 // ضع رابط صفحة الإضافة في كل متجر بعد نشرها؛ يظهر عندها «مرشد التثبيت» (ضغطتان) بدل Tampermonkey.
 // إيدج: منشورة رسميًا في Microsoft Edge Add-ons — التثبيت من المتجر بضغطتين.
-// فايرفوكس: نسخة Unlisted موقَّعة من موزيلا (رابط ملف .xpi مباشر) فيثبّت المعلم بضغطتين
-// بلا Tampermonkey حتى اعتماد النسخة المدرِجة (Listed). حدّث الرابط مع كل إصدار جديد:
-// ارفع الحزمة لنفس التسجيل Unlisted (تُوقَّع تلقائيًا) وضع رابط ملفها هنا — التحديث يصل
-// لمن ثبّت الإصدار الأقدم تلقائيًا من AMO.
-var EXT_STORE={chrome:'',edge:'https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd',firefox:'https://addons.mozilla.org/firefox/downloads/file/5154465/8b2ac955170c4febb778-3.4.9.xpi'};
-// كروم وإيدج: إضافة «الكبسولة» الخاصة (نفس كود الأداة) بدل Tampermonkey — تُحمَّل ملف ZIP وتُثبَّت «غير مُجمّعة».
-// فايرفوكس وسافاري والآيفون: لا تغيير (Tampermonkey / Userscripts كما هي).
+// فايرفوكس: النسخة المدرِجة (Listed) اعتمدتها موزيلا (٢٠٢٦-١٠-٢٤) — التثبيت الآن من صفحة
+// الإضافة الرسمية على AMO بضغطتين، والتحديث يصل تلقائيًا من المتجر مع كل إصدار جديد
+// بلا تغيير أي رابط. النسخة Unlisted الموقَّعة (noor-tool-unlisted@elkabsula.site ·
+// تسجيل 3104946) تبقى مسارًا احتياطيًا: لو احتجناها نعيد رابط ملف .xpi الموقَّع هنا.
+var EXT_STORE={chrome:'',edge:'https://microsoftedge.microsoft.com/addons/detail/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%E2%80%94-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/jbpbibeppdfddjlhkeobfkbccbjcnjpd',firefox:'https://addons.mozilla.org/firefox/addon/%D8%A7%D9%84%D9%83%D8%A8%D8%B3%D9%88%D9%84%D8%A9-%D8%A3%D8%AF%D8%A7%D8%A9-%D9%86%D9%88%D8%B1/'};
+// كروم وإيدج وفايرفوكس: إضافة «الكبسولة» بنُسخ متاجر رسمية. سافاري والآيفون: Userscripts كما هي.
 var EXT_ZIP='/download/tahdir-ext.zip';
 function extBrowser(b){return b==='chrome'||b==='edge';}
-// رابط ملف .xpi موقَّع مباشر (فايرفوكس Unlisted): مرشد «اضغط ← وافق» بدل صفحة متجر كبيرة
+// مرشد التثبيت يفحص الرابط: لو كان ملف .xpi موقَّعًا مباشرًا (مسار Unlisted الاحتياطي) يعرض
+// خطوة «افتح رابط الأداة ← فايرفوكس يبدأ التثبيت»، ولو صفحة متجر يعرض بطاقة متجر عادية.
 function isXpiUrl(u){return !!u&&u.indexOf('/downloads/file/')>=0&&/\.xpi(?:[?#].*)?$/.test(u);}
 function extVersion(){return document.documentElement.getAttribute('data-tahdir-ext')||'';}
 function hasExt(){return !!document.documentElement.getAttribute('data-tahdir-ext');}
@@ -384,6 +384,17 @@ function toolDialog(reason){
         '<li>اضغط <b>Load unpacked</b> واختر المجلد الذي فككته، ثم حدّث هذه الصفحة.</li></ol>'+
         '<p class="muted small">لو الإضافة وTampermonkey الاثنين متثبّتين مش هيحصل تعارض: الأداة مش هتشتغل مرتين.</p></details>';
     }
+    if(b==='firefox'){
+      // فايرفوكس: الإضافة منشورة رسميًا (Listed) في موزيلا بعد اعتماد المراجعة — تثبيت بضغتين
+      // وتحديث تلقائي من المتجر. الرابط صريح لا عبر extUrl() — فاللوحة قد تُعرض داخل تبويب
+      // فايرفوكس لمستخدم متصفح آخر.
+      var ffu=EXT_STORE.firefox;
+      return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
+        '<li>ثبّت إضافة <b>«الكبسولة — أداة نور»</b> مباشرة من موزيلا: <a href="'+esc(ffu)+'" target="_blank" rel="noopener">افتح صفحة الإضافة على Firefox Add-ons</a> ثم اضغط <b>«إضافة إلى Firefox»</b> ووافق على <b>«إضافة»</b>.</li>'+
+        '<li>خلاص — تتحدّث الإضافة تلقائيًا من المتجر: لا Tampermonkey ولا ملفات ولا إعدادات.</li>'+
+        '<li>ارجع للمنصة وحدّث الصفحة؛ الزر يتحول إلى <b>«أداة نور ✓»</b>.</li></ol>'+
+        '<p class="m-msg" style="background:#fff6e0;border-radius:10px;padding:8px 11px"><b>💡 أداة قديمة بـ Tampermonkey؟</b> الإضافة تتعرّف عليها ومنعًا للتكرار لا تعمل الأداة مرتين. والأفضل بعدها مسح السكربت: زر <b>«🗑 مسح الأداة»</b> في حوار «أداة نور» يشرح خطوات المسح.</p>';
+    }
     var nm=b==='firefox'?'Firefox':'Chrome';
     return '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
       '<li>ثبّت <b>Tampermonkey</b> من متجر '+nm+': <a href="'+tmStoreFor(b)+'" target="_blank" rel="noopener">افتح صفحة الإضافة</a> ثم اضغط «إضافة إلى '+nm+'».</li>'+
@@ -402,7 +413,7 @@ function toolDialog(reason){
     ? '<div class="m-msg" style="background:var(--main-l,#e3f1eb);border:1px solid var(--main,#1f8a70);border-radius:12px;padding:11px 13px">'+
       '<b>📱 أنت على أندرويد — لا تحتاج تثبيت سكربت.</b><br>'+
       'تطبيق «الكبسولة» فيه الأداة <b>مدمجة</b> ويعمل مباشرة: <a class="btn primary small" href="'+APK_URL+'" target="_blank" rel="noopener" style="margin-top:6px;display:inline-block">⬇ تحميل التطبيق</a>'+
-      '<div class="muted small" style="margin-top:7px">متصفحات أندرويد (Chrome · Samsung Internet) <b>لا تدعم إضافات السكربتات</b>، ولهذا عند فتح رابط الأداة تظهر لك <b>كنص فقط</b> ولا يظهر «تثبيت». ولو أردت السكربت على الجوال: استخدم <b>Firefox للأندرويد</b> + Tampermonkey.</div></div>'
+      '<div class="muted small" style="margin-top:7px">متصفحات أندرويد (Chrome · Samsung Internet) <b>لا تدعم إضافات السكربتات</b>، ولهذا عند فتح رابط الأداة تظهر لك <b>كنص فقط</b> ولا يظهر «تثبيت». ولو أردت الأداة على الجوال: استخدم <b>Firefox للأندرويد</b> — وثبّت إضافة «الكبسولة — أداة نور» من صفحتها على موزيلا (متوافقة مع فايرفوكس للأندرويد).</div></div>'
     : '';
   var h=(reason?'<p class="m-msg">'+esc(reason)+'</p>':'')+
    andNote+
@@ -444,11 +455,11 @@ function toolRemove(){
       '<li>افتح تطبيق <b>Userscripts</b> ← قائمة السكربتات ← اتجه إلى <b>«الكبسولة — أداة نور»</b> ← <b>حذف 🗑</b>.</li>'+
       '<li>ولو أردت إزالة الإضافة كلها: على الآيفون <b>الإعدادات</b> ← <b>Safari</b> ← <b>الإضافات</b> ← Userscripts ← أطفئها أو احذفها. وعلى الماك: <b>سافاري ← الإعدادات ← الإضافات</b> ← Userscripts.</li></ol>'+
       '<p class="m-msg muted small">بعد المسح حدّث الصفحة — لو أردت الأداة مجددًا ثبّتها من قائمة «المزيد» بضغطتين.</p>';
-  } else { // فايرفوكس (أو كروم مع سكربت Tampermonkey): مسح السكربت من لوحة Tampermonkey
-    h='<p class="m-msg">أداة نور عندك <b>سكربت داخل Tampermonkey</b>. عندك اختياران:</p>'+
+  } else { // فايرفوكس: الأداة إما إضافة منشورة من موزيلا أو سكربت داخل Tampermonkey — نغطي الاثنين
+    h='<p class="m-msg">أداة نور عندك أحد الاثنين — إضافة متصفح أو سكربت داخل Tampermonkey:</p>'+
       '<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em">'+
-      '<li><b>مسح السكربت فقط (الأدقَّ):</b> اضغط أيقونة Tampermonkey (خانة الإضافات 🧩) ← <b>لوحة التحكم / Dashboard</b> ← السطر <b>«الكبسولة — أداة نور»</b> ← أيقونة <b>السلة 🗑</b> ← وافق.</li>'+
-      '<li><b>أو إزالة كل شيء مع Tampermonkey:</b> افتح <code class="ltr" style="user-select:all">'+(b==='firefox'?au:exUrl)+'</code> <button type="button" class="btn small" data-copy="'+(b==='firefox'?au:exUrl)+'">نسخ</button> ← حدّد <b>Tampermonkey</b> ← <b>إزالة</b>.</li></ol>'+
+      '<li><b>لو إضافة:</b> <b>كليك يمين</b> على أيقونة «الكبسولة — أداة نور» في شريط المتصفح ← <b>«إزالة من المتصفح… / Remove from browser…»</b> ← وافق. أو من <code class="ltr" style="user-select:all">'+au+'</code> <button type="button" class="btn small" data-copy="'+au+'">نسخ</button> ← بطاقة الإضافة ← <b>حذف / Remove</b>.</li>'+
+      '<li><b>لو سكربت Tampermonkey:</b> اضغط أيقونة Tampermonkey (خانة الإضافات 🧩) ← <b>لوحة التحكم / Dashboard</b> ← السطر <b>«الكبسولة — أداة نور»</b> ← أيقونة <b>السلة 🗑</b> ← وافق. ولإزالة Tampermonkey نفسه: من <code class="ltr" style="user-select:all">'+au+'</code> حدّده ← <b>إزالة</b>.</li></ol>'+
       '<p class="m-msg muted small">بعد المسح حدّث صفحة الموقع. ولو مسحتها بالغلط: «المزيد» ← «أداة نور» ← خطوتان فقط وترجع.</p>';
   }
   var pr=dialog({title:'مسح أداة نور',html:h,okText:'تم',cancelText:false});

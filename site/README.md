@@ -105,7 +105,10 @@ node site/tests/run_all.cjs fixes quizcard     # الأسماء: fixes, labels, 
 - النطاقات تؤخذ تلقائيًا من سطور `@match` في رأس السكربت (نور + كل نطاقات الموقع).
 - لو Tampermonkey يشغّل الأداة في الصفحة نفسها لا تعمل الإضافة (منعًا للإرسال المكرر).
 - الموقع يقرأ `data-tahdir-ext` (إصدار الإضافة) ويعرض تنبيه تحديث واحدًا عند صدور إصدار أحدث.
-- **فايرفوكس وسافاري والآيفون: بلا أي تغيير** (Tampermonkey / Userscripts كما هي).
+- **فايرفوكس**: إضافة «الكبسولة — أداة نور» منشورة وقُبِلت كـ Listed في Firefox Add-ons
+  (الرابط في `EXT_STORE.firefox`) — التثبيت من صفحة المتجر بضغطتين بلا Tampermonkey.
+  نسخة Unlisted الموقَّعة تبقى احتياطية (انظر `site/extension/STORE_LISTING.md`).
+- **سافاري والآيفون: بلا أي تغيير** (Userscripts كما هي).
 - الاختبار: `python3 site/tools/build_ext.py --test` ثم `node site/tests/ext.cjs`.
 
 ## أداة نور: التثبيت والاستخدام
