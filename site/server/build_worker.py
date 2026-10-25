@@ -1370,6 +1370,94 @@ body.tqb .ga-btn{background:#1d4ed8!important;color:#fff!important;border-color:
 body.tqb .g-btn,body.tqb .u-btn.active{background:#eef3ff!important}
 body.tqb .foot{color:#64748b}
 '''
+# ===== صفحة البداية «الكبسولة» (khome): عُقد أقسام مرتبة بنفس روح «تقني حذيفة» لكن بهوية الكبسولة =====
+extra_css += '''
+/* ===== صفحة البداية: عقد الأقسام بهوية الكبسولة (كريمي ورقي + أخضر) ===== */
+body:has(.k-land){background:#f2f7f4!important;background-image:none!important}
+.k-land{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:18px;padding:14px 16px 26px;color:var(--ink)}
+.k-hd{width:100%;max-width:1080px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,.88);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:18px;padding:10px 16px;box-shadow:0 6px 24px rgba(8,80,63,.07)}
+.k-brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)}
+.k-mark{flex:none;display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:var(--main-l);border:1px solid var(--line)}
+.k-mark .kb-logo{width:34px;height:34px;display:block}
+.k-brand b{font-family:var(--f-display);font-size:1.35rem;color:var(--main-d);line-height:1.2;display:block}
+.k-brand small{color:var(--mute);font-size:.76rem;font-weight:700}
+.k-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.k-chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:.85rem;font-weight:700;border-radius:999px;padding:7px 14px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none;cursor:pointer;transition:border-color .15s,background .15s}
+.k-chip:hover{border-color:var(--main);background:var(--main-l)}
+.k-chip.solid{background:var(--main);border-color:var(--main);color:#fff}
+.k-chip.solid:hover{background:var(--main-d)}
+.k-who{font-weight:700;color:var(--main-d);font-size:.88rem}
+.k-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;max-width:780px;margin-top:3.5vh}
+.k-kicker{display:inline-block;background:var(--main-l);color:var(--main-d);border:1px solid var(--line);border-radius:999px;padding:4px 14px;font-size:.85rem;font-weight:700;animation:fxCardIn .5s both}
+.k-h1{margin:0;font-family:var(--f-display);font-size:clamp(2.6rem,8.5vw,4.8rem);line-height:1.15;color:var(--main-d);display:flex;align-items:center;justify-content:center;gap:.28em;animation:fxWin .7s cubic-bezier(.2,1.3,.4,1) both}
+.k-mark.big{width:1.15em;height:1.15em;border-radius:.26em;background:linear-gradient(135deg,var(--main-l),#fff);animation:kbFloat 3.5s ease-in-out infinite alternate}
+.k-mark.big .kb-logo{width:.72em;height:.72em}
+@keyframes kbFloat{to{transform:translateY(-.07em) rotate(-3deg)}}
+.k-lead{margin:0;font-size:clamp(1rem,2.2vw,1.18rem);line-height:1.9;color:var(--mute);max-width:640px}
+.k-cta{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
+.k-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:800;font-size:1.02rem;padding:12px 26px;border-radius:14px;border:0;cursor:pointer;text-decoration:none;color:#fff;background:var(--main);box-shadow:0 10px 24px rgba(12,122,99,.25);transition:transform .15s,box-shadow .15s,background .15s}
+.k-btn:hover{background:var(--main-d);transform:translateY(-2px);box-shadow:0 14px 30px rgba(12,122,99,.32)}
+.k-btn.ghost{background:var(--paper);color:var(--main-d);border:1.5px solid var(--line);box-shadow:none}
+.k-btn.ghost:hover{background:var(--main-l)}
+.k-cards{width:100%;max-width:1060px;display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:12px;margin-top:6px}
+.k-c{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;padding:14px 16px;border-radius:16px;text-decoration:none;color:var(--ink);background:var(--paper);border:1px solid var(--line);box-shadow:0 4px 14px rgba(8,80,63,.05);transition:transform .18s,border-color .18s,box-shadow .18s;animation:fxCardIn .55s cubic-bezier(.2,1.4,.4,1) both}
+.k-c:hover{transform:translateY(-3px);border-color:var(--main);box-shadow:0 12px 26px rgba(12,122,99,.14)}
+.k-ci{grid-row:1/3;width:48px;height:48px;display:grid;place-items:center;font-size:1.45rem;border-radius:14px;background:var(--main-l);border:1px solid var(--line)}
+.k-c:hover .k-ci{background:var(--main);animation:fxWiggle .5s}
+.k-c b{font-size:1.02rem}.k-c small{color:var(--mute);font-size:.8rem;line-height:1.55}
+.k-ft{margin-top:auto;font-size:.8rem;color:var(--mute);text-align:center}
+@media (max-width:620px){.k-hd{justify-content:center;flex-wrap:wrap}.k-nav{width:100%;justify-content:center}.k-who{width:100%;text-align:center;order:3}.k-mark.big{width:64px;height:64px}.k-cards{grid-template-columns:1fr 1fr}.k-c{grid-template-columns:1fr;grid-template-rows:auto;text-align:center;justify-items:center;row-gap:4px}.k-ci{grid-row:auto}}
+'''
+# ===== التجاوب الكامل: تابلت + موبايل (يضغط التخطيط حتى في وضع «موقع سطح المكتب» على الجوال ~980px) =====
+extra_css += '''
+@media (max-width:1000px){
+  .layout,.qlayout,.mil{grid-template-columns:minmax(0,1fr)}
+  .layout,.qlayout{gap:14px;padding-block:14px 40px}
+  .tree,.qside{position:static;max-height:none;overflow:visible}
+  .panel,.qmain{min-width:0}
+  .top .helix{display:none}
+  .lesson,.welcome{padding:16px 14px 20px;border-radius:18px}
+}
+@media (max-width:700px){
+  .top-in{padding-block:14px 12px;gap:10px}
+  /* الهيدر على الجوال: الاسم سطر كامل بمحاذاة الوسط، والأزرار تلتف على صفين بدل
+     تمرير أفقي كان يضغط الاسم إلى 43px ويخرج قائمة«المزيد» والجرس خارج الشاشة */
+  .top .actions{flex-wrap:wrap;justify-content:center;row-gap:8px;overflow:visible;-webkit-overflow-scrolling:touch}
+  .top .actions .btn{flex:none}
+  .top .actions .navmenu{flex:none}
+  .top .who{order:-1;flex:0 0 100%;width:100%;text-align:center;font-size:.92rem;white-space:normal;padding-inline-end:0}
+  /* شريط الحالات داخل الترويسة (بعض الصفحات تمرر صفّ .stat في extra): لا يمدّ الترويسة،
+     بل يبقى بعرض الشاشة مع تمرير أفقي داخلي مخفي الأعراب */
+  .top-in>*{min-width:0;max-width:100%}
+  .top .brand{max-width:100%}
+  .top .brand>div{min-width:0}
+  .top .stats{width:100%}
+  .stats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .stats::-webkit-scrollbar{display:none}
+  .stat{white-space:nowrap}
+  /* لوحة التحكم: تبويبات الأقسام تمرر أفقيًا بدل أن توسّع الشاشة كلها إلى 477px */
+  .dash>*{min-width:0}
+  .dash .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .dash .tabs::-webkit-scrollbar{display:none}
+  .dash .tabs .tab{padding:8px 10px;font-size:.86rem;flex:none;white-space:nowrap}
+  .t-wrap{max-width:100%}
+  .wrap{padding-inline:12px}
+  .app-bar{padding:0 12px}
+  .get-app{padding:12px 14px;border-radius:16px}
+  .btn{padding:9px 14px;font-size:.88rem}
+  .btn.small{padding:8px 12px;font-size:.84rem}
+  .tree{padding:12px}
+  .l-item,.lp-l{padding:10px 12px}
+  .sel,.qsel{width:100%;max-width:none}
+  .qcard{padding:12px}
+  .modal-box{width:min(440px,94vw)!important;max-height:88vh;overflow:auto}
+}
+/* تأمين كروت العقد على الجوال الضيق والذي لا يتجاوب مع عتاد متصفح قديم */
+@media (max-width:560px){
+  .kb-banner img.kb-moe,.kb-banner img.kb-vis{height:34px}
+  .kb-banner .kb-name b{font-size:clamp(24px,6.4vw,32px)}
+}
+'''
 CSS = base_css + extra_css
 
 FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">'
@@ -1481,6 +1569,48 @@ def NAV(active, extra=''):
     h += extra
     h += '<hr><button type="button" role="menuitem" id="logoutBtn"><span class="mi">⎋</span>تسجيل الخروج</button></div></div>'
     return h
+
+# ===== صفحة البداية بعد تسجيل الدخول: عقد أقسام مرتبة بنفس روح «تقني حذيفة» (تُقدّم كل الأدوات بضغطة) =====
+_KB_DESC = {
+  '/app': 'دروس كل المواد جاهزة — عدّلها واطبعها وأرسلها إلى نور.',
+  '/quiz': 'اختبارات قصيرة ومراجعات وفق الوثيقة، بالترويسة الرسمية.',
+  '/diag': 'اختبار تشخيصي للمادة كاملة: علوم ورياضيات مع تقرير بالطباعة.',
+  '/grading': 'ارفع صورة أو ملف الواجب ويُصحَّح تلقائيًا بالمعايير.',
+  '/games': 'ألعاب صفية للسبورة والتحدي المباشر بالجوالات.',
+  '/slides': 'عروض تقديمية لكل درس، جاهزة للعرض بملء الشاشة.',
+  '/remedial': 'خطط علاجية وأنشطة وواجب سريع لمواد العلوم.',
+  '/summaries': 'ملخصات الدروس والوحدات مع خرائط ذهنية.',
+  '/cando': 'مؤشرات «أستطيع أن» لكل درس بفروقات صفي.',
+  '/analysis': 'حلّل نتائج الطلبة وحدد المتعثّرين تلقائيًا.',
+  '/ld': 'سجل وتقارير صعوبات التعلم جاهزة للتعبئة.',
+  '/forms': 'نماذج إدارية وخطابات رسمية بخطوات قليلة.',
+  '/space': 'مهمات وموارد لطالبك بمسح رمز استجابة.',
+  '/research': 'بحوث إجرائية تُولَّد عبر بؤرة في خطوات ثابتة.',
+  '/finals': 'اختبارات وزارية سابقة كاملة بأسئلتها.',
+  '/searcher': 'بحث فوري في مصادر عُمان التعليمية (نافذة خارجية).',
+}
+def khome_cards():
+    cards = [('/app', '📝', 'التحضير', _KB_DESC['/app'])]
+    for _k, h, ic, t in MENU_ITEMS:
+        if h == '/app': continue
+        cards.append((h, ic, t, _KB_DESC.get(h, '')))
+    return cards
+KHOME = ('<div class="k-land"><header class="k-hd">'
+  f'<a class="k-brand" href="/khome"><span class="k-mark">{LOGO}</span><span><b>الكبسولة</b><small>إعداد أستاذ محمد مجدي، معلم الأحياء</small></span></a>'
+  '<nav class="k-nav"><span class="k-who" id="kWho"></span>'
+  '<a class="k-chip solid" href="/app">✍ ابدأ التحضير</a>'
+  '<a class="k-chip" href="/teqany">🏫 تقني حذيفة</a>'
+  '<button type="button" class="k-chip" id="kBtnLogout">⎋ خروج</button></nav></header>'
+  '<section class="k-hero"><span class="k-kicker">كل أدوات المعلم قبل الحصة في مكان مرتب</span>'
+  f'<h1 class="k-h1"><span class="k-mark big">{LOGO}</span>الكبسولة</h1>'
+  '<p class="k-lead">تحضير المواد وتقويمها وألعابها الصفية وعروضها وتحليل نتائجها ذاتها، وخطط علاجية للطلاب دون المستوى — بضغطات قليلة تنهي تجهيز حصتك وتزيد جوّها.</p>'
+  '<div class="k-cta"><a class="k-btn" href="/app">✍ ابدأ التحضير</a><a class="k-btn ghost" href="/quiz">🧾 تكوين اختبار</a></div></section>'
+  '<section class="k-cards" aria-label="أقسام المنصة">' + ''.join(
+    f'<a class="k-c" href="{h}"{" target=\"_blank\" rel=\"noopener\"" if h.startswith("http") else ""} style="animation-delay:{i*.05:.2f}s">'
+    f'<span class="k-ci" aria-hidden="true">{ic}</span><b>{t}</b><small>{d}</small></a>'
+    for i, (h, ic, t, d) in enumerate(khome_cards())) + '</section>'
+  '<p class="k-ft">الكبسولة، إعداد أستاذ محمد مجدي · مدرسة حذيفة بن محصن (5-12)</p></div>')
+
 
 APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span> درسًا</span><span class="stat"><span id="statFilled">0</span> بتحضير جاهز</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%',
   NAV('app')) + f'''
