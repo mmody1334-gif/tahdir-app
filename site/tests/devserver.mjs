@@ -16,7 +16,7 @@ class Stmt {
   _st() { return sq.prepare(this.sql); }
   async first() { return this._st().get(...this.args) ?? null; }
   async all() { return { results: this._st().all(...this.args) }; }
-  async run() { const r = this._st().run(...this.args); return { meta: { changes: r.changes } }; }
+  async run() { const r = this._st().run(...this.args); return { meta: { changes: r.changes, last_row_id: Number(r.lastInsertRowid) } }; }
 }
 const DB = {
   prepare: s => new Stmt(s),

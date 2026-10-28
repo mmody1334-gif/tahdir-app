@@ -177,6 +177,13 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS notices(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT NOT NULL, url TEXT, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS notice_reads(notice_id INTEGER NOT NULL, user_id INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(notice_id, user_id))`,
   `CREATE INDEX IF NOT EXISTS nr_user ON notice_reads(user_id)`,
+  // «المبادرات» (تقني حذيفة فقط): كل معلم يرفع مبادراته بإثباتاتها، والمدير يرى الجميع.
+  // الملف يُخزَّن base64 مقسّمًا على أجزاء (init_chunks) لأن صف D1 محدود بنحو 2MB.
+  `CREATE TABLE IF NOT EXISTS initiatives(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, summary TEXT, goals TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS init_user ON initiatives(user_id)`,
+  `CREATE TABLE IF NOT EXISTS init_files(id INTEGER PRIMARY KEY AUTOINCREMENT, init_id INTEGER NOT NULL, user_id INTEGER NOT NULL, name TEXT, mime TEXT, size INTEGER, parts INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS initf_i ON init_files(init_id)`,
+  `CREATE TABLE IF NOT EXISTS init_chunks(file_id INTEGER NOT NULL, seq INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(file_id, seq))`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
   `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`
@@ -270,7 +277,7 @@ function htmlTq(name, extra = {}) {
   const nonce = rand(16);
   const src = PAGES_TQ[name].replace(/%CSS%/, () => PAGES.css);
   const body = src.replace(/%NONCE%/g, nonce);
-  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
   return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp, ...SEC_HEADERS, ...extra } });
 }
 function html(name, extra = {}) {
@@ -1135,6 +1142,88 @@ async function studentApi(req, env, p, m, url) {
   }
   return null;
 }
+// ---------- «المبادرات» (تقني حذيفة) ----------
+// المعلم يرى ويعدّل مبادراته فقط؛ المدير (admin) يرى مبادرات كل المعلمين ويحذف.
+const INIT_MAX_FILE = 6 * 1024 * 1024, INIT_MAX_FILES = 20, INIT_CHUNK = 900000;
+const INIT_MIME = /^(image\/(jpeg|png|webp|gif)|application\/pdf)$/;
+function b64enc(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+function b64dec(b) { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+async function initDelFiles(env, where, arg) {
+  const ids = ((await env.DB.prepare('SELECT id FROM init_files WHERE ' + where).bind(arg).all()).results || []).map(r => r.id);
+  for (const id of ids) await env.DB.batch([env.DB.prepare('DELETE FROM init_chunks WHERE file_id = ?').bind(id), env.DB.prepare('DELETE FROM init_files WHERE id = ?').bind(id)]);
+}
+async function initApi(req, env, me, p, m, url) {
+  const admin = me.role === 'admin';
+  const own = async id => { const r = await env.DB.prepare('SELECT * FROM initiatives WHERE id = ?').bind(+id).first(); return r && (r.user_id === me.id || admin) ? r : null; };
+  if (p === '/api/init' && m === 'GET') {
+    const L = ((admin
+      ? await env.DB.prepare('SELECT i.*, u.name teacher, u.username FROM initiatives i LEFT JOIN users u ON u.id = i.user_id ORDER BY i.created_at DESC LIMIT 1000').all()
+      : await env.DB.prepare('SELECT i.*, ? teacher FROM initiatives i WHERE i.user_id = ? ORDER BY i.created_at DESC').bind(me.name, me.id).all()).results) || [];
+    const F = {};
+    if (L.length) {
+      const ids = L.map(r => r.id);
+      for (let i = 0; i < ids.length; i += 90) {
+        const part = ids.slice(i, i + 90);
+        const rs = (await env.DB.prepare('SELECT id, init_id, name, mime, size FROM init_files WHERE init_id IN (' + part.map(() => '?').join(',') + ') ORDER BY id').bind(...part).all()).results || [];
+        rs.forEach(f => (F[f.init_id] = F[f.init_id] || []).push(f));
+      }
+    }
+    return json({ admin, me: me.id, items: L.map(r => ({ ...r, mine: r.user_id === me.id, files: F[r.id] || [] })) });
+  }
+  if (p === '/api/init' && m === 'POST') {
+    const b = await body(req);
+    const title = String(b.title || '').trim().slice(0, 200), summary = String(b.summary || '').trim().slice(0, 6000), goals = String(b.goals || '').trim().slice(0, 6000);
+    if (!title) return json({ error: 'اكتب عنوان المبادرة.' }, 400);
+    if (b.id) {
+      const r = await own(b.id); if (!r || (r.user_id !== me.id && !admin)) return json({ error: 'غير موجودة.' }, 404);
+      await env.DB.prepare('UPDATE initiatives SET title=?, summary=?, goals=?, updated_at=? WHERE id=?').bind(title, summary, goals, now(), r.id).run();
+      return json({ ok: true, id: r.id });
+    }
+    const n = (await env.DB.prepare('SELECT COUNT(*) n FROM initiatives WHERE user_id = ?').bind(me.id).first()).n || 0;
+    if (n >= 200) return json({ error: 'وصلت إلى الحد الأقصى للمبادرات.' }, 400);
+    const r = await env.DB.prepare('INSERT INTO initiatives(user_id,title,summary,goals,created_at,updated_at) VALUES(?,?,?,?,?,?)').bind(me.id, title, summary, goals, now(), now()).run();
+    return json({ ok: true, id: r.meta && r.meta.last_row_id });
+  }
+  let mm = p.match(/^\/api\/init\/(\d+)$/);
+  if (mm && m === 'DELETE') {
+    const r = await own(mm[1]); if (!r) return json({ error: 'غير موجودة.' }, 404);
+    await initDelFiles(env, 'init_id = ?', r.id);
+    await env.DB.prepare('DELETE FROM initiatives WHERE id = ?').bind(r.id).run();
+    return json({ ok: true });
+  }
+  mm = p.match(/^\/api\/init\/(\d+)\/file$/);
+  if (mm && m === 'POST') {
+    const r = await own(mm[1]); if (!r) return json({ error: 'غير موجودة.' }, 404);
+    const mime = String(req.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+    if (!INIT_MIME.test(mime)) return json({ error: 'نوع الملف غير مدعوم (صور أو PDF فقط).' }, 400);
+    const cnt = (await env.DB.prepare('SELECT COUNT(*) n FROM init_files WHERE init_id = ?').bind(r.id).first()).n || 0;
+    if (cnt >= INIT_MAX_FILES) return json({ error: 'الحد الأقصى ' + INIT_MAX_FILES + ' ملفًا لكل مبادرة.' }, 400);
+    const buf = new Uint8Array(await req.arrayBuffer());
+    if (!buf.length) return json({ error: 'الملف فارغ.' }, 400);
+    if (buf.length > INIT_MAX_FILE) return json({ error: 'حجم الملف أكبر من 6 ميجابايت.' }, 400);
+    let name = ''; try { name = decodeURIComponent(req.headers.get('X-File-Name') || ''); } catch (e) {}
+    name = name.replace(/[\\/\u0000-\u001f]+/g, ' ').trim().slice(0, 120) || 'ملف';
+    const b64 = b64enc(buf), parts = Math.ceil(b64.length / INIT_CHUNK);
+    const ins = await env.DB.prepare('INSERT INTO init_files(init_id,user_id,name,mime,size,parts,created_at) VALUES(?,?,?,?,?,?,?)').bind(r.id, me.id, name, mime, buf.length, parts, now()).run();
+    const fid = ins.meta && ins.meta.last_row_id;
+    try {
+      for (let i = 0; i < parts; i++) await env.DB.prepare('INSERT INTO init_chunks(file_id,seq,data) VALUES(?,?,?)').bind(fid, i, b64.slice(i * INIT_CHUNK, (i + 1) * INIT_CHUNK)).run();
+    } catch (e) { await initDelFiles(env, 'id = ?', fid); return json({ error: 'تعذّر حفظ الملف، حاول مرة أخرى.' }, 500); }
+    await env.DB.prepare('UPDATE initiatives SET updated_at=? WHERE id=?').bind(now(), r.id).run();
+    return json({ ok: true, file: { id: fid, init_id: r.id, name, mime, size: buf.length } });
+  }
+  mm = p.match(/^\/api\/init\/file\/(\d+)$/);
+  if (mm) {
+    const f = await env.DB.prepare('SELECT f.*, i.user_id owner FROM init_files f JOIN initiatives i ON i.id = f.init_id WHERE f.id = ?').bind(+mm[1]).first();
+    if (!f || (f.owner !== me.id && !admin)) return json({ error: 'غير موجود.' }, 404);
+    if (m === 'DELETE') { await initDelFiles(env, 'id = ?', f.id); return json({ ok: true }); }
+    if (m !== 'GET') return null;
+    const cs = (await env.DB.prepare('SELECT data FROM init_chunks WHERE file_id = ? ORDER BY seq').bind(f.id).all()).results || [];
+    const bytes = b64dec(cs.map(c => c.data).join(''));
+    return new Response(bytes, { headers: { 'Content-Type': f.mime, 'Cache-Control': 'private, max-age=86400', 'Content-Disposition': 'inline; filename*=UTF-8\'\'' + encodeURIComponent(f.name), ...SEC_HEADERS } });
+  }
+  return null;
+}
 async function classesApi(req, env, me, p, m, url) {
   if (p === '/api/classes' && m === 'GET') {
     const r = (await env.DB.prepare(`SELECT c.*, (SELECT COUNT(*) FROM s_attempts a WHERE a.class_id = c.id) attempts, (SELECT COUNT(DISTINCT name) FROM s_attempts a WHERE a.class_id = c.id) students FROM classes c WHERE c.user_id = ? ORDER BY c.created_at DESC`).bind(me.id).all()).results || [];
@@ -1330,6 +1419,7 @@ export default {
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
       if (p === '/api/lessons') return jsonETag(req, { lessons: await lessonsFor(env, me) });
       if (p.startsWith('/api/ai/')) { const r = await aiApi(req, env, me, p, m, url); if (r) return r; }
+      if (p === '/api/init' || p.startsWith('/api/init/')) { const r = await initApi(req, env, me, p, m, url); if (r) return r; }
       if (p.startsWith('/api/classes')) { const r = await classesApi(req, env, me, p, m, url); if (r) return r; }
       if (p === '/api/courses') { const sc = scopeOf(me); return json({ courses: (await coursesList(env)).filter(c => !sc || sc.has(c.key)) }); }
       if (p === '/api/quiz/bank') {
