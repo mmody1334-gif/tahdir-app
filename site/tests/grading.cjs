@@ -38,8 +38,9 @@ function nour(url) {
   await p.waitForURL(B + '/'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForURL(B + '/admin');
   // تعرّف الأداة على أرقام الصفوف من نور أولًا
   const n0 = await c.newPage(); await n0.goto('https://lms.moe.gov.om/teacher'); await n0.waitForTimeout(800); await n0.close();
-  await p.goto(B + '/app'); await p.waitForTimeout(800); await p.click('#menuBtn'); console.log('menu has grading:', await p.isVisible('#menuList a[href="/grading"]'));
-  await p.click('#menuList a[href="/grading"]'); await p.waitForURL(B + '/grading'); await p.waitForSelector('#grFetch'); await p.waitForTimeout(1600);
+  // «تصحيح الواجبات» مخفي من الواجهة: يُفتح بالرابط المباشر فقط
+  await p.goto(B + '/app'); await p.waitForTimeout(800); await p.click('#menuBtn'); console.log('menu has grading (should be false):', await p.isVisible('#menuList a[href="/grading"]'));
+  await p.goto(B + '/grading'); await p.waitForSelector('#grFetch'); await p.waitForTimeout(1600);
   await p.screenshot({ path: OUT + 'gr_empty.png', fullPage: true });
   await pickC(p, '#grCourse', 'الأحياء|العاشر');
   const np = c.waitForEvent('page'); await p.click('#grFetch'); const idx = await np; await idx.waitForLoadState(); await idx.waitForTimeout(2500);

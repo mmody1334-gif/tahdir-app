@@ -1576,6 +1576,7 @@ extra_css += '''
 .home-card:active{transform:scale(.97);border-color:var(--main);box-shadow:0 6px 16px rgba(12,122,99,.16)}
 .home-card:active .home-ic,.home-card.tap .home-ic{animation:fxWiggle .5s}
 body.tqb .home-card:hover{box-shadow:0 12px 26px rgba(29,78,216,.14)}
+.menu-list a .mi{display:inline-block;transition:transform .18s}.menu-list a:hover .mi{animation:fxWiggle .5s}
 @media (prefers-reduced-motion:reduce){.home-card,.home-card .home-ic{animation:none!important;transition:none}}
 /* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
 /* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
@@ -1710,14 +1711,14 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'كروت الأسئلة (بليكرز)'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
-# «تصحيح الواجبات تلقائيًا» (/grading) يظهر في قائمة «الكبسولة» فقط، ولا يظهر في «تقني حذيفة» (يُحذف في brand_tq).
+# «تصحيح الواجبات تلقائيًا» (/grading و /teqany/grading) مخفي من كل القوائم والبطاقات: يُفتح بالرابط المباشر فقط.
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
     h = '<span class="who" id="who"></span>'
-    h += f'<a class="btn ghost small" href="/app"{cur("app")}>التحضير</a>'
+    h += f'<a class="btn ghost small" href="/app"{cur("app")}>القائمة الرئيسية</a>'
     # «القيم الثابتة» لم تعد قسمًا مستقلًا: صارت حقولًا داخل تحضير كل درس (الاستراتيجيات
     # والوسائل ومصادر التعلم)، لأن كل مادة — بل كل درس — يحتاج قيمه الخاصة.
     h += '<button type="button" class="btn ghost small pulse" id="toolBtn">أداة نور</button>'
