@@ -1658,7 +1658,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
 
 MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('grading', '/grading', '✅', 'تصحيح الواجبات تلقائيًا'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
-              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'بليكرز — بطاقات الإجابة'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
+              ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'كروت الأسئلة (بليكرز)'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
 # «تصحيح الواجبات تلقائيًا» (/grading) يظهر في قائمة «الكبسولة» فقط، ولا يظهر في «تقني حذيفة» (يُحذف في brand_tq).
 def NAV(active, extra=''):
     cur = lambda k: ' aria-current="page"' if k == active else ''
@@ -1814,7 +1814,7 @@ FORMS_PAGE = TOP('<div class="stats"><span class="stat">النماذج الإد�
 SPACE_PAGE = TOP('<div class="stats"><span class="stat">مساحة الطالب</span><span class="stat">صفوف برمز يتدرب فيها طلابك بلا حساب</span></div>').replace('%BTNS%', NAV('space')) + '''
 <main class="wrap an-wrap" id="spMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>'''
 STUDENT_PAGE = '<main class="st" id="st"></main>'
-CARDS_PAGE = TOP('<div class="stats"><span class="stat">بليكرز — بطاقات الإجابة</span><span class="stat">بطاقة لكل طالب · الأسئلة على السبورة · المسح بكاميرا الجوال</span></div>').replace('%BTNS%', NAV('cards')) + '''
+CARDS_PAGE = TOP('<div class="stats"><span class="stat">كروت الأسئلة (بليكرز)</span><span class="stat">بطاقة لكل طالب · الأسئلة على السبورة · المسح بكاميرا الجوال</span></div>').replace('%BTNS%', NAV('cards')) + '''
 <main class="wrap an-wrap" id="cdMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
 <div id="printArea"></div>'''
 # «المبادرات»: خاصة بـ «تقني حذيفة» فقط (لا تُضاف إلى PAGES ولا MENU_ITEMS)
@@ -1930,7 +1930,8 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
 # أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا.
 # الروابط الخارجية (مثل باحث المدرسة) لا تُبنى ببادئة /teqany ولا تُستبعد:
 # شرط h.startswith('/') القديم كان يحذفها، فغابت من كروت الواجهة رغم وجودها في «المزيد».
-TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, '') for _k, h, ic, t in MENU_ITEMS
+_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال'}
+TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, _TQ_DESC.get(h, '')) for _k, h, ic, t in MENU_ITEMS
                 if _k != 'grading' and (h if h.startswith('http') else '/teqany' + h) not in {x[0] for x in TQ_SECTIONS}]
 # باحث المدرسة خاص بـ «تقني حذيفة» فقط: غير موجود في MENU_ITEMS (أُخفي من الكبسولة)،
 # فيُضاف هنا صراحةً إلى كروت تقني وقائمة «المزيد» الخاصة بها، لا إلى الكبسولة.
@@ -1974,7 +1975,7 @@ PAGES = {
   'analysis': page('تحليل نتائج الاختبارات · الكبسولة', ANALYSIS_PAGE, rd('client_analysis.js')),
   'ld': page('سجل صعوبات التعلم · الكبسولة', LD_PAGE, rd('client_ld.js')),
   'forms': page('النماذج الإدارية · الكبسولة', FORMS_PAGE, rd('client_forms.js')),
-  'cards': page('بليكرز · الكبسولة', CARDS_PAGE, rd('vendor/qr.js') + chr(10) + rd('client_cardscan.js') + chr(10) + rd('client_cards.js')),
+  'cards': page('كروت الأسئلة · الكبسولة', CARDS_PAGE, rd('vendor/qr.js') + chr(10) + rd('client_cardscan.js') + chr(10) + rd('client_cards.js')),
   'space': page('مساحة الطالب · الكبسولة', SPACE_PAGE, rd('vendor/qr.js') + chr(10) + rd('client_space.js')),
   'student': page('مساحة الطالب', STUDENT_PAGE, rd('client_student.js')),
   'research': page('البحوث الإجرائية · الكبسولة', RESEARCH_PAGE, 'window.RESEARCH=' + json.dumps(RESEARCH, ensure_ascii=False, separators=(',', ':')) + ';' + chr(10) + rd('client_rsgen.js') + chr(10) + rd('client_research.js')),

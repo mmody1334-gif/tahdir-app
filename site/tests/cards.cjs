@@ -21,6 +21,14 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   if (await p.$('#setupForm')) { await p.fill('#name', 'أ. محمد مجدي'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.fill('#password2', 'Bio@2026x'); await p.click('#setupForm button[type=submit]'); await p.waitForTimeout(1500); await p.goto(B + '/', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(800); }
   await shut(p); if (await p.$('#loginForm')) { await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForTimeout(2500); }
   await p.goto(B + '/cards', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2000); await shut(p);
+  // الاسم والأماكن: «المزيد» + بطاقات الواجهة (الكبسولة) + واجهة تقني وقائمتها
+  const places = await p.evaluate(async () => {
+    const N = 'كروت الأسئلة (بليكرز)', get = u => fetch(u).then(r => r.text()), d = h => new DOMParser().parseFromString(h, 'text/html');
+    const kh = d(await get('/khome')), tq = d(await get('/teqany')), tqp = d(await get('/teqany/quiz'));
+    const has = (doc, sel) => [...doc.querySelectorAll(sel)].some(a => a.textContent.includes(N));
+    return { menu: has(document, '#menuList a[href="/cards"]'), home: has(kh, 'a[href="/cards"]'), tqCard: has(tq, 'a.tq-c[href="/teqany/cards"]'), tqMenu: has(tqp, '#menuList a[href="/teqany/cards"]'), title: document.querySelector('.an-head h2').textContent.includes(N) };
+  });
+  ok('«كروت الأسئلة (بليكرز)» في المزيد وبطاقات الواجهة وتقني', Object.values(places).every(Boolean), JSON.stringify(places));
   // الشرح: يفتح تلقائيًا أول مرة، وصور رفع البطاقة صحيحة (الكاشف نفسه يقرأ كل صورة بإجابتها)
   ok('«طريقة الاستخدام» فُتحت تلقائيًا أول زيارة', await p.evaluate(() => localStorage.getItem('tahdir_cards_help') === '1'));
   await p.click('#ckHelp'); await p.waitForSelector('.ck-help .ck-holds figure');
@@ -40,7 +48,7 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   ok('صور الشرح: كل اتجاه يُقرأ بإجابته (أ ب ج د)', holds.join() === '0,1,2,3', holds.join());
   await shut(p); await p.waitForTimeout(300);
   ok('خطوات «دليلك للاستخدام!» لهذه الصفحة', await p.evaluate(() => tourSteps().length === 6 && /بليكرز/.test(tourSteps()[0].title)));
-  ok('القسم في «المزيد» باسم بليكرز', await p.evaluate(() => /بليكرز/.test((document.querySelector('#menuList a[href="/cards"]') || {}).textContent || '')));
+  ok('القسم في «المزيد» باسم كروت الأسئلة (بليكرز)', await p.evaluate(() => /كروت الأسئلة \(بليكرز\)/.test((document.querySelector('#menuList a[href="/cards"]') || {}).textContent || '')));
   // إضافة صف
   await p.click('#cdNewC'); await p.waitForSelector('#cfL');
   await p.fill('#cfT', 'العاشر / 2');

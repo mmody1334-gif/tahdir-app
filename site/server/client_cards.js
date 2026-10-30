@@ -47,7 +47,7 @@ function parseNames(t){
 function holdSvg(k,size,en){return '<div class="ck-hold" style="width:'+size+'px;height:'+size+'px"><div style="transform:rotate('+[0,-90,180,90][k]+'deg)">'+cardSvg(7,{en:en})+'</div></div>';}
 function holdRow(size,en){var L=en?CARD_LET_EN:LET;return '<div class="ck-holds">'+[0,1,2,3].map(function(k){return '<figure><span class="ck-up">▲ '+L[k]+'</span>'+holdSvg(k,size,en)+'<figcaption>إجابتي <b>'+L[k]+'</b></figcaption></figure>';}).join('')+'</div>';}
 function help(){
-  dialog({title:'طريقة الاستخدام — بليكرز',wide:true,cancelText:false,okText:'فهمت ✓',html:'<div class="ck-help">'+
+  dialog({title:'طريقة الاستخدام — كروت الأسئلة (بليكرز)',wide:true,cancelText:false,okText:'فهمت ✓',html:'<div class="ck-help">'+
     '<h4>للمعلم: 4 خطوات</h4><ol>'+
       '<li><b>أضف صفًا:</b> اختر المادة والصف، والصق الأسماء بترتيب الكشف (من Excel أو نور). تحفظ المنصة <b>الاسم الأول والقبيلة</b> فقط (علي بن سالم بن محمد الشامسي ← علي الشامسي).</li>'+
       '<li><b>اطبع البطاقات:</b> بطاقتان في الصفحة بحجم 100%. البطاقة رقم 1 لأول طالب في الكشف، وهكذا. يحتفظ الطالب ببطاقته لكل الحصص.</li>'+
@@ -73,7 +73,7 @@ function load(){
 }
 var TAB='classes';
 function home(){
-  var h='<div class="an-head"><h2>🪪 بليكرز — بطاقات الإجابة</h2><p class="muted">لكل طالب بطاقة مطبوعة برمز خاص، يديرها فيصبح حرف إجابته في الأعلى، وتمسح الفصل كله بكاميرا جوالك في ثوانٍ: يُسجَّل كل طالب باسمه صح أو خطأ. الأسئلة تُعرض على شاشة الكمبيوتر وتتحكم فيها من الجوال.</p></div>'+
+  var h='<div class="an-head"><h2>🪪 كروت الأسئلة (بليكرز)</h2><p class="muted">لكل طالب بطاقة مطبوعة برمز خاص، يديرها فيصبح حرف إجابته في الأعلى، وتمسح الفصل كله بكاميرا جوالك في ثوانٍ: يُسجَّل كل طالب باسمه صح أو خطأ. الأسئلة تُعرض على شاشة الكمبيوتر وتتحكم فيها من الجوال.</p></div>'+
     '<ol class="ck-steps"><li><b>أضف صفًا</b> والصق أسماء الطلاب</li><li><b>اطبع البطاقات</b> ووزّعها بالترتيب</li><li><b>ولّد الأسئلة</b> من بنك الصف</li><li><b>اعرض على الكمبيوتر</b> وامسح بالجوال</li></ol>'+
     '<div class="an-new"><button type="button" class="btn small" id="ckHelp">❓ طريقة الاستخدام</button></div>'+
     '<div class="ck-tabs" role="tablist"><button role="tab" data-tab="classes" aria-selected="'+(TAB==='classes')+'">👥 صفوفي ('+classes.length+')</button><button role="tab" data-tab="sessions" aria-selected="'+(TAB==='sessions')+'">📋 الجلسات والنتائج ('+sessions.length+')</button></div>';
