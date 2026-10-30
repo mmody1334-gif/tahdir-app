@@ -379,21 +379,23 @@ function teacherSubject(){
   return ss[0]||'العلوم';
 }
 var homeQ='';
-function homeCardHtml(c,attr){
-  return '<button type="button" class="home-card" '+attr+'="'+esc(c.key)+'"><span class="home-ic" aria-hidden="true">'+c.icon+'</span><span class="home-title">'+esc(c.title)+'</span><span class="home-sub">'+esc(c.sub)+'</span></button>';
+function homeCardHtml(c,attr,i){
+  return '<button type="button" class="home-card" '+attr+'="'+esc(c.key)+'" style="animation-delay:'+((i||0)*0.05).toFixed(2)+'s"><span class="home-ic" aria-hidden="true">'+c.icon+'</span><span class="home-title">'+esc(c.title)+'</span><span class="home-sub">'+esc(c.sub)+'</span></button>';
 }
 function renderHomeCards(){
   var q=normAr(homeQ);
   var main=HOME_CARDS.filter(function(c){return !q||normAr(c.title+' '+c.sub).indexOf(q)>=0;});
   var tools=HOME_TOOLS.filter(function(c){return !q||normAr(c.title+' '+c.sub).indexOf(q)>=0;});
-  var g=$('homeGrid');if(g)g.innerHTML=main.length?main.map(function(c){return homeCardHtml(c,'data-home');}).join(''):'<div class="home-empty">لا توجد أقسام مطابقة للبحث.</div>';
-  var t=$('homeTools');if(t)t.innerHTML=tools.length?tools.map(function(c){return homeCardHtml(c,'data-tool');}).join(''):'';
+  var g=$('homeGrid');if(g)g.innerHTML=main.length?main.map(function(c,i){return homeCardHtml(c,'data-home',i);}).join(''):'<div class="home-empty">لا توجد أقسام مطابقة للبحث.</div>';
+  var t=$('homeTools');if(t)t.innerHTML=tools.length?tools.map(function(c,i){return homeCardHtml(c,'data-tool',main.length+i);}).join(''):'';
   var th=$('homeToolsHead');if(th)th.style.display=tools.length?'':'none';
   Array.prototype.forEach.call(document.querySelectorAll('[data-home]'),function(b){
     b.onclick=function(){
       var k=b.getAttribute('data-home');
       var c=HOME_CARDS.filter(function(x){return x.key===k;})[0];if(!c)return;
       if(c.key==='prep'){showPrep();return;}
+      // على الجوال لا يوجد «مرور»: نُظهر اهتزاز الأيقونة لحظة ثم ننتقل
+      if(window.matchMedia&&matchMedia('(hover:none)').matches){b.classList.add('tap');setTimeout(function(){location.href=tqUrl(c.route);},180);return;}
       location.href=tqUrl(c.route); // داخل «تقني حذيفة» تبقى البطاقات تحت /teqany
     };
   });

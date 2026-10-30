@@ -1568,6 +1568,15 @@ extra_css += '''
   .kb-banner img.kb-moe,.kb-banner img.kb-vis{height:34px}
   .kb-banner .kb-name b{font-size:clamp(24px,6.4vw,32px)}
 }
+/* بطاقات رئيسية الكبسولة (/app): نفس تفاعل بطاقات «تقني حذيفة» — دخول متتابع، ارتفاع عند المرور، وأيقونة تهتز وتكبر — بألوان الكبسولة */
+.home-card{transition:transform .18s,border-color .18s,box-shadow .18s;animation:fxCardIn .55s cubic-bezier(.2,1.4,.4,1) both;-webkit-tap-highlight-color:transparent}
+.home-card:hover{transform:translateY(-3px);border-color:var(--main);box-shadow:0 12px 26px rgba(12,122,99,.16)}
+.home-card .home-ic{transition:transform .2s,box-shadow .2s}
+.home-card:hover .home-ic{animation:fxWiggle .5s;box-shadow:0 8px 18px rgba(16,38,31,.28)}
+.home-card:active{transform:scale(.97);border-color:var(--main);box-shadow:0 6px 16px rgba(12,122,99,.16)}
+.home-card:active .home-ic,.home-card.tap .home-ic{animation:fxWiggle .5s}
+body.tqb .home-card:hover{box-shadow:0 12px 26px rgba(29,78,216,.14)}
+@media (prefers-reduced-motion:reduce){.home-card,.home-card .home-ic{animation:none!important;transition:none}}
 /* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
 /* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
 @media (max-width:700px){
