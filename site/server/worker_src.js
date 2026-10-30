@@ -1318,6 +1318,21 @@ export default {
       if (p === '/download/tahdir.apk') return new Response(Uint8Array.from(atob(APK), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Disposition': 'attachment; filename="tahdir.apk"', 'Cache-Control': 'no-cache' } });
       if (ICONS[p]) return new Response(Uint8Array.from(atob(ICONS[p]), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' } });
       if (p === '/manifest.webmanifest') return new Response(MANIFEST, { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
+      // فيديو الإعلانات مع دعم Range (Safari/آيفون لا يشغّل الفيديو بدونه، والأصول الثابتة تُرجع الملف كاملًا)
+      { const pv = p.match(/^\/pv\/([a-z0-9_-]+\.(mp4|jpg))$/i);
+        if (pv && env.ASSETS) {
+          const r = await env.ASSETS.fetch(new Request(new URL('/promo/' + pv[1], url.origin)));
+          if (!r.ok) return new Response('nf', { status: 404 });
+          const buf = new Uint8Array(await r.arrayBuffer()), ct = pv[2].toLowerCase() === 'mp4' ? 'video/mp4' : 'image/jpeg', n = buf.length;
+          const H = { 'Content-Type': ct, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' };
+          const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.get('Range') || '');
+          if (rg && (rg[1] || rg[2])) {
+            let a = rg[1] ? +rg[1] : Math.max(0, n - +rg[2]), z = rg[1] && rg[2] ? Math.min(+rg[2], n - 1) : n - 1;
+            if (a >= n || a > z) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${n}` } });
+            return new Response(req.method === 'HEAD' ? null : buf.subarray(a, z + 1), { status: 206, headers: { ...H, 'Content-Range': `bytes ${a}-${z}/${n}`, 'Content-Length': String(z - a + 1) } });
+          }
+          return new Response(req.method === 'HEAD' ? null : buf, { headers: { ...H, 'Content-Length': String(n) } });
+        } }
       if (p === '/version') { let packs = false; try { packs = await loadPacks(env, url); } catch (e) { packs = String(e.message || e); } return json({ ...BUILD, packs }); }
       if ((mm0 = p.match(/^\/x\/([a-f0-9]{40})$/))) return exportFile(req, env, mm0[1]);
       if (p === '/robots.txt') return new Response('User-agent: *\nDisallow: /', { headers: { 'Content-Type': 'text/plain' } });

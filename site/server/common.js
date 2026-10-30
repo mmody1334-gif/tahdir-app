@@ -641,6 +641,8 @@ function initNav(me){
 // إعلانات ديناميكية يضيفها المدير من لوحة التحكم. حالة «مقروء» لكل مستخدم مخزّنة في
 // قاعدة البيانات (تبقى حتى لو مسح تخزين المتصفح)، وغير المقروء نقطة حمراء على الجرس.
 // الإعلان الثابت المبني داخل الصفحة (showAnnouncement) باقٍ كما هو؛ هذا complementary.
+// فيديو الإعلانات يُخدَم من /pv/ (يدعم Range لآيفون) بدل الأصل الثابت /promo/
+function vidUrl(u){return String(u||'').replace(/^\/promo\//,'/pv/');}
 function initNotices(me){
   if(navigator.webdriver)return; // الاختبارات الآلية لا تحتاج الجرس
   if(!me)return; // الجرس للمسجلين فقط (وإلا فسيرد الخادم 401 ويعيدنا للدخول)
@@ -665,7 +667,7 @@ function initNotices(me){
       return '<li class="bp-it'+(n.read?' read':'')+'">'+
         '<div class="bp-t">'+(n.read?'':'<span class="bp-ndot" aria-hidden="true"></span>')+esc(n.title)+'</div>'+
         '<div class="bp-b">'+esc(n.body).replace(/\n/g,'<br>')+'</div>'+
-        (n.video?'<video class="bp-vid" src="'+esc(n.video)+'" poster="'+esc(n.video.replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="none"></video>':'')+
+        (n.video?'<video class="bp-vid" src="'+esc(vidUrl(n.video))+'" poster="'+esc(vidUrl(n.video).replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="none"></video>':'')+
         (n.url?'<a class="bp-link" href="'+esc(n.url)+'" target="_blank" rel="noopener">فتح الرابط ↗</a>':'')+
         (n.read?'<span class="bp-read">مقروء ✓</span>':'<button type="button" class="btn small primary bp-ok" data-no="'+n.id+'">حسنًا</button>')+
         '<span class="bp-date">'+fmtDate(n.created_at)+'</span></li>';
@@ -694,7 +696,7 @@ function initNotices(me){
       var ov=$('modal');if(!ov)return;
       if(!ov.hidden||$('tourOv')){if(++tries<40)setTimeout(show,900);return;}
       var p=dialog({title:v.title,okText:'حسنًا 👍',cancelText:false,
-        html:'<div class="nv-wrap"><video class="nv-vid" id="nvVid" src="'+esc(v.video)+'" poster="'+esc(v.video.replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="auto"></video>'+
+        html:'<div class="nv-wrap"><video class="nv-vid" id="nvVid" src="'+esc(vidUrl(v.video))+'" poster="'+esc(vidUrl(v.video).replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="auto"></video>'+
           '<button type="button" class="nv-snd" id="nvSnd" hidden>🔊 شغّل الصوت</button></div><p class="m-msg nv-txt">'+esc(v.body)+'</p><p class="muted small nv-later">تجده دائمًا في الإشعارات 🔔 أعلى الصفحة.</p>'});
       var box=$('modalBox');if(box)box.classList.add('nv-box');
       var vid=$('nvVid'),snd=$('nvSnd');

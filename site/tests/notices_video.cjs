@@ -16,7 +16,7 @@ let pass = 0, fail = 0; const ok = (n, c, x) => { (c ? pass++ : fail++); console
   const k = await p.evaluate(() => fetch('/api/notices?b=k').then(r => r.json())), t = await p.evaluate(() => fetch('/api/notices?b=t').then(r => r.json()));
   ok('الكبسولة: إعلانها فقط', k.notices.some(n => n.video === '/promo/kabsula.mp4') && !k.notices.some(n => n.video === '/promo/teqany.mp4'));
   ok('تقني: إعلانها فقط', t.notices.some(n => n.video === '/promo/teqany.mp4') && !t.notices.some(n => n.video === '/promo/kabsula.mp4'));
-  ok('ملف الفيديو يُخدم', await p.evaluate(() => fetch('/promo/kabsula.mp4', { headers: { Range: 'bytes=0-99' } }).then(r => r.status === 206 || r.ok)));
+  ok('ملف الفيديو يُخدم', await p.evaluate(() => fetch('/pv/kabsula.mp4', { headers: { Range: 'bytes=0-99' } }).then(async r => r.status === 206 && (await r.arrayBuffer()).byteLength === 100)));
   for (const [path, vid] of [['/quiz', 'kabsula'], ['/teqany/quiz', 'teqany']]) {
     await p.goto(B + path, { waitUntil: 'domcontentloaded' });
     // نافذة الترحيب/الدليل قد تظهر أولًا: نغلق ما ليس فيديو حتى تظهر نافذة الإعلان
@@ -27,14 +27,14 @@ let pass = 0, fail = 0; const ok = (n, c, x) => { (c ? pass++ : fail++); console
       await p.waitForTimeout(1500);
       const st = await p.$eval('#nvVid', v => ({ src: v.getAttribute('src'), t: v.currentTime, h264: !!v.canPlayType('video/mp4; codecs="avc1.640028"') }));
       // Chromium الخاص بالاختبارات بلا H.264 (المتصفحات والتطبيق الحقيقي تدعمه): نتحقق من التشغيل حين يتوفر
-      ok(path + ': فيديو المنصة الصحيح' + (st.h264 ? ' يعمل' : ' (متصفح الاختبار بلا H.264)'), st.src === '/promo/' + vid + '.mp4' && (!st.h264 || st.t > 0), JSON.stringify(st));
+      ok(path + ': فيديو المنصة الصحيح' + (st.h264 ? ' يعمل' : ' (متصفح الاختبار بلا H.264)'), st.src === '/pv/' + vid + '.mp4' && (!st.h264 || st.t > 0), JSON.stringify(st));
       await p.screenshot({ path: OUT + '/notice_video_' + vid + '.png' });
       await p.click('#mOk'); await p.waitForTimeout(400);
     }
     await p.reload({ waitUntil: 'domcontentloaded' }); await p.waitForTimeout(4500);
     ok(path + ': لا تتكرر بعد قراءتها', !(await p.$('#nvVid')));
     await p.click('#bellBtn'); await p.waitForTimeout(800);
-    ok(path + ': الفيديو باقٍ في الجرس', await p.evaluate(v => !!document.querySelector('#bellPanel video.bp-vid[src="/promo/' + v + '.mp4"]'), vid));
+    ok(path + ': الفيديو باقٍ في الجرس', await p.evaluate(v => !!document.querySelector('#bellPanel video.bp-vid[src="/pv/' + v + '.mp4"]'), vid));
     await p.keyboard.press('Escape');
   }
   ok('بلا أخطاء جافاسكربت', !errs.length, errs.join(' | '));
