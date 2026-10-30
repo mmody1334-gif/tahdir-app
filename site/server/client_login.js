@@ -46,4 +46,15 @@ if(setup){
   });
 }
 if(/TahdirApp/.test(navigator.userAgent)){var ga=document.getElementById('getApp');if(ga)ga.hidden=true;}
+// واجهة «تقني حذيفة»: إن كان المعلم مسجّلًا يظهر شريطه (القائمة الرئيسية · الدليل · الإشعارات · المزيد) وتعمل الإشعارات ونافذة الفيديو
+var tqBar=$('tqBar');
+if(tqBar){
+  fetch('/api/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null;}).then(function(me){
+    if(!me||!me.name)return;
+    tqBar.hidden=false;
+    var cta=document.querySelector('.tq-cta .tq-btn:not(.ghost)');if(cta){cta.href=tqUrl(me.role==='admin'?'/admin':'/app');cta.innerHTML='القائمة الرئيسية <span aria-hidden="true">←</span>';}
+    initNav(me);
+    if(typeof IN_APP!=='undefined'&&IN_APP&&typeof appShell==='function')appShell();
+  },function(){});
+}
 })();

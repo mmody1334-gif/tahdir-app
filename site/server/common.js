@@ -1006,6 +1006,7 @@ function appShell(){
   // بلا تكبير بالأصابع: يتصرف كتطبيق (المحتوى نفسه مهيأ لعرض الجوال)
   var vp=document.querySelector('meta[name=viewport]');if(vp&&!/maximum-scale/.test(vp.content))vp.content+=',maximum-scale=1,user-scalable=no';
   var mb=$('menuBtn');if(!mb||$('abar'))return;
+  if($('tqBar')&&$('tqBar').hidden)return; // واجهة تقني قبل التأكد من تسجيل الدخول
   var P=location.pathname.replace(/^\/teqany/,'')||'/',hash=location.hash;
   // عنوان قصير للقسم: نفس اسمه في قائمة «الأقسام»، وإلا أول شارة في الترويسة
   var ma=Array.prototype.filter.call(document.querySelectorAll('#menuList a'),function(a){return (a.getAttribute('href')||'').replace(/^\/teqany/,'')===P;})[0];

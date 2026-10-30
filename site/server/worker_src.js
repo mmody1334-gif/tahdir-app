@@ -1377,7 +1377,8 @@ export default {
       // بقية صفحات «تقني» (بعد التحقق من الدخول)
       if (TQ_MAP[p]) return htmlTq(TQ_MAP[p]);
       // أي صفحة جديدة في المنصة تعمل تلقائيًا تحت /teqany/<اسمها> بهوية «تقني حذيفة»
-      { const tq = p.match(/^\/teqany\/([a-z]+)\/?$/); if (tq && tq[1] !== 'css' && tq[1] !== 'teqany' && tq[1] !== 'grading' && PAGES_TQ[tq[1]]) return htmlTq(tq[1]); }
+      // «تصحيح الواجبات» مخفي من القوائم في المنصتين، ويُفتح بالرابط المباشر (/grading و /teqany/grading)
+      { const tq = p.match(/^\/teqany\/([a-z]+)\/?$/); if (tq && tq[1] !== 'css' && tq[1] !== 'teqany' && PAGES_TQ[tq[1]]) return htmlTq(tq[1]); }
       if (p === '/app') return html('app');
       if (p === '/api/me') {
         // «first»: أول دخول لهذا الحساب — يُستخدم لإظهار دليل الاستخدام مرة واحدة

@@ -1592,6 +1592,15 @@ body.tqb .home-card:hover{box-shadow:0 12px 26px rgba(29,78,216,.14)}
 .nv-snd{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);border:0;border-radius:999px;padding:10px 18px;font:inherit;font-weight:800;background:var(--main);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;animation:glow 1.6s ease-in-out infinite}
 .nv-txt{margin:0 0 4px}.nv-later{margin:0}
 .bp-vid{display:block;width:100%;max-height:340px;background:#000;border-radius:12px;margin:8px 0 4px;aspect-ratio:9/16;object-fit:contain}
+/* واجهة «تقني حذيفة»: شريط المعلم تحت البانر (بعد تسجيل الدخول) */
+.tq-navbar{width:100%;max-width:1060px;margin:10px auto 0;padding:8px 12px;background:#fff;border:1px solid #e3e9f6;border-radius:16px;box-shadow:0 6px 18px rgba(15,23,42,.06);animation:fxCardIn .45s cubic-bezier(.2,1.4,.4,1) both;position:relative;z-index:5}
+.tq-navbar .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-start}
+.tq-navbar .who{font-weight:800;color:#1e3a8a;margin-inline-end:auto}
+.tq-navbar .btn.ghost{background:#f6f9ff;border:1px solid #d6e1fb;color:#1e3a8a}
+.tq-navbar .btn.ghost:hover{background:#eef3ff;border-color:#1d4ed8}
+.tq-navbar .menu-btn{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+.tq-navbar .menu-btn:hover{background:#1e3a8a}
+@media (max-width:820px){html.inapp .tq-navbar{display:none}}
 /* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
 /* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
 @media (max-width:700px){
@@ -2006,7 +2015,9 @@ TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, _TQ_DESC.g
 # فيُضاف هنا صراحةً إلى كروت تقني وقائمة «المزيد» الخاصة بها، لا إلى الكبسولة.
 TQ_SECTIONS.append(('/teqany/initiatives', '💡', 'المبادرات', 'ارفع مبادرتك بإثباتاتها'))
 TQ_SECTIONS.append(('https://hudhifa-searcher.onrender.com/', '🔎', 'باحث المدرسة', ''))
-TEQANY = tq_shell('<section class="tq-hero"><span class="tq-kicker">منصة مدرسة حذيفة بن محصن</span>'
+# شريط المعلم في واجهة «تقني حذيفة» (يظهر بعد تسجيل الدخول فقط): نفس شريط الكبسولة — القائمة الرئيسية، الدليل، الإشعارات، المزيد
+TQ_NAVBAR = '<div class="tq-navbar" id="tqBar" hidden><div class="actions whobar">%TQNAV%</div></div>'
+TEQANY = tq_shell(TQ_NAVBAR + '<section class="tq-hero"><span class="tq-kicker">منصة مدرسة حذيفة بن محصن</span>'
   '<h1 class="tq-h1">' + TEQANY_LOGO + '</h1>'
   '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
   '<div class="tq-cta"><a class="tq-btn" href="/teqany/login">دخول المنصة <span aria-hidden="true">←</span></a><a class="tq-btn ghost" href="/teqany/tahdir">التحضير مباشرة</a></div></section>'
@@ -2078,6 +2089,9 @@ def brand_tq(h):
     h = h.replace('<a role="menuitem" href="https://hudhifa-searcher.onrender.com/"', '<a role="menuitem" href="/teqany/initiatives"><span class="mi">💡</span>المبادرات</a><a role="menuitem" href="https://hudhifa-searcher.onrender.com/"', 1)
     return h
 
+# شريط المعلم في واجهة /teqany: روابط «تقني حذيفة» نفسها (بادئة /teqany، بلا «تصحيح الواجبات»، مع المبادرات وباحث المدرسة)
+_tqnav = brand_tq(NAV('teqany')).replace('id="toolBtn"', 'id="toolBtn" hidden')
+PAGES['teqany'] = PAGES['teqany'].replace('%TQNAV%', _tqnav)
 PAGES_TQ = {k: (brand_tq(v) if k != 'css' else v) for k, v in PAGES.items() if k != 'teqany'}
 PAGES_TQ['login'] = page('تقني حذيفة · الدخول', TQ_LOGIN, rd('client_login.js'))
 PAGES_TQ['initiatives'] = brand_tq(page('المبادرات · الكبسولة', INIT_PAGE, rd('client_init.js'))).replace('href="/teqany/initiatives">', 'href="/teqany/initiatives" aria-current="page">', 1)
