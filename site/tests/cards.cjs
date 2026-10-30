@@ -198,6 +198,14 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   // تقني حذيفة
   const tq = await p.evaluate(() => fetch('/teqany/cards').then(r => r.status + ' ' + r.headers.get('permissions-policy')));
   ok('يعمل في تقني حذيفة أيضًا', /^200 .*camera=\(self\)/.test(tq), tq);
+  // بطاقة القسم في الرئيسية التي يراها المعلم (/app) وفي تقني (/teqany/tahdir): تنقل إلى الصفحة الصحيحة
+  for (const [home, dest, key] of [['/app', '/cards', 'cards'], ['/teqany/tahdir', '/teqany/cards', 'cards'], ['/teqany/tahdir', '/teqany/quiz', 'quiz']]) {
+    await p.goto(B + home, { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2200); await shut(p); await p.evaluate(() => { const t = document.getElementById('tourOv'); if (t) t.remove(); });
+    const card = await p.$('[data-home="' + key + '"]');
+    const txt = card ? await card.textContent() : '';
+    if (card) { await card.click(); await p.waitForTimeout(1200); }
+    ok('بطاقة «' + key + '» في رئيسية ' + home + ' ← ' + dest, (key !== 'cards' || /كروت الأسئلة \(بليكرز\)/.test(txt)) && new URL(p.url()).pathname === dest, txt.trim().slice(0, 40) + ' → ' + p.url());
+  }
   ok('بلا أخطاء جافاسكربت', errs.length === 0, errs.join(' | '));
   console.log(`\n${pass} pass, ${fail} fail`); await b1.close(); s.stop && s.stop(); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

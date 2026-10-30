@@ -348,6 +348,7 @@ function openSettings(){
 var HOME_CARDS=[
   {key:'prep',title:'التحضير',icon:'📋',sub:'دروس جاهزة للإرسال إلى نور',route:''},
   {key:'quiz',title:'التقويم والاختبارات',icon:'📝',sub:'اختبارات قصيرة وفق الوثيقة',route:'/quiz'},
+  {key:'cards',title:'كروت الأسئلة (بليكرز)',icon:'🪪',sub:'بطاقة لكل طالب وامسح الصف بالجوال',route:'/cards'},
   {key:'games',title:'الألعاب التعليمية',icon:'🎲',sub:'شد الحبل، العداء، كرة القدم…',route:'/games'},
   {key:'slides',title:'العروض التقديمية',icon:'📽️',sub:'عروض كل مادة وصف',route:'/slides'},
   {key:'finals',title:'الاختبارات النهائية',icon:'🗂',sub:'أسئلة الوزارة حسب الدرس',route:'/finals'},
@@ -393,7 +394,7 @@ function renderHomeCards(){
       var k=b.getAttribute('data-home');
       var c=HOME_CARDS.filter(function(x){return x.key===k;})[0];if(!c)return;
       if(c.key==='prep'){showPrep();return;}
-      location.href=c.route;
+      location.href=tqUrl(c.route); // داخل «تقني حذيفة» تبقى البطاقات تحت /teqany
     };
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'),function(b){
