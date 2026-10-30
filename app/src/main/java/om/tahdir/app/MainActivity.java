@@ -109,6 +109,8 @@ public class MainActivity extends Activity {
 
         FrameLayout frame = new FrameLayout(this);
         site = makeWebView();
+        site.getSettings().setSupportZoom(false);
+        site.getSettings().setBuiltInZoomControls(false);
         nour = makeWebView();
         frame.addView(site);
         frame.addView(nour);
@@ -160,6 +162,10 @@ public class MainActivity extends Activity {
         s.setDatabaseEnabled(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        // يتصرف كتطبيق جوال: الموقع يعرض واجهة الجوال (شريط سفلي، أوراق سفلية)، فلا تكبير بالأصابع،
+        // وحجم الخط ثابت حتى لا يكسر تكبيرُ خط النظام التخطيطَ (كان يُظهر صفحات أعرض من الشاشة).
+        // منصة نور تبقى قابلة للتكبير لأنها موقع كمبيوتر.
+        s.setTextZoom(100);
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
         s.setSupportMultipleWindows(false);

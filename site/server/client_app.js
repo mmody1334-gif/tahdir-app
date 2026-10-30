@@ -407,6 +407,7 @@ function renderHomeCards(){
   });
 }
 function showHome(){
+  if(window.abSync)window.abSync(false);
   var lay=document.querySelector('.wrap.layout');if(lay)lay.classList.add('home-view');
   // شريحة المعلم: الاسم + «معلم المادة» فقط، بلا صف (بناءً على طلب المعلم).
   $('panel').innerHTML='<div class="home"><div class="home-head"><span class="home-teacher">'+esc(me&&me.name?me.name:'')+' · معلم '+esc(teacherSubject())+'</span><p class="home-tag">كل شيء يحتاجه المعلم في مكان واحد</p><input id="homeSearch" class="home-search" type="search" placeholder="🔎 ابحث في القائمة…" value="'+esc(homeQ)+'" aria-label="البحث في أقسام الرئيسية"></div><div class="home-grid" id="homeGrid"></div><h2 class="home-tools-h" id="homeToolsHead">أدوات الكبسولة</h2><p class="home-tools-p">أدوات الإرسال والاستخدام الخاصة بالكبسولة</p><div class="home-grid tools" id="homeTools"></div></div>';
@@ -415,6 +416,7 @@ function showHome(){
   if(inp)inp.oninput=function(){homeQ=this.value;renderHomeCards();};
 }
 function showPrep(){
+  if(window.abSync)window.abSync(true);
   var lay=document.querySelector('.wrap.layout');if(lay)lay.classList.remove('home-view');
   renderTree();
   // الأنيميشن (morph) هنا كما هو تمامًا، لم يُغيَّر.
@@ -437,8 +439,10 @@ function init(){
     if(location.hash==='#settings'){history.replaceState(null,'','/app');setTimeout(openSettings,50);}
     if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
     $('statLessons').textContent=lessons.length;$('statFilled').textContent=lessons.filter(function(l){return !isEmpty(l);}).length;
-    renderTree();showHome();
+    renderTree();if(location.hash==="#prep")showPrep();else showHome();
   },function(e){showWelcome('تعذّر تحميل الدروس',e.message);});
 }
+// شريط التطبيق السفلي (common.js) ينتقل بين الرئيسية والتحضير بلا إعادة تحميل
+window.appShowPrep=showPrep;window.appShowHome=showHome;
 init();
 })();

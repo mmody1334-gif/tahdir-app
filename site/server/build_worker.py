@@ -1568,6 +1568,49 @@ extra_css += '''
   .kb-banner img.kb-moe,.kb-banner img.kb-vis{height:34px}
   .kb-banner .kb-name b{font-size:clamp(24px,6.4vw,32px)}
 }
+/* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
+/* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
+@media (max-width:700px){
+  .ohead td span,.ohead td div{white-space:normal!important}
+  .ohead img{height:11mm!important}
+  .ohead td{font-size:.7em!important}
+}
+html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+@media (max-width:820px){
+  html.inapp,html.inapp body{overflow-x:clip;overscroll-behavior-y:none}
+  html.inapp body{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px));min-height:100vh;box-sizing:border-box}
+  html.inapp header.top{display:none}
+  html.inapp .atop{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;height:54px;padding:0 12px;background:var(--paper,#fff);border-bottom:1px solid var(--line);transition:box-shadow .2s}
+  html.inapp .atop.sh{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  html.inapp .atop-t{flex:1;font-size:1.08rem;font-weight:800;color:var(--main-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.inapp .atop-back{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--main-l);color:var(--main-d);font-size:1.25rem;font-weight:800;text-decoration:none;flex:none}
+  html.inapp .atop-sp{width:4px}
+  html.inapp .atop-who{font-size:.78rem;color:var(--mute);max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.inapp .abar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;background:var(--paper,#fff);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.06);padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))}
+  html.inapp .ab-i{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:56px;border:0;background:none;font:inherit;color:var(--mute);text-decoration:none;border-radius:14px;cursor:pointer;-webkit-user-select:none;user-select:none}
+  html.inapp .ab-ic{display:grid;place-items:center;width:44px;height:28px;border-radius:14px;transition:transform .15s,background .15s}
+  html.inapp .ab-t{font-size:.7rem;font-weight:700;line-height:1.2}
+  html.inapp .ab-i.on{color:var(--main-d)}
+  html.inapp .ab-i.on .ab-ic{background:var(--main-l);color:var(--main)}
+  html.inapp .ab-i.on .ab-t{font-weight:800}
+  html.inapp .ab-i:active{background:var(--main-l)}
+  html.inapp .ab-i:active .ab-ic{transform:scale(.9)}
+  html.inapp .ab-dot{position:absolute;top:7px;left:calc(50% - 14px);width:9px;height:9px;border-radius:50%;background:#e11d48;border:2px solid var(--paper,#fff)}
+  html.inapp .menu-list{bottom:calc(66px + env(safe-area-inset-bottom,0px))!important;top:auto!important;left:0!important;right:0!important;margin:6px!important;max-width:none!important;max-height:72vh!important;border-radius:20px;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+  html.inapp .menu-list a,html.inapp .menu-list button{min-height:46px}
+  html.inapp .menu-list:not([hidden]){box-shadow:0 -10px 40px rgba(0,0,0,.25),0 0 0 100vmax rgba(6,20,16,.38);animation:abSheet .2s ease-out}
+  html.inapp .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  html.inapp .modal{align-items:end;padding:0}
+  html.inapp .modal-box{width:100%!important;max-width:none!important;border-radius:22px 22px 0 0!important;max-height:90vh;overflow:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))!important;animation:abSheet .22s ease-out}
+  html.inapp .wrap{padding-inline:10px}
+  html.inapp input,html.inapp select,html.inapp textarea{font-size:16px}
+  html.inapp .btn{min-height:42px}
+  html.inapp table{max-width:100%}
+  html.inapp #paper,html.inapp .paper{overflow-x:auto}
+  html.inapp main,html.inapp .wrap{animation:abIn .25s ease-out}
+}
+@keyframes abSheet{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes abIn{from{opacity:0}to{opacity:1}}
 '''
 CSS = base_css + extra_css
 

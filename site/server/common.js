@@ -972,3 +972,51 @@ document.addEventListener('click',function(e){
     });
   },1500);
 })();
+
+// ---------- وضع التطبيق (أندرويد/آيفون): واجهة تطبيق جوال لا صفحة ويب ----------
+// شريط علوي مضغوط بعنوان القسم + شريط تنقل سفلي ثابت (الرئيسية · التحضير · الاختبارات · الإشعارات · الأقسام).
+// يعمل فقط داخل التطبيق وعلى الشاشات الضيقة (CSS: .inapp تحت 821px)؛ الموقع على الكمبيوتر لا يتغير.
+// الأزرار السفلية تستدعي أزرار الصفحة الأصلية نفسها (القائمة · الجرس) فلا يتكرر أي منطق.
+function appShell(){
+  var R=document.documentElement;R.classList.add('inapp');
+  // بلا تكبير بالأصابع: يتصرف كتطبيق (المحتوى نفسه مهيأ لعرض الجوال)
+  var vp=document.querySelector('meta[name=viewport]');if(vp&&!/maximum-scale/.test(vp.content))vp.content+=',maximum-scale=1,user-scalable=no';
+  var mb=$('menuBtn');if(!mb||$('abar'))return;
+  var P=location.pathname.replace(/^\/teqany/,'')||'/',hash=location.hash;
+  // عنوان قصير للقسم: نفس اسمه في قائمة «الأقسام»، وإلا أول شارة في الترويسة
+  var ma=Array.prototype.filter.call(document.querySelectorAll('#menuList a'),function(a){return (a.getAttribute('href')||'').replace(/^\/teqany/,'')===P;})[0];
+  var st=document.querySelector('header.top .stats .stat'),title=ma?ma.textContent.replace(/^\S+\s*/,'').trim():st?st.textContent.split(':')[0].trim():document.title.split('·')[0].trim();
+  if(ma&&ma.querySelector('.mi'))title=ma.textContent.replace(ma.querySelector('.mi').textContent,'').trim();
+  if(P==='/app')title=hash==='#prep'?'التحضير':'الرئيسية';
+  var top=document.createElement('div');top.className='atop';top.id='atop';
+  top.innerHTML=(P!=='/app'||hash==='#prep'?'<a class="atop-back" href="'+tqUrl('/app')+'" aria-label="الرئيسية">→</a>':'<span class="atop-sp"></span>')+'<b class="atop-t">'+esc(title)+'</b><span class="atop-who" id="atopWho"></span>';
+  var hd=document.querySelector('header.top');(hd&&hd.parentNode?hd.parentNode:document.body).insertBefore(top,hd||document.body.firstChild);
+  var SV=function(d){return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';};
+  var ICO={home:SV('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),prep:SV('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>'),
+    quiz:SV('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>'),bell:SV('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),menu:SV('<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>')};
+  var it=function(id,ic,t,href,on){return (href?'<a':'<button type="button"')+' class="ab-i'+(on?' on':'')+'" id="'+id+'"'+(href?' href="'+href+'"':'')+'><span class="ab-ic" aria-hidden="true">'+ic+'</span><span class="ab-t">'+t+'</span>'+(id==='abBell'?'<span class="ab-dot" id="abDot" hidden></span>':'')+(href?'</a>':'</button>');};
+  var nav=document.createElement('nav');nav.className='abar';nav.id='abar';nav.setAttribute('aria-label','التنقل');
+  nav.innerHTML=it('abHome',ICO.home,'الرئيسية',tqUrl('/app'),P==='/app'&&hash!=='#prep')+it('abPrep',ICO.prep,'التحضير',tqUrl('/app')+'#prep',P==='/app'&&hash==='#prep')+
+    it('abQuiz',ICO.quiz,'الاختبارات',tqUrl('/quiz'),P==='/quiz')+($('bellBtn')?it('abBell',ICO.bell,'الإشعارات'):'')+it('abMenu',ICO.menu,'الأقسام',null,false);
+  document.body.appendChild(nav);
+  // القائمة ولوحة الإشعارات داخل الترويسة المخفية على الجوال: ننقلهما إلى body لتظهرا كورقة سفلية
+  ['menuList','bellPanel'].forEach(function(id){var x=$(id);if(x)document.body.appendChild(x);});
+  // داخل /app: التحضير والرئيسية بلا إعادة تحميل
+  if(P==='/app')['abHome','abPrep'].forEach(function(id){$(id).addEventListener('click',function(e){
+    if(typeof window.appShowPrep!=='function')return;e.preventDefault();var prep=id==='abPrep';
+    if(prep)window.appShowPrep();else window.appShowHome();window.scrollTo(0,0);});});
+  // تُستدعى من client_app عند التبديل بين الرئيسية والتحضير (من الشريط أو من بطاقة «التحضير»)
+  window.abSync=function(prep){if(!$('abHome')||P!=='/app')return;history.replaceState(null,'',tqUrl('/app')+(prep?'#prep':''));
+    $('abHome').classList.toggle('on',!prep);$('abPrep').classList.toggle('on',prep);
+    var t=document.querySelector('#atop .atop-t');if(t)t.textContent=prep?'التحضير':'الرئيسية';
+    var bk=document.querySelector('#atop .atop-back,#atop .atop-sp');if(bk)bk.outerHTML=prep?'<a class="atop-back" href="'+tqUrl('/app')+'" aria-label="الرئيسية">→</a>':'<span class="atop-sp"></span>';
+    var nb=document.querySelector('#atop .atop-back');if(nb&&prep)nb.onclick=function(ev){ev.preventDefault();window.appShowHome();window.scrollTo(0,0);};};
+  $('abMenu').addEventListener('click',function(e){e.stopPropagation();mb.click();});
+  if($('abBell'))$('abBell').addEventListener('click',function(e){e.stopPropagation();$('bellBtn').click();});
+  // نقطة غير المقروء والاسم من عناصر الصفحة الأصلية
+  var sync=function(){var d=$('bellDot'),a=$('abDot');if(d&&a)a.hidden=d.hidden;var w=$('who'),aw=$('atopWho');if(w&&aw&&w.textContent)aw.textContent=w.textContent.split(' ').slice(0,2).join(' ');};
+  sync();if(window.MutationObserver){var mo=new MutationObserver(sync);if($('bellDot'))mo.observe($('bellDot'),{attributes:true});if($('who'))mo.observe($('who'),{childList:true,characterData:true,subtree:true});}
+  // ظل الشريط العلوي عند التمرير
+  window.addEventListener('scroll',function(){top.classList.toggle('sh',window.scrollY>4);},{passive:true});
+}
+if(IN_APP){try{appShell();}catch(e){}}
