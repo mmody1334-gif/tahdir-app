@@ -763,7 +763,7 @@ function toggleFull(el){
 // تُخزَّن مرة واحدة في localStorage، وتُعاد من زر «دليل الاستخدام» في الشريط.
 // كل خطوة تُظلّل عنصرًا (spotlight) وتُظهر فقاعة بجانبه مع سهم يشير إليه.
 var TOUR_KEY='tahdir_tour_v1',tourEls=null,tourI=0,tourList=[],tourObs=null;
-function tourPage(){var p=location.pathname;return p==='/app'?'app':p==='/quiz'?'quiz':p==='/finals'?'finals':p==='/games'?'games':p==='/remedial'?'remedial':p==='/summaries'?'summaries':'other';}
+function tourPage(){var p=location.pathname.replace(/^\/teqany(?=\/)/,'');if(p==='/tahdir')p='/app';return p==='/app'?'app':p==='/quiz'?'quiz':p==='/finals'?'finals':p==='/games'?'games':p==='/remedial'?'remedial':p==='/summaries'?'summaries':p==='/cards'?'cards':'other';}
 function tourSteps(){
   var pg=tourPage();
   if(pg==='app')return [
@@ -784,6 +784,14 @@ function tourSteps(){
     {sel:null,title:'الاختبارات النهائية',text:'أسئلة الوزارة للأعوام السابقة، مقصوصة كما وردت مع الإجابات.'},
     {sel:'#courseSel',title:'١) اختر المقرر',text:'ثم اختر الوحدة من الشريط الجانبي.'},
     {sel:null,title:'جاهز ✓',text:'فعّل «إظهار الإجابات» للمراجعة، أو اطبع المختار من الشريط.'}
+  ];
+  if(pg==='cards')return [
+    {sel:null,title:'بليكرز — بطاقات الإجابة 🪪',text:'لكل طالب بطاقة مطبوعة برمز خاص. يدير الطالب بطاقته فيصبح حرف إجابته في الأعلى، وتمسح الصف كله بكاميرا جوالك، فيُسجَّل كل طالب باسمه صح أو خطأ.'},
+    {sel:'#cdNewC',title:'١) أضف صفًا',text:'اختر المادة والصف، والصق أسماء الطلاب بترتيب الكشف. تحفظ المنصة الاسم الأول والقبيلة ليظهرا مع المسح، ورقم الطالب في الكشف هو رقم بطاقته.'},
+    {sel:'[data-pr]',title:'٢) اطبع البطاقات',text:'بطاقتان في الصفحة (مثل Plickers). وزّعها بالترتيب: البطاقة 1 لأول طالب في الكشف، وهكذا. يحتفظ الطالب ببطاقته لكل الحصص.'},
+    {sel:'[data-go]',title:'٣) ولّد الأسئلة وابدأ',text:'اختر الدروس وعدد الأسئلة (5 أو 10 أو 15 أو 20) من بنك الصف نفسه، ثم «بدء الجلسة».'},
+    {sel:'#ckHelp',title:'٤) الكمبيوتر يعرض والجوال يمسح',text:'اعرض الأسئلة على كمبيوتر الفصل، وامسح رمز QR الظاهر عليه بجوالك (بنفس الحساب) لتفتح الكاميرا. من الجوال تنتقل للسؤال التالي وتُظهر الإجابة، والسبورة تتغير وحدها. الشرح الكامل في «طريقة الاستخدام».'},
+    {sel:'[data-tab="sessions"]',title:'٥) النتائج',text:'كل جلسة تُحفظ بنتائجها: صح/خطأ لكل طالب، وتقرير للطباعة، وإرسال إلى «تحليل النتائج» و«سجل صعوبات التعلم».'}
   ];
   return [{sel:null,title:'دليل الاستخدام',text:'تنقّل بين الصفحات من القائمة أعلى الشاشة: التحضير · التقويم · الألعاب · النهائيات.'}];
 }

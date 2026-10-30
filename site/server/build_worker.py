@@ -1012,6 +1012,11 @@ button.lv-opt{cursor:pointer}
 .ck-bqr{background:#fff;border-radius:18px;padding:12px;display:inline-block;margin:16px 0}.ck-bqr svg{display:block;width:260px;height:260px}.ck-bend{font-size:1.4rem;color:#a7f3d0}
 .ck-bctl{position:fixed;bottom:14px;left:14px;display:flex;gap:8px;z-index:101}.ck-bctl button,.ck-bctl a{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:10px;width:42px;height:42px;font-size:20px;cursor:pointer;display:grid;place-items:center;text-decoration:none}
 @media (max-width:700px){.ck-start{grid-template-columns:1fr}.ck-cn{min-width:52px}}
+.ck-help h4{margin:14px 0 6px;color:var(--main-d)}.ck-help ol,.ck-help ul{margin:0;padding-inline-start:22px;display:grid;gap:6px;line-height:1.8}
+.ck-holds{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:8px 0}.ck-holds figure{margin:0;text-align:center}.ck-holds figcaption{margin-top:6px;font-weight:700}.ck-up{display:inline-block;background:#f59e0b;color:#fff;font-weight:900;border-radius:999px;padding:1px 12px;margin-bottom:6px;font-size:1.05em}.ck-bhelp .ck-up{font-size:1.8rem;padding:2px 20px}.ck-holds figcaption b{font-size:1.2em;color:var(--main-d)}
+.ck-hold{background:#fff;border:1px solid #ccc;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.12)}.ck-hold>div,.ck-hold svg{width:100%;height:100%;display:block}
+.ck-bhelp{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:30px;text-align:center}.ck-bhelp h1{font-size:2.6rem;margin:0}.ck-bhelp p{font-size:1.4rem;opacity:.9;margin:0 0 10px}
+.ck-bhelp .ck-holds{gap:36px}.ck-bhelp figcaption{font-size:1.6rem}.ck-bhelp figcaption b{color:#fbbf24}.ck-bhint{font-size:1rem;opacity:.7}
 /* المسح الحي (ملء الشاشة على الجوال) */
 body.ck-noscroll{overflow:hidden}body.ck-noscroll #modal{z-index:3000}body.ck-noscroll #toast{z-index:3001}
 .ck-live{position:fixed;inset:0;z-index:2000;background:#0b0f10;color:#fff;display:flex;flex-direction:column}

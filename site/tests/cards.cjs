@@ -21,6 +21,25 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   if (await p.$('#setupForm')) { await p.fill('#name', 'أ. محمد مجدي'); await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.fill('#password2', 'Bio@2026x'); await p.click('#setupForm button[type=submit]'); await p.waitForTimeout(1500); await p.goto(B + '/', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(800); }
   await shut(p); if (await p.$('#loginForm')) { await p.fill('#username', 'mohamed'); await p.fill('#password', 'Bio@2026x'); await p.click('#loginBtn'); await p.waitForTimeout(2500); }
   await p.goto(B + '/cards', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2000); await shut(p);
+  // الشرح: يفتح تلقائيًا أول مرة، وصور رفع البطاقة صحيحة (الكاشف نفسه يقرأ كل صورة بإجابتها)
+  ok('«طريقة الاستخدام» فُتحت تلقائيًا أول زيارة', await p.evaluate(() => localStorage.getItem('tahdir_cards_help') === '1'));
+  await p.click('#ckHelp'); await p.waitForSelector('.ck-help .ck-holds figure');
+  await p.screenshot({ path: OUT + '/cards_help.png', fullPage: true });
+  const holds = await p.evaluate(async () => {
+    const out = [];
+    for (const f of document.querySelectorAll('.ck-help .ck-holds figure')) {
+      const svg = f.querySelector('svg').outerHTML.replace('<svg ', '<svg width="300" height="300" ');
+      const rot = +(f.querySelector('.ck-hold>div').style.transform.match(/-?\d+/)[0]);
+      const im = new Image(); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await im.decode();
+      const c = document.createElement('canvas'); c.width = 500; c.height = 500; const x = c.getContext('2d'); x.fillStyle = '#777'; x.fillRect(0, 0, 500, 500);
+      x.translate(250, 250); x.rotate(rot * Math.PI / 180); x.drawImage(im, -150, -150, 300, 300);
+      const h = cardDetect(cardGray(x, 500, 500), 500, 500)[0]; out.push(h ? h.ans : -1);
+    }
+    return out;
+  });
+  ok('صور الشرح: كل اتجاه يُقرأ بإجابته (أ ب ج د)', holds.join() === '0,1,2,3', holds.join());
+  await shut(p); await p.waitForTimeout(300);
+  ok('خطوات «دليلك للاستخدام!» لهذه الصفحة', await p.evaluate(() => tourSteps().length === 6 && /بليكرز/.test(tourSteps()[0].title)));
   ok('القسم في «المزيد» باسم بليكرز', await p.evaluate(() => /بليكرز/.test((document.querySelector('#menuList a[href="/cards"]') || {}).textContent || '')));
   // إضافة صف
   await p.click('#cdNewC'); await p.waitForSelector('#cfL');
@@ -56,6 +75,10 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   await p.click('#stBoard'); await p.waitForSelector('.ck-bqr svg', { timeout: 8000 });
   ok('السبورة تنتظر الجوال وتعرض رمز QR', /امسح الرمز/.test(await p.textContent('#bdW')));
   await p.screenshot({ path: OUT + '/cards_board_wait.png' });
+  await p.click('#bdHelp'); await p.waitForTimeout(300);
+  ok('السبورة: «شرح للطلاب» يعرض طريقة رفع البطاقة', !(await p.$eval('#bdH', e => e.hidden)) && (await p.$$('#bdH figure')).length === 4);
+  await p.screenshot({ path: OUT + '/cards_board_help.png' });
+  await p.click('#bdHelp'); await p.waitForTimeout(200);
 
   // ===== فيديو الكاميرا: 12 طالبًا يرفعون بطاقاتهم =====
   // السؤال 1: الطلاب 1..8 يجيبون الصحيح، 9..12 يجيبون خطأ

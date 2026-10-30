@@ -41,6 +41,30 @@ function parseNames(t){
   }).filter(Boolean);
 }
 
+
+// ================= الشرح =================
+// رسم البطاقة كما يرفعها الطالب لكل إجابة (أ: كما هي، ب: الجانب الأيمن للأعلى، ج: مقلوبة، د: الجانب الأيسر للأعلى)
+function holdSvg(k,size,en){return '<div class="ck-hold" style="width:'+size+'px;height:'+size+'px"><div style="transform:rotate('+[0,-90,180,90][k]+'deg)">'+cardSvg(7,{en:en})+'</div></div>';}
+function holdRow(size,en){var L=en?CARD_LET_EN:LET;return '<div class="ck-holds">'+[0,1,2,3].map(function(k){return '<figure><span class="ck-up">▲ '+L[k]+'</span>'+holdSvg(k,size,en)+'<figcaption>إجابتي <b>'+L[k]+'</b></figcaption></figure>';}).join('')+'</div>';}
+function help(){
+  dialog({title:'طريقة الاستخدام — بليكرز',wide:true,cancelText:false,okText:'فهمت ✓',html:'<div class="ck-help">'+
+    '<h4>للمعلم: 4 خطوات</h4><ol>'+
+      '<li><b>أضف صفًا:</b> اختر المادة والصف، والصق الأسماء بترتيب الكشف (من Excel أو نور). تحفظ المنصة <b>الاسم الأول والقبيلة</b> فقط (علي بن سالم بن محمد الشامسي ← علي الشامسي).</li>'+
+      '<li><b>اطبع البطاقات:</b> بطاقتان في الصفحة بحجم 100%. البطاقة رقم 1 لأول طالب في الكشف، وهكذا. يحتفظ الطالب ببطاقته لكل الحصص.</li>'+
+      '<li><b>ولّد الأسئلة:</b> اختر الدروس والعدد (5/10/15/20) ثم «بدء الجلسة».</li>'+
+      '<li><b>اعرض وامسح:</b> «عرض الأسئلة» على كمبيوتر الفصل، وامسح رمز QR الظاهر عليه بكاميرا جوالك (بنفس حسابك) فتفتح كاميرا المسح. من الجوال: «التالي» و«الإجابة»، والسبورة تتبعك.</li></ol>'+
+    '<h4>للطالب: كيف يرفع البطاقة؟</h4><p>يمسك البطاقة بحيث يكون حرف إجابته في <b>الأعلى</b> ويرفعها مواجهةً للمعلم:</p>'+holdRow(92)+
+    '<h4>نصائح لمسح سريع ودقيق</h4><ul>'+
+      '<li>قف أمام الصف وحرّك الجوال ببطء من جهة لأخرى؛ الكاميرا تقرأ عدة بطاقات في اللحظة نفسها، ويظهر إطار <b style="color:#16a34a">أخضر</b> واسم الطالب على كل بطاقة سُجّلت.</li>'+
+      '<li>الإطار <b style="color:#d97706">البرتقالي</b> يعني أن البطاقة قُرئت مرة واحدة وتنتظر التأكيد — أبقِ الكاميرا عليها لحظة.</li>'+
+      '<li>لا يغطّي الطالب المربع الأسود بأصابعه، والإضاءة العادية تكفي (تجنّب الضوء المنعكس على البطاقة).</li>'+
+      '<li>لو لم تُقرأ بطاقات آخر الصف: اقترب خطوة، أو اطبع «بطاقة كبيرة في الصفحة».</li>'+
+      '<li>يستطيع الطالب تغيير إجابته وأنت تمسح: يُسجَّل آخر اتجاه رفعه.</li>'+
+      '<li>زر «👥» في الجوال يعرض من بقي بلا إجابة.</li></ul>'+
+    '<p class="muted small">يعمل المسح من متصفح الجوال (Chrome أو Safari) ومن تطبيق الكبسولة بعد تحديثه.</p></div>'});
+  try{localStorage.setItem('tahdir_cards_help','1');}catch(e){}
+}
+
 // ================= القائمة الرئيسية =================
 function load(){
   return api('/api/quizzes?kind=cclass,csession').then(function(r){
@@ -51,6 +75,7 @@ var TAB='classes';
 function home(){
   var h='<div class="an-head"><h2>🪪 بليكرز — بطاقات الإجابة</h2><p class="muted">لكل طالب بطاقة مطبوعة برمز خاص، يديرها فيصبح حرف إجابته في الأعلى، وتمسح الفصل كله بكاميرا جوالك في ثوانٍ: يُسجَّل كل طالب باسمه صح أو خطأ. الأسئلة تُعرض على شاشة الكمبيوتر وتتحكم فيها من الجوال.</p></div>'+
     '<ol class="ck-steps"><li><b>أضف صفًا</b> والصق أسماء الطلاب</li><li><b>اطبع البطاقات</b> ووزّعها بالترتيب</li><li><b>ولّد الأسئلة</b> من بنك الصف</li><li><b>اعرض على الكمبيوتر</b> وامسح بالجوال</li></ol>'+
+    '<div class="an-new"><button type="button" class="btn small" id="ckHelp">❓ طريقة الاستخدام</button></div>'+
     '<div class="ck-tabs" role="tablist"><button role="tab" data-tab="classes" aria-selected="'+(TAB==='classes')+'">👥 صفوفي ('+classes.length+')</button><button role="tab" data-tab="sessions" aria-selected="'+(TAB==='sessions')+'">📋 الجلسات والنتائج ('+sessions.length+')</button></div>';
   if(TAB==='classes'){
     h+='<div class="an-new"><button type="button" class="btn primary" id="cdNewC">+ إضافة صف</button></div>';
@@ -64,6 +89,9 @@ function home(){
   main(h);
   each('[data-tab]',function(b){b.onclick=function(){TAB=b.getAttribute('data-tab');home();};});
   if($('cdNewC'))$('cdNewC').onclick=function(){editClass(null);};
+  $('ckHelp').onclick=help;
+  var seen=null;try{seen=localStorage.getItem('tahdir_cards_help');}catch(e){}
+  if(!seen&&!classes.length&&!SCAN)setTimeout(help,400);
   each('[data-ed]',function(b){b.onclick=function(){getDoc(b.getAttribute('data-ed')).then(editClass);};});
   each('[data-pr]',function(b){b.onclick=function(){getDoc(b.getAttribute('data-pr')).then(printCards);};});
   each('[data-go]',function(b){b.onclick=function(){getDoc(b.getAttribute('data-go')).then(generate);};});
@@ -316,8 +344,9 @@ function live(S,C){
 // ================= شاشة السبورة (الكمبيوتر) =================
 function board(){
   document.body.classList.add('ck-boardb');
-  var o=document.createElement('div');o.className='ck-board';o.innerHTML='<div class="ck-bw" id="bdW"></div><div class="ck-bctl"><button type="button" id="bdFs" title="ملء الشاشة">⛶</button><a href="'+tqUrl('/cards')+'" title="رجوع">✕</a></div>';
+  var o=document.createElement('div');o.className='ck-board';o.innerHTML='<div class="ck-bw" id="bdW"></div><div class="ck-bhelp" id="bdH" hidden><h1>كيف ترفع بطاقتك؟</h1><p>اجعل حرف إجابتك في <b>الأعلى</b>، وارفع البطاقة مواجهةً للمعلم، ولا تغطِّ المربع الأسود بأصابعك.</p>'+holdRow(200)+'</div><div class="ck-bctl"><button type="button" id="bdHelp" title="شرح للطلاب">👨‍🎓</button><button type="button" id="bdFs" title="ملء الشاشة">⛶</button><a href="'+tqUrl('/cards')+'" title="رجوع">✕</a></div>';
   document.body.appendChild(o);
+  $('bdHelp').onclick=function(){var h=$('bdH');h.hidden=!h.hidden;$('bdW').hidden=!h.hidden;};
   $('bdFs').onclick=function(){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}catch(e){}};
   var S0=null,last='';
   if(BSID)getDoc(BSID).then(function(s){S0=s;last='';tick(true);},function(){});
@@ -325,7 +354,7 @@ function board(){
     var url=BSID?scanUrl(BSID):'',qr='';try{if(url)qr=qrSvg(url,260);}catch(e){}
     $('bdW').innerHTML='<div class="ck-bwait">'+(S0?'<h1>'+esc(S0.title)+'</h1><p>'+S0.questions.length+' سؤالًا · '+esc(S0.className||'')+'</p>':'<div class="ck-bl">🪪</div><h1>شاشة السبورة</h1>')+
       (s&&s.ended&&s.sid===BSID?'<p class="ck-bend">انتهت الجلسة — النتائج على جوال المعلم وفي «الجلسات والنتائج».</p>':
-      (qr?'<div class="ck-bqr">'+qr+'</div><p>امسح الرمز بكاميرا جوالك (بنفس الحساب) لبدء مسح البطاقات.<br>سيظهر السؤال الأول هنا تلقائيًا.</p>':'<p>ابدأ الجلسة من جوالك بنفس الحساب، وسيظهر السؤال هنا تلقائيًا.</p>'))+'</div>';
+      (qr?'<div class="ck-bqr">'+qr+'</div><p>امسح الرمز بكاميرا جوالك (بنفس الحساب) لبدء مسح البطاقات.<br>سيظهر السؤال الأول هنا تلقائيًا.</p><p class="ck-bhint">👨‍🎓 لشرح طريقة رفع البطاقة للطلاب اضغط الزر أسفل الشاشة.</p>':'<p>ابدأ الجلسة من جوالك بنفس الحساب، وسيظهر السؤال هنا تلقائيًا.</p>'))+'</div>';
   }
   function tick(once){
     api('/api/cards/live').then(function(r){
