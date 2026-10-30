@@ -1585,6 +1585,8 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
   html.inapp .atop-t{flex:1;font-size:1.08rem;font-weight:800;color:var(--main-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   html.inapp .atop-back{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--main-l);color:var(--main-d);font-size:1.25rem;font-weight:800;text-decoration:none;flex:none}
   html.inapp .atop-sp{width:4px}
+  html.inapp .atop-t.atop-link{flex:0 1 auto;cursor:pointer;background:var(--main-l);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:.95rem}
+  html.inapp .atop-link+.atop-who{margin-inline-start:auto}
   html.inapp .atop-who{font-size:.78rem;color:var(--mute);max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   html.inapp .abar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;background:var(--paper,#fff);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.06);padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))}
   html.inapp .ab-i{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:56px;border:0;background:none;font:inherit;color:var(--mute);text-decoration:none;border-radius:14px;cursor:pointer;-webkit-user-select:none;user-select:none}

@@ -1016,6 +1016,10 @@ function appShell(){
   // نقطة غير المقروء والاسم من عناصر الصفحة الأصلية
   var sync=function(){var d=$('bellDot'),a=$('abDot');if(d&&a)a.hidden=d.hidden;var w=$('who'),aw=$('atopWho');if(w&&aw&&w.textContent)aw.textContent=w.textContent.split(' ').slice(0,2).join(' ');};
   sync();if(window.MutationObserver){var mo=new MutationObserver(sync);if($('bellDot'))mo.observe($('bellDot'),{attributes:true});if($('who'))mo.observe($('who'),{childList:true,characterData:true,subtree:true});}
+  // شارة الترويسة إن كانت رابطًا (مثل «لوحة التحكم» ← اللوحة الشاملة بكلمة مرورها): العنوان العلوي يفتح نفس الرابط
+  var tt=top.querySelector('.atop-t');
+  tt.addEventListener('click',function(){var l=document.querySelector('header.top .stats a.stat-link');if(l)location.href=l.href;});
+  setTimeout(function(){var l=document.querySelector('header.top .stats a.stat-link');if(l){tt.textContent=l.textContent;tt.classList.add('atop-link');tt.setAttribute('role','link');}},0);
   // ظل الشريط العلوي عند التمرير
   window.addEventListener('scroll',function(){top.classList.toggle('sh',window.scrollY>4);},{passive:true});
 }
