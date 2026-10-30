@@ -126,6 +126,8 @@ final class WebScreen: UIViewController, WKNavigationDelegate, WKUIDelegate, WKS
         let cfg = WKWebViewConfiguration()
         cfg.websiteDataStore = .default()
         cfg.applicationNameForUserAgent = "TahdirApp/1"
+        cfg.allowsInlineMediaPlayback = true
+        cfg.mediaTypesRequiringUserActionForPlayback = []
         let uc = WKUserContentController()
         uc.add(WeakHandler(self), name: "tahdir")
         cfg.userContentController = uc
@@ -216,6 +218,13 @@ final class WebScreen: UIViewController, WKNavigationDelegate, WKUIDelegate, WKS
     }
 
     // MARK: نوافذ التنبيه (تستخدمها الأداة)
+    /// «بطاقات الإجابة»: الكاميرا لموقع الكبسولة فقط
+    @available(iOS 15.0, *)
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        let ours = ["tahdir.hudhaifa-bio.workers.dev", "elkabsula.site", "www.elkabsula.site"].contains(origin.host)
+        decisionHandler(ours && type == .camera ? .grant : .deny)
+    }
+
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
         await withCheckedContinuation { (k: CheckedContinuation<Void, Never>) in
             let a = UIAlertController(title: nil, message: message, preferredStyle: .alert)

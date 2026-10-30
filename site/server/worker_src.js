@@ -273,6 +273,7 @@ function jsonETag(req, data) {
 const PAGES_TQ = __PAGES_TQ__;
 // عرض صفحة بهوية «تقني حذيفة» (نسخة جاهزة من البناء) — نفس المحتوى والشعار مختلف
 function htmlTq(name, extra = {}) {
+  if (name === 'cards') extra = { 'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()', ...extra };
   if (!PAGES_TQ[name]) return html(name, extra);
   const nonce = rand(16);
   const src = PAGES_TQ[name].replace(/%CSS%/, () => PAGES.css);
@@ -281,6 +282,7 @@ function htmlTq(name, extra = {}) {
   return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp, ...SEC_HEADERS, ...extra } });
 }
 function html(name, extra = {}) {
+  if (name === 'cards') extra = { 'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()', ...extra };
   const nonce = rand(16);
   const body = PAGES[name].replace(/%NONCE%/g, nonce).replace('%CSS%', () => PAGES.css);
   // worker-src 'self' ضروري لـpdf.js: إن لم يُذكر يرث script-src (وهو nonce فقط)
@@ -1400,6 +1402,7 @@ export default {
       if (p === '/ld') return html('ld');
       if (p === '/forms') return html('forms');
       if (p === '/space') return html('space');
+      if (p === '/cards') return html('cards');
       if (p === '/api/finals') {
         const key = url.searchParams.get('key') || '', sc = scopeOf(me);
         if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
@@ -1419,6 +1422,20 @@ export default {
       if (p.startsWith('/api/live/')) return liveApi(req, env, me, p, m, url);
       if (p === '/api/lessons') return jsonETag(req, { lessons: await lessonsFor(env, me) });
       if (p.startsWith('/api/ai/')) { const r = await aiApi(req, env, me, p, m, url); if (r) return r; }
+      // ---------- «بطاقات الإجابة»: حالة الجلسة الحية لشاشة السبورة (جوال المعلم يكتب، والسبورة تقرأ) ----------
+      if (p === '/api/cards/live') {
+        const k = 'cl:' + me.id;
+        if (m === 'POST') {
+          const t = await req.text();
+          if (t.length > 60000) return json({ error: 'too_large' }, 413);
+          let b = {}; try { b = JSON.parse(t || '{}'); } catch (e) {}
+          await env.DB.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind(k, JSON.stringify(b.state || null)).run();
+          return json({ ok: true });
+        }
+        const r = await env.DB.prepare('SELECT v FROM kv WHERE k = ?').bind(k).first();
+        let st = null; try { st = r ? JSON.parse(r.v) : null; } catch (e) {}
+        return json({ state: st });
+      }
       if (p === '/api/init' || p.startsWith('/api/init/')) { const r = await initApi(req, env, me, p, m, url); if (r) return r; }
       if (p.startsWith('/api/classes')) { const r = await classesApi(req, env, me, p, m, url); if (r) return r; }
       if (p === '/api/courses') { const sc = scopeOf(me); return json({ courses: (await coursesList(env)).filter(c => !sc || sc.has(c.key)) }); }

@@ -31,6 +31,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key><string>لإرفاق صور أو ملفات في منصة نور عند الحاجة.</string>
-	<key>NSCameraUsageDescription</key><string>لالتقاط صورة وإرفاقها في منصة نور عند الحاجة.</string>
+	<key>NSCameraUsageDescription</key><string>لالتقاط صورة وإرفاقها في منصة نور عند الحاجة، ولمسح بطاقات إجابات الطلاب في «بطاقات الإجابة».</string>
 </dict>
 </plist>

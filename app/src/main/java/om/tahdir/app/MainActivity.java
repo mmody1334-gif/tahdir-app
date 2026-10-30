@@ -16,6 +16,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
+import android.content.pm.PackageManager;
+import android.Manifest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -45,6 +48,8 @@ public class MainActivity extends Activity {
     static final String TOOL_URL = SITE + "tool/tahdir-noor.user.js";
     static final int GREEN = Color.parseColor("#0B3B33");
     static final int FILE_REQ = 7;
+    static final int CAM_REQ = 8;
+    PermissionRequest camPending;
 
     WebView site, nour, current;
     Button tabSite, tabNour;
@@ -149,6 +154,7 @@ public class MainActivity extends Activity {
     WebView makeWebView() {
         WebView w = new WebView(this);
         WebSettings s = w.getSettings();
+        s.setMediaPlaybackRequiresUserGesture(false);
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
@@ -194,6 +200,23 @@ public class MainActivity extends Activity {
                 if (view != current) return;
                 progress.setVisibility(p < 100 ? View.VISIBLE : View.GONE);
                 progress.setProgress(p);
+            }
+            /** الكاميرا لصفحة «بطاقات الإجابة» في موقع الكبسولة فقط (لا تُمنح لأي موقع آخر مثل نور). */
+            @Override
+            public void onPermissionRequest(PermissionRequest r) {
+                runOnUiThread(() -> {
+                    boolean ours = false, video = false;
+                    try { String h = r.getOrigin().getHost(); ours = h != null && (h.equals("tahdir.hudhaifa-bio.workers.dev") || h.equals("elkabsula.site") || h.equals("www.elkabsula.site")); } catch (Exception ignored) { }
+                    for (String x : r.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(x)) video = true;
+                    if (!ours || !video) { r.deny(); return; }
+                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    } else {
+                        if (camPending != null) camPending.deny();
+                        camPending = r;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAM_REQ);
+                    }
+                });
             }
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams params) {
@@ -252,6 +275,17 @@ public class MainActivity extends Activity {
                 show(nour);
             });
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
+        if (req == CAM_REQ && camPending != null) {
+            if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) camPending.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            else camPending.deny();
+            camPending = null;
+            return;
+        }
+        super.onRequestPermissionsResult(req, perms, res);
     }
 
     @Override

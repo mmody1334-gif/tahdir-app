@@ -495,6 +495,7 @@ api('/api/me').then(function(m){
   var qs=new URLSearchParams(location.search),qid=+qs.get('quiz');
   var sig=null;try{sig=JSON.parse(localStorage.getItem('tahdir_an_sig')||'null');}catch(e){}
   var _new=newA;newA=function(o){var a=_new(o);if(sig)a.sig=Object.assign(a.sig,sig);return a;};
-  if(qid){history.replaceState(null,'',location.pathname);fromQuiz(qid);}else loadList();
+  var oid=+qs.get('open');
+  if(qid){history.replaceState(null,'',location.pathname);fromQuiz(qid);}else if(oid){history.replaceState(null,'',location.pathname);openA(oid);}else loadList();
 },function(e){$('anMain').innerHTML='<div class="welcome"><h2>تعذّر التحميل</h2><p>'+esc(e.message)+'</p></div>';});
 })();
