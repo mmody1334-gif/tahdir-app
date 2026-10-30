@@ -404,7 +404,7 @@ function renderHomeCards(){
       var k=b.getAttribute('data-tool');
       if(k==='tool'){if(typeof toolDialog==='function')toolDialog('');else if($('toolBtn'))$('toolBtn').click();}
       else if(k==='tour'){if(typeof tourStart==='function')tourStart();else if($('tourBtn'))$('tourBtn').click();}
-      else if(k==='app'){var ab=$('appBar');if(ab&&!ab.hidden)ab.scrollIntoView({behavior:'smooth',block:'start'});else if($('pcBtn'))$('pcBtn').click();}
+      else if(k==='app'){var ab=$('appBar');if(ab){if(ab.hidden){ab.hidden=false;ab.classList.remove('reshow');ab.offsetHeight;ab.classList.add('reshow');}ab.scrollIntoView({behavior:'smooth',block:'start'});}else if($('pcBtn'))$('pcBtn').click();}
     };
   });
 }
@@ -430,6 +430,15 @@ function init(){
   // لا يوجد زر «قيم ثابتة» في الشريط: الاستراتيجيات والوسائل صارت حقولًا في كل درس.
   if(IN_APP){if($('appBar'))$('appBar').hidden=true;}
   else{
+    // إعلان التطبيق: يُخفى نهائيًا بزر ×، ويبقى متاحًا من بطاقة «التطبيق والأدوات»
+    var AB='tahdir_appbar_closed',ab=$('appBar');
+    try{if(ab&&localStorage.getItem(AB))ab.hidden=true;}catch(e){}
+    if($('appBarX'))$('appBarX').onclick=function(){
+      try{localStorage.setItem(AB,'1');}catch(e){}
+      ab.style.maxHeight=ab.offsetHeight+'px';ab.offsetHeight;ab.classList.add('closing');
+      setTimeout(function(){ab.hidden=true;ab.classList.remove('closing');ab.style.maxHeight='';},360);
+      toast('تم الإخفاء — تجده في «التطبيق والأدوات» أسفل الرئيسية');
+    };
     if($('pcBtn'))$('pcBtn').onclick=function(){toolDialog('');};
     if($('iosBtn'))$('iosBtn').onclick=function(){dialog({title:'التطبيق على الآيفون',html:'<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>افتح الموقع من متصفح <b>Safari</b>.</li><li>اضغط زر <b>«مشاركة»</b> ⬆ أسفل الشاشة.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة».</li></ol><p class="m-msg">يظهر «التحضير الآلي» بأيقونة على شاشتك مثل أي تطبيق.</p>',okText:'تم',cancelText:false});};}
   Promise.all([api('/api/me'),api('/api/lessons')]).then(function(r){

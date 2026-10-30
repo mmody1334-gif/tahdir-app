@@ -1578,6 +1578,13 @@ extra_css += '''
 body.tqb .home-card:hover{box-shadow:0 12px 26px rgba(29,78,216,.14)}
 .menu-list a .mi{display:inline-block;transition:transform .18s}.menu-list a:hover .mi{animation:fxWiggle .5s}
 @media (prefers-reduced-motion:reduce){.home-card,.home-card .home-ic{animation:none!important;transition:none}}
+/* إعلان «التطبيق على الموبايل» في الرئيسية: أصغر وأهدأ (بلا توهج مستمر) + زر إخفاء دائم */
+.app-bar .get-app{position:relative;width:auto;animation:glow 2.2s ease-in-out 2;padding:10px 16px;padding-inline-end:48px;border-width:1.5px}
+.app-bar .get-app h3{font-size:.98rem}.app-bar .get-app p{font-size:.8rem}
+.app-bar .ga-x{position:absolute;top:8px;inset-inline-end:8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--mute);font-size:1.2rem;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .15s,color .15s}
+.app-bar .ga-x:hover{background:#fee2e2;color:#b91c1c;transform:rotate(90deg)}
+.app-bar.closing{transition:opacity .3s,transform .3s,max-height .35s;opacity:0;transform:translateY(-8px);max-height:0!important;overflow:hidden;margin-top:0}
+.app-bar.reshow .get-app{animation:fxWin .45s cubic-bezier(.2,1.4,.4,1)}
 /* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
 /* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
 @media (max-width:700px){
@@ -1781,7 +1788,7 @@ KHOME = ('<div class="k-land"><header class="k-hd">'
 
 APP = TOP('<div class="stats"><span class="stat"><span id="statLessons">0</span> درسًا</span><span class="stat"><span id="statFilled">0</span> بتحضير جاهز</span><span class="stat">الفصل الدراسي الأول</span></div>').replace('%BTNS%',
   NAV('app')) + f'''
-<div class="app-bar" id="appBar"><div class="get-app"><div><h3>📱 تطبيق «الكبسولة» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
+<div class="app-bar" id="appBar"><div class="get-app"><button type="button" class="ga-x" id="appBarX" aria-label="إخفاء الإعلان" title="إخفاء — تجده لاحقًا في «التطبيق والأدوات»">×</button><div><h3>📱 تطبيق «الكبسولة» على الموبايل</h3><p>أرسل التحضير والواجب لنور من موبايلك بضغطة. الأداة مدمجة بدون Tampermonkey.</p></div><div class="ga-btns"><a class="ga-btn" href="/download/tahdir.apk" download>⬇ أندرويد</a><button type="button" class="ga-btn alt" id="iosBtn">📲 آيفون</button><button type="button" class="ga-btn alt" id="pcBtn">💻 أداة الكمبيوتر</button></div></div></div>
 <div class="wrap layout"><aside class="tree" id="tree" aria-label="الصفوف والوحدات والدروس"></aside>
 <main class="panel" id="panel"><div class="welcome">{CELL}<h2>جارٍ تحميل الدروس…</h2></div></main></div>
 <p class="foot">الكبسولة، إعداد أ. محمد مجدي</p><div id="cellArt" hidden>{CELL}</div>'''
