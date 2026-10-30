@@ -650,7 +650,7 @@ function initNotices(me){
   var place=function(){var r=bb.getBoundingClientRect(),top=Math.max(8,r.bottom+8);bp.style.top=top+'px';bp.style.maxHeight=(window.innerHeight-top-12)+'px';bp.style.left=Math.max(8,Math.min(r.left,window.innerWidth-bp.offsetWidth-8))+'px';};
   var close=function(){open=false;bp.hidden=true;bb.setAttribute('aria-expanded','false');};
   function load(){
-    return api('/api/notices').then(function(r){data=r.notices||[];paint();},function(){});
+    return api('/api/notices?b='+(location.pathname.indexOf('/teqany')===0?'t':'k')).then(function(r){data=r.notices||[];paint();},function(){});
   }
   function mark(id){
     api('/api/notices/read',id?{id:id}:{all:1}).then(load,function(){});
@@ -665,6 +665,7 @@ function initNotices(me){
       return '<li class="bp-it'+(n.read?' read':'')+'">'+
         '<div class="bp-t">'+(n.read?'':'<span class="bp-ndot" aria-hidden="true"></span>')+esc(n.title)+'</div>'+
         '<div class="bp-b">'+esc(n.body).replace(/\n/g,'<br>')+'</div>'+
+        (n.video?'<video class="bp-vid" src="'+esc(n.video)+'" poster="'+esc(n.video.replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="none"></video>':'')+
         (n.url?'<a class="bp-link" href="'+esc(n.url)+'" target="_blank" rel="noopener">فتح الرابط ↗</a>':'')+
         (n.read?'<span class="bp-read">مقروء ✓</span>':'<button type="button" class="btn small primary bp-ok" data-no="'+n.id+'">حسنًا</button>')+
         '<span class="bp-date">'+fmtDate(n.created_at)+'</span></li>';
@@ -685,7 +686,28 @@ function initNotices(me){
   window.addEventListener('resize',function(){if(open)place();});
   window.addEventListener('scroll',function(){if(open)place();},{passive:true});
   // علامة غير المقروء تظهر من أول تحميل الصفحة دون فتح
-  load();
+  // + إشعار فيديو غير مقروء (مثل إعلان المنصة) يُعرض في نافذة بمجرد فتح الصفحة، مرة واحدة لكل معلم
+  load().then(function(){
+    var v=data.filter(function(n){return n.video&&!n.read;})[0];if(!v)return;
+    var tries=0;
+    setTimeout(function show(){
+      var ov=$('modal');if(!ov)return;
+      if(!ov.hidden||$('tourOv')){if(++tries<40)setTimeout(show,900);return;}
+      var p=dialog({title:v.title,okText:'حسنًا 👍',cancelText:false,
+        html:'<div class="nv-wrap"><video class="nv-vid" id="nvVid" src="'+esc(v.video)+'" poster="'+esc(v.video.replace(/\.mp4$/,'.jpg'))+'" controls playsinline preload="auto"></video>'+
+          '<button type="button" class="nv-snd" id="nvSnd" hidden>🔊 شغّل الصوت</button></div><p class="m-msg nv-txt">'+esc(v.body)+'</p><p class="muted small nv-later">تجده دائمًا في الإشعارات 🔔 أعلى الصفحة.</p>'});
+      var box=$('modalBox');if(box)box.classList.add('nv-box');
+      var vid=$('nvVid'),snd=$('nvSnd');
+      if(vid){
+        var pr=vid.play();
+        // المتصفح قد يمنع التشغيل بالصوت تلقائيًا: نشغّله صامتًا ونعرض زر الصوت
+        if(pr&&pr.catch)pr.catch(function(){vid.muted=true;vid.play().catch(function(){});if(snd)snd.hidden=false;});
+        if(snd)snd.onclick=function(){vid.muted=false;vid.currentTime=0;vid.play().catch(function(){});snd.hidden=true;};
+      }
+      mark(v.id);
+      p.then(function(){var b=$('modalBox');if(b)b.classList.remove('nv-box');});
+    },1200);
+  });
 }
 // اختيار الصف: المادة أولًا (قائمة منبثقة) ثم صفوفها مرتّبة
 var CP_ICON={'العلوم':'🔬','الأحياء':'🧬','الكيمياء':'⚗️','الفيزياء':'🧲','العلوم البيئية':'🌍','اللغة الإنجليزية':'🔤','اللغة العربية':'📖','الرياضيات':'➗','الدراسات الاجتماعية':'🗺️','تقنية المعلومات':'💻','التربية الإسلامية':'🕌'};

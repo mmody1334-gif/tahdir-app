@@ -197,6 +197,21 @@ async function ensureSchema(db) {
   try { await db.prepare('ALTER TABLE users ADD COLUMN vault INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
   // فتح «الشاملة» بكلمة مرورها يُحفظ على الجلسة نفسها (يعمل حتى مع حجب الكوكيز)
   try { await db.prepare('ALTER TABLE sessions ADD COLUMN vault_ok INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
+  // الإشعارات: فيديو اختياري (يُعرض في الجرس ونافذة عند فتح الصفحة) ومنصة مستهدفة: k الكبسولة · t تقني حذيفة · فارغ = الاثنتان
+  try { await db.prepare('ALTER TABLE notices ADD COLUMN video TEXT').run(); } catch (e) { /* already there */ }
+  try { await db.prepare('ALTER TABLE notices ADD COLUMN brand TEXT').run(); } catch (e) { /* already there */ }
+  // إشعارا الفيديو الترويجي لكل منصة: يُنشران مرة واحدة فقط (لو حذفهما المدير لا يعودان)
+  try {
+    const seeded = await db.prepare("SELECT v FROM kv WHERE k = 'seed_promo_v1'").first();
+    if (!seeded) {
+      const t = Date.now();
+      await db.batch([
+        db.prepare('INSERT INTO notices(title,body,url,video,brand,created_at) VALUES(?,?,?,?,?,?)').bind('🎬 شاهد إعلان «الكبسولة»', 'فيديو قصير في دقيقة: كيف تحوّل «الكبسولة» حصتك — التحضير الجاهز، والاختبارات وفق الوثيقة، والألعاب التعليمية، والعروض… كل ما يحتاجه المعلم في مكان واحد. شاركه مع زملائك!', null, '/promo/kabsula.mp4', 'k', t),
+        db.prepare('INSERT INTO notices(title,body,url,video,brand,created_at) VALUES(?,?,?,?,?,?)').bind('🎬 شاهد إعلان «تقني حذيفة»', 'فيديو قصير في دقيقة: منصة مدرسة حذيفة بن محصن — التحضير الجاهز، والاختبارات وفق الوثيقة، والألعاب التعليمية، والعروض… كل ما يحتاجه المعلم في مكان واحد.', null, '/promo/teqany.mp4', 't', t),
+        db.prepare("INSERT OR REPLACE INTO kv(k,v) VALUES('seed_promo_v1','1')")
+      ]);
+    }
+  } catch (e) { /* لا يوقف الموقع */ }
   schemaReady = true;
 }
 
@@ -1363,7 +1378,10 @@ export default {
       // ---------- مركز الإشعارات (الجرس) ----------
       // قائمة الرسائل الموجهة للمعلمين من المدير: الأخيرة أولاً مع حالة «مقروء» الخاصة بهذا المستخدم
       if (p === '/api/notices') {
-        const N = (await env.DB.prepare('SELECT id,title,body,url,created_at FROM notices ORDER BY id DESC LIMIT 20').all()).results || [];
+        // كل منصة ترى إشعاراتها فقط (?b=k الكبسولة · ?b=t تقني حذيفة) + الإشعارات العامة
+        const bq = url.searchParams.get('b'), br = bq === 't' || bq === 'k' ? bq : null;
+        const N = (await (br ? env.DB.prepare("SELECT id,title,body,url,video,brand,created_at FROM notices WHERE brand IS NULL OR brand = '' OR brand = ? ORDER BY id DESC LIMIT 20").bind(br)
+          : env.DB.prepare('SELECT id,title,body,url,video,brand,created_at FROM notices ORDER BY id DESC LIMIT 20')).all()).results || [];
         const R = new Set(((await env.DB.prepare('SELECT notice_id FROM notice_reads WHERE user_id = ?').bind(me.id).all()).results || []).map(r => r.notice_id));
         return json({ notices: N.map(n => ({ ...n, read: R.has(n.id) })) });
       }
@@ -1523,14 +1541,16 @@ export default {
       if (p === '/api/admin/report') return json(await adminReport(env, Math.max(0, Math.min(3650, +url.searchParams.get('days') || 0)), VAULT));
       // ---------- إدارة الإشعارات: يكتب المدير الإعلان فيتلقاه كل المعلمين في الجرس ----------
       if (p === '/api/admin/notices' && m === 'GET') {
-        const N = (await env.DB.prepare('SELECT n.id, n.title, n.body, n.url, n.created_at, (SELECT COUNT(*) FROM notice_reads r WHERE r.notice_id = n.id) reads FROM notices n ORDER BY n.id DESC LIMIT 50').all()).results || [];
+        const N = (await env.DB.prepare('SELECT n.id, n.title, n.body, n.url, n.video, n.brand, n.created_at, (SELECT COUNT(*) FROM notice_reads r WHERE r.notice_id = n.id) reads FROM notices n ORDER BY n.id DESC LIMIT 50').all()).results || [];
         return json({ notices: N });
       }
       if (p === '/api/admin/notices' && m === 'POST') {
         const b = await body(req);
         const t = String(b.title || '').trim().slice(0, 120), bd = String(b.body || '').trim().slice(0, 4000), u = String(b.url || '').trim().slice(0, 300);
+        const vd = String(b.video || '').trim().slice(0, 300), br = b.brand === 'k' || b.brand === 't' ? b.brand : null;
         if (!t || !bd) return json({ error: 'اكتب العنوان والنص.' }, 400);
-        await env.DB.prepare('INSERT INTO notices(title,body,url,created_at) VALUES(?,?,?,?)').bind(t, bd, u || null, now()).run();
+        if (vd && !/^\/promo\/[a-z0-9_-]+\.mp4$/i.test(vd)) return json({ error: 'رابط الفيديو غير صالح.' }, 400);
+        await env.DB.prepare('INSERT INTO notices(title,body,url,video,brand,created_at) VALUES(?,?,?,?,?,?)').bind(t, bd, u || null, vd || null, br, now()).run();
         return json({ ok: true });
       }
       { const no = p.match(/^\/api\/admin\/notices\/(\d+)$/);

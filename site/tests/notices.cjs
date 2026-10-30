@@ -12,6 +12,8 @@ async function post(u, b, body, method) {
       headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
     return { status: r.status, j: await r.json().catch(() => ({})) };
   }, { path: b, body, method });
+  // إشعارا الفيديو الترويجي يُنشران تلقائيًا (انظر notices_video.cjs): هذا الاختبار يخص إعلانات المدير فقط
+  if (r.j && Array.isArray(r.j.notices)) r.j.notices = r.j.notices.filter(n => !n.video);
   return r;
 }
 
@@ -22,6 +24,7 @@ async function post(u, b, body, method) {
 
   // ---------- المدير: تهيئة + إنشاء إعلانين ----------
   const cA = await b.newContext({ viewport: { width: 1450, height: 950 }, locale: 'ar-OM' });
+  await cA.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })); // الجرس معطّل للاختبارات الآلية
   const pA = await cA.newPage();
   await pA.goto(B + '/', { waitUntil: 'domcontentloaded' });
   await pA.waitForTimeout(900);
@@ -50,10 +53,11 @@ async function post(u, b, body, method) {
 
   // ---------- معلم: يبلغ عن الإعلانين غير مقروءين ----------
   const cT = await b.newContext({ viewport: { width: 1450, height: 950 }, locale: 'ar-OM' });
+  await cT.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })); // الجرس معطّل للاختبارات الآلية
   const pT = await cT.newPage();
   await pT.goto(B + '/', { waitUntil: 'domcontentloaded' });
   await pT.waitForTimeout(800);
-  const mkT = await post(pT, '/api/admin/teachers', { name: 'أ. نورة', username: 'noura_n', password: 'Test@2026x' });
+  const mkT = await post(pA, '/api/admin/teachers', { name: 'أ. نورة', username: 'noura_n', password: 'Test@2026x' });
   console.log('إنشاء المعلمة: ' + mkT.status);
   await pT.fill('#username', 'noura_n'); await pT.fill('#password', 'Test@2026x');
   await pT.click('#loginBtn'); await pT.waitForTimeout(2600);
@@ -75,9 +79,10 @@ async function post(u, b, body, method) {
 
   // ---------- عزل لكل مستخدم: معلم جديد يرى الجميع غير مقروء ----------
   const cT2 = await b.newContext({ viewport: { width: 1450, height: 950 }, locale: 'ar-OM' });
+  await cT2.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })); // الجرس معطّل للاختبارات الآلية
   const pT2 = await cT2.newPage();
   await pT2.goto(B + '/', { waitUntil: 'domcontentloaded' }); await pT2.waitForTimeout(800);
-  const mkT2 = await post(pT2, '/api/admin/teachers', { name: 'أ. سالم', username: 'salim_n', password: 'Test@2026x' });
+  const mkT2 = await post(pA, '/api/admin/teachers', { name: 'أ. سالم', username: 'salim_n', password: 'Test@2026x' });
   console.log('إنشاء المعلم الثاني: ' + mkT2.status);
   await pT2.fill('#username', 'salim_n'); await pT2.fill('#password', 'Test@2026x');
   await pT2.click('#loginBtn'); await pT2.waitForTimeout(2600);
@@ -98,6 +103,8 @@ async function post(u, b, body, method) {
     return { found: true, unread: bb.classList.contains('unread'), dotVisible: !dot.hidden };
   });
   ok('الجرس يضيء عند وجود غير مقروء', glow.found === true && glow.unread === true && glow.dotVisible === true, JSON.stringify(glow).slice(0, 100));
+  await pT.goto(B + '/app', { waitUntil: 'domcontentloaded' }); await pT.waitForTimeout(2600);
+  await pT.evaluate(() => { const m = document.getElementById('modal'); if (m && !m.hidden) { const x = document.getElementById('mOk') || document.getElementById('mCancel'); x && x.click(); } });
   const bell = await pT.evaluate(() => {
     const bb = document.getElementById('bellBtn'), bp = document.getElementById('bellPanel');
     if (!bb || !bp) return { found: false };
@@ -116,6 +123,8 @@ async function post(u, b, body, method) {
   await pA.waitForTimeout(2800);
   const tabs = await pA.evaluate(() => Array.prototype.map.call(document.querySelectorAll('[data-tab]'), function (b) { return b.getAttribute('data-tab'); }));
   ok('تبويب «الإشعارات» موجود في اللوحة', tabs.indexOf('notices') >= 0, tabs.join(','));
+  await pA.evaluate(() => { const m = document.getElementById('modal'); if (m && !m.hidden) { const x = document.getElementById('mOk') || document.getElementById('mCancel'); x && x.click(); } });
+  await pA.click('[data-tab="notices"]').catch(() => {}); await pA.waitForTimeout(400);
   const tpl = await pA.evaluate(() => {
     const btn = document.getElementById('addNotice');
     if (!btn) return { found: false };

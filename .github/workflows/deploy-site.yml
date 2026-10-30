@@ -38,6 +38,7 @@ jobs:
           fi
           mkdir -p site/dist/assets/fin && cp -r site/finals/img/. site/dist/assets/fin/
           mkdir -p site/dist/assets/pdf && cp -r site/vendor/pdf/. site/dist/assets/pdf/
+          mkdir -p site/dist/assets/promo && cp -r site/vendor/promo/. site/dist/assets/promo/
           # تنظيف صور الوزارة (خطوط الحواف، صناديق الدرجات، شظايا الورقة) — الأصول في site/finals تبقى كما هي
           pip install -q numpy pillow opencv-python-headless && python3 site/tools/clean_fin.py site/dist/assets/fin || echo "::warning::fin image cleaning skipped"
           cd site && npx --yes wrangler@3.114.0 deploy && cd ..

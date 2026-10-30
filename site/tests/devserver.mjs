@@ -50,6 +50,15 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
     res.end(readFileSync(f)); return;
   }
+  // فيديو الإعلانات: يُخدَم كما في الإنتاج (/promo/… → dist/assets/promo/…) مع دعم Range لتشغيل الفيديو
+  if (req.url.startsWith('/promo/')) {
+    const rel = decodeURIComponent(req.url.slice(7).split('?')[0]);
+    const f = join(dir, '../dist/assets/promo', rel);
+    if (!rel || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
+    const buf = readFileSync(f), ct = rel.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg', rg = /bytes=(\d+)-(\d*)/.exec(req.headers.range || '');
+    if (rg) { const a = +rg[1], z = rg[2] ? +rg[2] : buf.length - 1; res.writeHead(206, { 'content-type': ct, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${z}/${buf.length}`, 'content-length': z - a + 1 }); res.end(buf.subarray(a, z + 1)); return; }
+    res.writeHead(200, { 'content-type': ct, 'accept-ranges': 'bytes', 'content-length': buf.length }); res.end(buf); return;
+  }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   headers.set('CF-Connecting-IP', req.headers['x-test-ip'] || '127.0.0.1');

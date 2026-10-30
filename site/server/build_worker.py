@@ -1585,6 +1585,13 @@ body.tqb .home-card:hover{box-shadow:0 12px 26px rgba(29,78,216,.14)}
 .app-bar .ga-x:hover{background:#fee2e2;color:#b91c1c;transform:rotate(90deg)}
 .app-bar.closing{transition:opacity .3s,transform .3s,max-height .35s;opacity:0;transform:translateY(-8px);max-height:0!important;overflow:hidden;margin-top:0}
 .app-bar.reshow .get-app{animation:fxWin .45s cubic-bezier(.2,1.4,.4,1)}
+/* إشعار الفيديو: نافذة عند فتح الصفحة + فيديو داخل الجرس */
+.modal-box.nv-box{width:min(460px,96vw)}
+.nv-wrap{position:relative;display:flex;justify-content:center;background:#000;border-radius:16px;overflow:hidden;margin:6px 0 10px}
+.nv-vid{display:block;width:auto;max-width:100%;max-height:min(62vh,640px);aspect-ratio:9/16;background:#000}
+.nv-snd{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);border:0;border-radius:999px;padding:10px 18px;font:inherit;font-weight:800;background:var(--main);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;animation:glow 1.6s ease-in-out infinite}
+.nv-txt{margin:0 0 4px}.nv-later{margin:0}
+.bp-vid{display:block;width:100%;max-height:340px;background:#000;border-radius:12px;margin:8px 0 4px;aspect-ratio:9/16;object-fit:contain}
 /* ===== وضع التطبيق على الجوال (html.inapp يضيفه common.js داخل تطبيق أندرويد/آيفون فقط) ===== */
 /* ترويسة الورقة الرسمية: لا تفرض عرضًا أكبر من شاشة الجوال (كانت الصفحة كلها تنزاح أفقيًا) */
 @media (max-width:700px){
