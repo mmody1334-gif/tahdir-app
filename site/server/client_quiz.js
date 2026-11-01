@@ -9,6 +9,8 @@ var TYPE_TXT={mcq:'اختيار من متعدد',short:'إجابة قصيرة',l
 var QNO=['الأول','الثاني','الثالث','الرابع'];
 var DEF_HDR={dir:'المديرية العامة للتعليم بمحافظة البريمي',school:'مدرسة حذيفة بن محصن (5-12)',year:'2027/2026',term:'الأول'};
 var me=null,courses=[],course=null,bank={lessons:[],items:[]},lessonById={},mode='quiz';
+// صفحة «الواجبات المنزلية»: نفس محرّك التقويم، لكن القسم واجب منزلي فقط (window.PAGE_MODE==='hw')
+var HW=window.PAGE_MODE==='hw';if(HW)mode='hw';
 var cfg={quizNo:'الأول',total:10,lessons:{},unit:'',reviewCount:0,dlv:[true,true,true],dn:6};
 var hdr=null,doc=null,dirty=false,paperView='quiz';
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
