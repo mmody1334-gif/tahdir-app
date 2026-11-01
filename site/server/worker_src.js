@@ -125,7 +125,7 @@ function staleSeconds(env) {
   const v = env && env.STALE_SECONDS ? parseInt(env.STALE_SECONDS, 10) : NaN;
   return Number.isFinite(v) && v >= 0 ? v : STALE_DAYS * 86400;
 }
-const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
+const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','hw_items_1','hw_items_2','hw_items_custom','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
 // أنواع الأحداث المقبولة في /api/event. أي نوع غير مذكور هنا يُرفض، فيضيع الحدث بصمت.
 // عند إضافة track() جديد في client_*.js أضف نوعه هنا وأضف تسميته العربية في TYPES داخل client_admin.js.
 const EVENT_TYPES = new Set([
@@ -1458,16 +1458,31 @@ export default {
       if (p.startsWith('/api/ai/')) { const r = await aiApi(req, env, me, p, m, url); if (r) return r; }
       // ---------- «بطاقات الإجابة»: حالة الجلسة الحية لشاشة السبورة (جوال المعلم يكتب، والسبورة تقرأ) ----------
       if (p === '/api/cards/live') {
-        const k = 'cl:' + me.id;
         if (m === 'POST') {
           const t = await req.text();
           if (t.length > 60000) return json({ error: 'too_large' }, 413);
           let b = {}; try { b = JSON.parse(t || '{}'); } catch (e) {}
-          await env.DB.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind(k, JSON.stringify(b.state || null)).run();
+          const sidParam = url.searchParams.get('sid'), state = b.state || {}, sid = sidParam ? Number(sidParam) : Number(state.sid || 0);
+          if (!Number.isSafeInteger(sid) || sid < 1 || (sidParam && Number(state.sid) !== sid)) return json({ error: 'معرّف الجلسة غير صالح.' }, 400);
+          const own = await env.DB.prepare('SELECT id FROM quizzes WHERE id = ? AND user_id = ? AND kind = ?').bind(sid, me.id, 'csession').first();
+          if (!own) return json({ error: 'الجلسة غير متاحة.' }, 404);
+          const value = JSON.stringify(state);
+          await env.DB.batch([
+            env.DB.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('cl:' + me.id + ':' + sid, value),
+            env.DB.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('cl:' + me.id, value)
+          ]);
           return json({ ok: true });
         }
-        const r = await env.DB.prepare('SELECT v FROM kv WHERE k = ?').bind(k).first();
+        const sidParam = url.searchParams.get('sid'), sid = sidParam ? Number(sidParam) : 0;
+        if (sidParam && (!Number.isSafeInteger(sid) || sid < 1)) return json({ state: null });
+        if (sid) {
+          const own = await env.DB.prepare('SELECT id FROM quizzes WHERE id = ? AND user_id = ? AND kind = ?').bind(sid, me.id, 'csession').first();
+          if (!own) return json({ state: null });
+        }
+        let r = sid ? await env.DB.prepare('SELECT v FROM kv WHERE k = ?').bind('cl:' + me.id + ':' + sid).first() : null;
+        if (!r) r = await env.DB.prepare('SELECT v FROM kv WHERE k = ?').bind('cl:' + me.id).first();
         let st = null; try { st = r ? JSON.parse(r.v) : null; } catch (e) {}
+        if (sid && st && Number(st.sid) !== sid) st = null;
         return json({ state: st });
       }
       if (p === '/api/init' || p.startsWith('/api/init/')) { const r = await initApi(req, env, me, p, m, url); if (r) return r; }
@@ -1510,12 +1525,12 @@ export default {
         if (data.length > 400000) return json({ error: 'الاختبار كبير جدًا.' }, 400);
         if (b.id) {
           const r = await env.DB.prepare('UPDATE quizzes SET title=?, grade=?, subject=?, kind=?, data=?, updated_at=? WHERE id=? AND user_id=?').bind(title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, +b.id, me.id).run();
-          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id });
+          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id, updated_at: t });
         }
         const n = await env.DB.prepare('SELECT COUNT(*) n FROM quizzes WHERE user_id = ?').bind(me.id).first();
         if (n && n.n >= 400) return json({ error: 'وصلت إلى الحد الأقصى للملفات المحفوظة. احذف بعضها أولًا.' }, 400);
         const r = await env.DB.prepare('INSERT INTO quizzes(user_id,title,grade,subject,kind,data,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id').bind(me.id, title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, t).first();
-        return json({ ok: true, id: r && r.id });
+        return json({ ok: true, id: r && r.id, updated_at: t });
       }
       if ((mm0 = p.match(/^\/api\/quizzes\/(\d+)$/))) {
         const id = +mm0[1];

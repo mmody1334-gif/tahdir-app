@@ -1023,7 +1023,7 @@ body.ck-noscroll{overflow:hidden}body.ck-noscroll #modal{z-index:3000}body.ck-no
 .ck-lh{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:rgba(0,0,0,.6)}
 .ck-x{border:0;background:rgba(255,255,255,.15);color:#fff;width:40px;height:40px;border-radius:50%;font-size:18px;cursor:pointer;flex:none}
 .ck-lq{flex:1;min-width:0;display:grid;gap:2px}.ck-lq b{font-size:.85rem;color:#9fe3cf}.ck-lq span{font-size:.95rem;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ck-lc{display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex:none}.ck-cnt{background:#16a34a;border-radius:999px;padding:2px 12px;font-size:.95rem;white-space:nowrap}.ck-cnt b{font-size:1.15rem}
+.ck-lc{display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex:none}.ck-sync-note{font-size:.64rem;opacity:.8;max-width:45vw;text-align:right;line-height:1.25}.ck-cnt{background:#16a34a;border-radius:999px;padding:2px 12px;font-size:.95rem;white-space:nowrap}.ck-cnt b{font-size:1.15rem}
 .ck-dist{font-size:.78rem;background:rgba(255,255,255,.14);border-radius:6px;padding:0 6px}.ck-dist.ok{background:#16a34a}
 .ck-cam{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .ck-cam video,.ck-cam canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}

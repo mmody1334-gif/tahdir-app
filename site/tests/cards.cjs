@@ -80,8 +80,12 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   ok('شاشة البدء: عرض على الكمبيوتر + QR للجوال', !!(await p.$('.ck-qr svg')) && !!(await p.$('#stBoard')));
   await p.screenshot({ path: OUT + '/cards_start.png', fullPage: true });
   const S = await p.evaluate(() => api('/api/quizzes?kind=csession').then(r => api('/api/quizzes/' + r.quizzes[0].id)).then(r => ({ id: r.quiz.id, q: r.quiz.data.questions.map(q => q.correct) })));
+  const S2 = await p.evaluate(async () => { const c=(await api('/api/quizzes?kind=cclass')).quizzes[0],title='جلسة اختبار عزل البث';return (await api('/api/quizzes',{title,grade:c.grade||'',subject:c.subject||'',kind:'csession',data:{id:null,title,classId:c.id,className:c.title,questions:[],answers:{},cur:0,reveal:false}})).id; });
   await p.click('#stBoard'); await p.waitForSelector('.ck-bqr svg', { timeout: 8000 });
   ok('السبورة تنتظر الجوال وتعرض رمز QR', /امسح الرمز/.test(await p.textContent('#bdW')));
+  await p.evaluate(async id=>api('/api/cards/live?sid='+id,{state:{t:Date.now(),sid:id,title:'جلسة أخرى',ended:false}}),S2);
+  const isolated=await p.evaluate(async ids=>{const a=await api('/api/cards/live?sid='+ids[0]),b=await api('/api/cards/live?sid='+ids[1]);return {main:a.state,other:b.state&&b.state.title};},[S.id,S2]);
+  ok('حالة بث كل جلسة مستقلة ولا تستبدل شاشة جلسة أخرى', !isolated.main&&isolated.other==='جلسة أخرى', JSON.stringify(isolated));
   await p.screenshot({ path: OUT + '/cards_board_wait.png' });
   await p.click('#bdHelp'); await p.waitForTimeout(300);
   ok('السبورة: «شرح للطلاب» يعرض طريقة رفع البطاقة', !(await p.$eval('#bdH', e => e.hidden)) && (await p.$$('#bdH figure')).length === 4);
@@ -126,26 +130,38 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   await makeVideo(ans0, dir + '/q1.y4m'); await makeVideo(ans1, dir + '/q2.y4m');
 
   // ===== الجوال بالكاميرا =====
-  async function phone(video) {
+  async function phone(video, injectLiveFailure) {
     const b = await PW.chromium.launch({ headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-video-capture=' + video] });
     const c = await b.newContext({ viewport: { width: 400, height: 860 }, isMobile: true, hasTouch: true, locale: 'ar-OM', userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Mobile Safari/537.36', permissions: ['camera'] });
     await c.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
     const q = await c.newPage(); q.on('pageerror', e => errs.push('phone: ' + e.message));
+    if(injectLiveFailure)await q.addInitScript(()=>{window.__forcedFailures={live:true};const nativeFetch=window.fetch.bind(window);window.fetch=function(input,init){const u=typeof input==='string'?input:input.url,p=new URL(u,location.href).pathname,m=((init&&init.method)||'GET').toUpperCase();if(m==='POST'&&p==='/api/cards/live'&&window.__forcedFailures.live){window.__forcedFailures.live=false;return Promise.reject(new TypeError('Injected network failure'));}return nativeFetch(input,init);};});
     await q.goto(B + '/', { waitUntil: 'domcontentloaded' }); await q.waitForTimeout(600); await shut(q);
     if (await q.$('#loginForm')) { await q.fill('#username', 'mohamed'); await q.fill('#password', 'Bio@2026x'); await q.click('#loginBtn'); await q.waitForTimeout(2000); }
     await q.goto(B + '/cards?scan=' + S.id, { waitUntil: 'domcontentloaded' });
     await q.waitForSelector('#cdLive', { timeout: 15000 }); await shut(q);
-    return { b, q };
+    return { b, q, c };
   }
-  let ph = await phone(dir + '/q1.y4m'), q = ph.q;
+  let ph = await phone(dir + '/q1.y4m', true), q = ph.q;
+  await ph.c.setOffline(true);
   await q.waitForFunction(() => /^12/.test((document.querySelector('.ck-cnt') || {}).textContent || ''), null, { timeout: 25000 }).catch(() => {});
   const cnt1 = await q.textContent('.ck-cnt');
   ok('الجوال يقرأ 12 بطاقة معًا في السؤال 1', /^12\s*\/\s*20/.test(cnt1.trim()), cnt1);
-  await q.waitForTimeout(400); await q.screenshot({ path: OUT + '/cards_phone_scan.png' });
+  await q.waitForTimeout(1800);
+  const offlineBackup=await q.evaluate(id=>!!localStorage.getItem('tahdir_cards_pending_'+id),S.id);
+  const offlineCount=await p.evaluate(async id=>{const r=await api('/api/quizzes/'+id);return Object.keys((r.quiz.data.answers||{})[0]||{}).length;},S.id);
+  ok('أثناء انقطاع الإنترنت: تُحفظ نسخة محلية ولا يُدّعى حفظها على الخادم',offlineBackup&&offlineCount<12,'local='+offlineBackup+'; server='+offlineCount);
+  await ph.c.setOffline(false); await q.waitForTimeout(400); await q.screenshot({ path: OUT + '/cards_phone_scan.png' });
   // السبورة تتزامن
   await p.waitForFunction(() => /أجاب 12 من 20/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
   ok('السبورة على الكمبيوتر تعرض السؤال وعدد من أجاب', /أجاب 12 من 20/.test(await p.textContent('#bdW')) && !!(await p.$('.ck-bq')));
+  let injected=await q.evaluate(()=>window.__forcedFailures);
+  ok('فشل بث مؤقت من الجوال ← إعادة إرسال تلقائية للسبورة', !injected.live);
   ok('السبورة لا تكشف الإجابة قبل الإظهار', !(await p.$('.ck-bc.ok')));
+  const savedAfterRetry=await p.waitForFunction(async id=>{const r=await api('/api/quizzes/'+id);return Object.keys((r.quiz.data.answers||{})[0]||{}).length>=12;},S.id,{timeout:15000}).then(()=>true).catch(()=>false);
+  ok('عودة الإنترنت ← تُحفظ الإجابات المعلّقة تلقائيًا على الخادم',savedAfterRetry);
+  const backupCleared=await q.waitForFunction(id=>!localStorage.getItem('tahdir_cards_pending_'+id),S.id,{timeout:8000}).then(()=>true).catch(()=>false);
+  ok('حُذفت النسخة المحلية المؤقتة بعد تأكيد الحفظ على الخادم',backupCleared);
   await p.screenshot({ path: OUT + '/cards_board_q1.png' });
   await q.click('#lvR'); await p.waitForSelector('.ck-bc.ok', { timeout: 6000 }).catch(() => {});
   ok('إظهار الإجابة من الجوال ← تظهر على السبورة بالنسب', !!(await p.$('.ck-bc.ok')) && /67%/.test(await p.textContent('.ck-bc.ok')), await p.textContent('.ck-bc.ok').catch(() => ''));
@@ -176,8 +192,8 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   await ph.b.close();
   // ===== الكمبيوتر: النتائج ← التحليل وسجل الصعوبات =====
   await p.goto(B + '/cards', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500); await shut(p);
-  await p.click('[data-tab="sessions"]'); await p.click('[data-res]'); await p.waitForSelector('.ck-rt');
-  ok('السبورة أُبلغت بانتهاء الجلسة', await p.evaluate(() => api('/api/cards/live').then(r => r.state && r.state.ended === true)));
+  await p.click('[data-tab="sessions"]'); await p.click('[data-res="' + S.id + '"]'); await p.waitForSelector('.ck-rt');
+  ok('السبورة أُبلغت بانتهاء الجلسة', await p.evaluate(id => api('/api/cards/live?sid='+id).then(r => r.state && r.state.ended === true), S.id));
   await p.screenshot({ path: OUT + '/cards_results.png', fullPage: true });
   await p.click('#rsAn'); await p.waitForTimeout(800);
   const an = await p.evaluate(() => api('/api/quizzes?kind=analysis').then(r => api('/api/quizzes/' + r.quizzes[0].id)).then(r => r.quiz.data));
@@ -185,7 +201,7 @@ const NAMES = ['علي بن سالم بن محمد بن علي بن الشامس
   await p.click('#mOk'); await p.waitForURL(/\/analysis/, { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(1800);
   ok('فتح التحليل مباشرة', /analysis/.test(p.url()) && /تحليل/.test(await p.textContent('#anMain')));
   await p.goto(B + '/cards', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500); await shut(p);
-  await p.click('[data-tab="sessions"]'); await p.click('[data-res]'); await p.waitForSelector('.ck-rt');
+  await p.click('[data-tab="sessions"]'); await p.click('[data-res="' + S.id + '"]'); await p.waitForSelector('.ck-rt');
   await p.click('#rsLd'); await p.waitForTimeout(600);
   const lowN = await p.$$eval('[data-lw]', x => x.length);
   await p.click('#mOk'); await p.waitForTimeout(1200);

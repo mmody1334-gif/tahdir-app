@@ -99,8 +99,16 @@ function home(){
   each('[data-start]',function(b){b.onclick=function(){getDoc(b.getAttribute('data-start')).then(startScreen);};});
   each('[data-del]',function(b){b.onclick=function(){var id=b.getAttribute('data-del');dialog({title:'حذف نهائي؟',message:TAB==='classes'?'سيُحذف الصف وقائمة طلابه (تبقى نتائج جلساته السابقة).':'ستُحذف الجلسة وإجابات الطلاب فيها.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/quizzes/'+id,null,'DELETE').then(load);});};});
 }
-function getDoc(id){return api('/api/quizzes/'+id).then(function(r){var d=r.quiz.data;d.id=r.quiz.id;return d;},function(e){toast(e.message);throw e;});}
-function saveDoc(kind,d){return api('/api/quizzes',{id:d.id||undefined,title:d.title,grade:d.grade||'',subject:d.subject||'',kind:kind,data:d}).then(function(r){d.id=r.id;return d;});}
+function getDoc(id){return api('/api/quizzes/'+id).then(function(r){var d=r.quiz.data;d.id=r.quiz.id;d.updated_at=r.quiz.updated_at;return d;},function(e){toast(e.message);throw e;});}
+function saveDoc(kind,d){return api('/api/quizzes',{id:d.id||undefined,title:d.title,grade:d.grade||'',subject:d.subject||'',kind:kind,data:d}).then(function(r){d.id=r.id;d.updated_at=r.updated_at||d.updated_at;return d;});}
+function pendingKey(id){return 'tahdir_cards_pending_'+id;}
+function restorePending(S){
+  try{var raw=localStorage.getItem(pendingKey(S.id));if(!raw)return S;var p=JSON.parse(raw),d=p&&p.data;if(!d||String(d.id)!==String(S.id))return S;
+    if(JSON.stringify(S.answers||{})===JSON.stringify(d.answers||{})&&S.cur===d.cur&&S.reveal===d.reveal){localStorage.removeItem(pendingKey(S.id));return S;}
+    if((+S.updated_at||0)<=(+p.baseUpdatedAt||0)){d.updated_at=S.updated_at;d.id=S.id;d._pendingRestore=true;toast('استُعيدت إجابات محفوظة على هذا الهاتف لم تصل إلى الخادم بعد.');return d;}
+    toast('توجد نسخة محلية أقدم من بيانات الخادم؛ أبقينا الأحدث على الخادم لتجنب استبدال إجابات أخرى.');
+  }catch(e){}return S;
+}
 
 // ================= إضافة صف =================
 function editClass(C){
@@ -233,14 +241,14 @@ function startScreen(S){
   $('stBack').onclick=function(){TAB='sessions';load();};
 }
 function openScan(id){
-  getDoc(id).then(function(S){return getDoc(S.classId).then(function(C){live(S,C);},function(){toast('الصف المرتبط بالجلسة غير موجود');});});
+  getDoc(id).then(function(S){S=restorePending(S);return getDoc(S.classId).then(function(C){live(S,C);},function(){toast('الصف المرتبط بالجلسة غير موجود');});});
 }
 
 // ================= المسح الحي (الجوال) =================
 function live(S,C){
-  S.answers=S.answers||{};S.cur=Math.min(S.cur||0,S.questions.length-1);S.reveal=false;
+  var restoredPending=!!S._pendingRestore;delete S._pendingRestore;S.answers=S.answers||{};S.cur=Math.min(S.cur||0,S.questions.length-1);S.reveal=false;
   var roster={};C.students.forEach(function(s){roster[s.n]=s.name;});
-  var st={stream:null,run:false,maxW:1280,pend:{},showLet:true,wake:null,dirty:false,lastPush:0,saveT:null,ms:0};
+  var st={stream:null,run:false,maxW:1280,pend:{},showLet:true,wake:null,dirty:false,lastPush:0,saveT:null,ms:0,rev:0,saving:false,savePromise:null,retryT:null,retryN:0,liveBusy:false,liveNext:null,liveRetryT:null,liveRetryN:0,closing:false,closed:false,toRes:false,syncText:'جارٍ الاتصال بالسبورة'};
   var o=document.createElement('div');o.className='ck-live';o.id='cdLive';
   o.innerHTML='<div class="ck-lh"><button type="button" class="ck-x" id="lvX" aria-label="إنهاء">✕</button><div class="ck-lq"><b id="lvN"></b><span id="lvQ"></span></div><div class="ck-lc" id="lvC"></div></div>'+
     '<div class="ck-cam" id="lvCam"><video id="lvV" playsinline muted autoplay></video><canvas id="lvO"></canvas><div class="ck-msg" id="lvM">جارٍ تشغيل الكاميرا…</div></div>'+
@@ -255,7 +263,7 @@ function live(S,C){
     $('lvN').textContent='السؤال '+(S.cur+1)+' / '+S.questions.length+(S.reveal?' · الإجابة: '+LET[q.correct]:'');
     $('lvQ').textContent=q.stem;
     var okN=Object.keys(a).filter(function(x){return a[x]===q.correct;}).length;
-    $('lvC').innerHTML='<span class="ck-cnt"><b>'+n+'</b> / '+tot+'</span>'+(S.reveal&&n?'<span class="ck-dist ok">✓ '+okN+'</span><span class="ck-dist">✗ '+(n-okN)+'</span>':'');
+    $('lvC').innerHTML='<span class="ck-sync-note" id="lvSync" aria-live="polite">'+esc(st.syncText)+'</span><span class="ck-cnt"><b>'+n+'</b> / '+tot+'</span>'+(S.reveal&&n?'<span class="ck-dist ok">✓ '+okN+'</span><span class="ck-dist">✗ '+(n-okN)+'</span>':'');
     $('lvLn').textContent=tot-n?(tot-n)+' بقي':'الكل ✓';
     $('lvP').disabled=S.cur===0;$('lvNx').textContent=S.cur===S.questions.length-1?'إنهاء ✓':'التالي ←';
     $('lvR').textContent=S.reveal?'🙈 إخفاء':'👁 الإجابة';
@@ -272,25 +280,38 @@ function live(S,C){
   }
   // الكمبيوتر (شاشة السبورة) يقرأ هذه الحالة من الخادم كل ثانية تقريبًا
   var pushT=null;
-  function push(){clearTimeout(pushT);pushT=setTimeout(function(){
-    var q=S.questions[S.cur],a=A();
-    api('/api/cards/live',{state:{t:Date.now(),sid:S.id,title:S.title,cls:C.title,i:S.cur,n:S.questions.length,q:{stem:q.stem,choices:q.choices,table:q.table||null,correct:S.reveal?q.correct:null},reveal:S.reveal,
-      done:Object.keys(a).map(Number),dist:S.reveal?q.choices.map(function(_,k){return Object.keys(a).filter(function(x){return a[x]===k;}).length;}):null,
-      students:C.students.map(function(s){return [s.n,s.name];}),ended:false}}).catch(function(){});
-  },250);}
-  function save(){clearTimeout(st.saveT);st.saveT=setTimeout(function(){if(st.dirty){st.dirty=false;saveDoc('csession',S).catch(function(){st.dirty=true;});}},1500);}
+  function setSyncText(t){st.syncText=t;var e=$('lvSync');if(e)e.textContent=t;}
+  function liveState(){var q=S.questions[S.cur],a=A();return {t:Date.now(),sid:S.id,title:S.title,cls:C.title,i:S.cur,n:S.questions.length,q:{stem:q.stem,choices:q.choices,table:q.table||null,correct:S.reveal?q.correct:null},reveal:S.reveal,done:Object.keys(a).map(Number),dist:S.reveal?q.choices.map(function(_,k){return Object.keys(a).filter(function(x){return a[x]===k;}).length;}):null,students:C.students.map(function(s){return [s.n,s.name];}),ended:false};}
+  function scheduleLiveRetry(){if(st.liveRetryT||!st.liveNext||!navigator.onLine||(st.closed&&!st.liveNext.ended))return;if(st.liveRetryN>=8){setSyncText('تعذّر الاتصال — راجع الاتصال وأعد فتح الشاشة');return;}var ms=Math.min(15000,500*Math.pow(2,Math.min(st.liveRetryN,5)));st.liveRetryN++;st.liveRetryT=setTimeout(function(){st.liveRetryT=null;var x=st.liveNext;st.liveNext=null;if(x)transmitLive(x);},ms);}
+  function transmitLive(state){if(st.closed&&!state.ended)return;if(st.liveBusy){st.liveNext=state;return;}st.liveNext=null;clearTimeout(st.liveRetryT);st.liveRetryT=null;st.liveBusy=true;setSyncText(navigator.onLine?'جارٍ المزامنة مع السبورة…':'لا يوجد اتصال — ستُعاد المحاولة تلقائيًا');
+    api('/api/cards/live?sid='+encodeURIComponent(S.id),{state:state}).then(function(){st.liveBusy=false;st.liveRetryN=0;if(st.liveNext){var x=st.liveNext;st.liveNext=null;transmitLive(x);}else{setSyncText(state.ended?'انتهت الجلسة':'متصل بالسبورة');if(st.closed)cleanupListeners();}},function(){st.liveBusy=false;if(!st.liveNext)st.liveNext=state;if(navigator.onLine){setSyncText('تعذّر الاتصال — جارٍ إعادة المحاولة');scheduleLiveRetry();}else setSyncText('لا يوجد اتصال — ستُعاد المحاولة تلقائيًا');});
+  }
+  function push(){clearTimeout(pushT);pushT=setTimeout(function(){transmitLive(liveState());},250);}
+  function backupPending(){if(!S.id)return;try{localStorage.setItem(pendingKey(S.id),JSON.stringify({baseUpdatedAt:+S.updated_at||0,data:S}));}catch(e){}}
+  function scheduleSaveRetry(){if(st.retryT||!st.dirty||!navigator.onLine||st.closed)return;if(st.retryN>=8){setSyncText('تعذّر حفظ الإجابات — أبقِ الصفحة مفتوحة وأعد الاتصال');return;}var ms=Math.min(30000,1000*Math.pow(2,Math.min(st.retryN,5)));st.retryN++;st.retryT=setTimeout(function(){st.retryT=null;persistNow().catch(scheduleSaveRetry);},ms);}
+  function persistNow(){clearTimeout(st.saveT);st.saveT=null;if(!st.dirty)return Promise.resolve(S);if(st.saving)return st.savePromise.then(function(){return st.dirty?persistNow():S;});if(!navigator.onLine)return Promise.reject(new Error('لا يوجد اتصال بالإنترنت'));
+    var rev=st.rev,snap=JSON.parse(JSON.stringify(S));st.saving=true;setSyncText('جارٍ حفظ الإجابات…');
+    st.savePromise=saveDoc('csession',snap).then(function(saved){st.saving=false;st.retryN=0;clearTimeout(st.retryT);st.retryT=null;if(saved.updated_at)S.updated_at=saved.updated_at;if(st.rev===rev){st.dirty=false;try{localStorage.removeItem(pendingKey(S.id));}catch(e){}}else{st.dirty=true;backupPending();}if(st.dirty)return persistNow();setSyncText('متصل بالسبورة');if(st.closing)finishClose();return S;},function(e){st.saving=false;st.dirty=true;setSyncText('تعذّر حفظ الإجابات — جارٍ إعادة المحاولة');throw e;});return st.savePromise;
+  }
+  function save(){clearTimeout(st.saveT);st.saveT=setTimeout(function(){persistNow().catch(scheduleSaveRetry);},1500);}
+  function markDirty(){if(st.closed||st.closing)return;st.dirty=true;st.rev++;st.retryN=0;clearTimeout(st.retryT);st.retryT=null;backupPending();save();}
+  function finishClose(){if(!st.closing||st.closed||st.dirty||st.saving)return;st.closed=true;clearTimeout(st.saveT);clearTimeout(st.retryT);st.saveT=st.retryT=null;stopCam();o.remove();document.body.classList.remove('ck-noscroll');if(SCAN)history.replaceState(null,'',location.pathname);if(st.toRes)results(S);else load();cleanupListeners();}
+  function onOnline(){if(st.dirty){clearTimeout(st.retryT);st.retryT=null;st.retryN=0;persistNow().catch(scheduleSaveRetry);}if(st.liveNext){clearTimeout(st.liveRetryT);st.liveRetryT=null;st.liveRetryN=0;var x=st.liveNext;st.liveNext=null;transmitLive(x);}else if(!st.closed&&!st.closing)push();}
+  function onOffline(){setSyncText('لا يوجد اتصال — ستُعاد المحاولة تلقائيًا');}
+  function onVisibility(){if(document.visibilityState==='hidden'){if(st.dirty)persistNow().catch(scheduleSaveRetry);if(!st.closed&&!st.closing)push();}}
+  function cleanupListeners(){if(st.liveBusy||st.liveNext||st.liveRetryT)return;window.removeEventListener('online',onOnline);window.removeEventListener('offline',onOffline);document.removeEventListener('visibilitychange',onVisibility);}
+  window.addEventListener('online',onOnline);window.addEventListener('offline',onOffline);document.addEventListener('visibilitychange',onVisibility);
   function stopCam(){st.run=false;if(st.stream){st.stream.getTracks().forEach(function(t){t.stop();});st.stream=null;}try{st.wake&&st.wake.release();}catch(e){}}
   function close(toRes){
-    stopCam();clearTimeout(st.saveT);clearTimeout(pushT);
-    api('/api/cards/live',{state:{t:Date.now(),sid:S.id,title:S.title,ended:true}}).catch(function(){});
-    saveDoc('csession',S).then(function(){o.remove();document.body.classList.remove('ck-noscroll');if(SCAN)history.replaceState(null,'',location.pathname);if(toRes)results(S);else load();},function(e){toast('تعذّر الحفظ: '+e.message);});
+    if(st.closing||st.closed)return;st.closing=true;st.toRes=toRes;stopCam();clearTimeout(st.saveT);clearTimeout(pushT);st.saveT=pushT=null;
+    transmitLive({t:Date.now(),sid:S.id,title:S.title,ended:true});st.dirty=true;st.rev++;backupPending();persistNow().then(finishClose).catch(function(e){toast('تعذّر الحفظ؛ سنعيد المحاولة تلقائيًا. أبقِ الصفحة مفتوحة واتصل بالإنترنت.');scheduleSaveRetry();});
   }
   $('lvX').onclick=function(){dialog({title:'إنهاء المسح؟',message:'تُحفظ الإجابات، ويمكنك متابعة الجلسة لاحقًا.',okText:'إنهاء وعرض النتائج',cancelText:'متابعة المسح'}).then(function(ok){if(ok)close(true);});};
-  $('lvP').onclick=function(){if(S.cur>0){S.cur--;S.reveal=false;st.pend={};st.dirty=true;save();head();}};
-  $('lvNx').onclick=function(){if(S.cur<S.questions.length-1){S.cur++;S.reveal=false;st.pend={};st.dirty=true;save();head();}else close(true);};
-  $('lvR').onclick=function(){S.reveal=!S.reveal;head();};
+  $('lvP').onclick=function(){if(S.cur>0){S.cur--;S.reveal=false;st.pend={};markDirty();head();}};
+  $('lvNx').onclick=function(){if(S.cur<S.questions.length-1){S.cur++;S.reveal=false;st.pend={};markDirty();head();}else close(true);};
+  $('lvR').onclick=function(){S.reveal=!S.reveal;markDirty();head();};
   $('lvL').onclick=function(){var sh=$('lvSh');sh.hidden=!sh.hidden;if(!sh.hidden)sheet();};
-  head();
+  head();if(restoredPending)markDirty();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('lvM').innerHTML='المتصفح لا يدعم الكاميرا. افتح الصفحة من Chrome أو Safari على الجوال.';return;}
   navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}).then(function(s){
     st.stream=s;V.srcObject=s;st.run=true;
@@ -322,7 +343,7 @@ function live(S,C){
       h.ok=p.c>=2;
       if(h.ok&&a[h.n]!==h.ans){var isNew=a[h.n]==null;a[h.n]=h.ans;changed=true;if(isNew)beep();}
     });
-    if(changed){st.dirty=true;save();head();}
+    if(changed){markDirty();head();}
   }
   function draw(hits){
     octx.clearRect(0,0,O.width,O.height);
@@ -357,7 +378,7 @@ function board(){
       (qr?'<div class="ck-bqr">'+qr+'</div><p>امسح الرمز بكاميرا جوالك (بنفس الحساب) لبدء مسح البطاقات.<br>سيظهر السؤال الأول هنا تلقائيًا.</p><p class="ck-bhint">👨‍🎓 لشرح طريقة رفع البطاقة للطلاب اضغط الزر أسفل الشاشة.</p>':'<p>ابدأ الجلسة من جوالك بنفس الحساب، وسيظهر السؤال هنا تلقائيًا.</p>'))+'</div>';
   }
   function tick(once){
-    api('/api/cards/live').then(function(r){
+    api('/api/cards/live?sid='+encodeURIComponent(BSID||'')).then(function(r){
       var s=r.state,key=JSON.stringify(s||{});if(key===last)return;last=key;
       var mine=s&&!s.ended&&Date.now()-s.t<3*3600*1000&&(!BSID||s.sid===BSID);
       if(!mine){waiting(s);return;}
