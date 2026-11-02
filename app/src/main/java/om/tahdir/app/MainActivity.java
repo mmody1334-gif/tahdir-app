@@ -45,7 +45,7 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
     static final String SITE = BuildConfig.SITE_URL;
     static final String NOUR = "https://lms.moe.gov.om/teacher";
-    static final String TOOL_URL = "https://elkabsula.site/tool/tahdir-noor.user.js";
+    static final String TOOL_URL = BuildConfig.TOOL_URL;
     static final int GREEN = Color.parseColor(BuildConfig.TAB_COLOR);
     static final int ACTIVE = Color.parseColor(BuildConfig.TAB_ACTIVE);
     static final int FILE_REQ = 7;
@@ -197,7 +197,7 @@ public class MainActivity extends Activity {
                 view.loadDataWithBaseURL(null, "<html dir='rtl'><meta name='viewport' content='width=device-width,initial-scale=1'>"
                     + "<body style='font-family:sans-serif;text-align:center;padding:60px 24px;color:#163'>"
                     + "<h2>لا يوجد اتصال بالإنترنت</h2><p>تأكد من الاتصال ثم اضغط إعادة المحاولة.</p>"
-                    + "<button style='background:#1F8A70;color:#fff;border:0;border-radius:10px;padding:12px 26px;font-size:16px' onclick=\"location.href='" + u + "'\">إعادة المحاولة</button></body></html>",
+                    + "<button style='background:" + BuildConfig.TAB_ACTIVE + ";color:#fff;border:0;border-radius:10px;padding:12px 26px;font-size:16px' onclick=\"location.href='" + u + "'\">إعادة المحاولة</button></body></html>",
                     "text/html", "utf-8", u);
             }
         });

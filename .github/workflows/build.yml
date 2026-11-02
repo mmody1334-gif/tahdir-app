@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -51,3 +52,7 @@ jobs:
           cd /tmp/dist && git init -q -b dist && git add . \
             && git -c user.name=build-bot -c user.email=build-bot@users.noreply.github.com commit -qm "APK build ${{ github.run_number }}" \
             && git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" dist
+      - name: Redeploy site with the new APKs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-site.yml --repo ${{ github.repository }} --ref main
