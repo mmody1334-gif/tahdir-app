@@ -1701,6 +1701,14 @@ PROMO = '''<aside class="get-app" id="getApp" aria-label="حمّل التطبي�
   <details><summary>💻 على الكمبيوتر</summary><ol><li>سجّل الدخول.</li><li>اضغط زر «ثبّت أداة نور» أعلى صفحة الدروس واتبع الخطوتين.</li></ol></details>
 </aside>'''
 
+PROMO_TQ = '''<aside class="get-app tq-get-app" id="getApp" aria-label="حمّل التطبيق">
+  <h3>📱 حمّل تطبيق «تقني حذيفة»</h3>
+  <p>على موبايلك: التحضير والواجب يتبعتوا لنور بضغطة، والأداة مدمجة بدون أي إعداد.</p>
+  <div class="ga-btns"><a class="ga-btn" href="/download/teqany.apk" download>⬇ تحميل للأندرويد</a></div>
+  <details><summary>📲 على الآيفون</summary><ol><li>افتح الموقع من متصفح Safari.</li><li>اضغط زر «مشاركة» ⬆ أسفل الشاشة.</li><li>اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».</li></ol></details>
+  <details><summary>💻 على الكمبيوتر</summary><ol><li>سجّل الدخول.</li><li>اضغط زر «ثبّت أداة نور» أعلى صفحة الدروس واتبع الخطوتين.</li></ol></details>
+</aside>'''
+
 def auth_shell(card):
     return f'''<main class="auth"><div class="kb-band">{BANNER}</div>
 <section class="auth-art">
@@ -2037,7 +2045,7 @@ TEQANY = tq_shell(TQ_NAVBAR + '<section class="tq-hero"><span class="tq-kicker">
   '<p class="tq-lead">مساحة تقنية لمعلّمي مدرسة حذيفة بن محصن: التحضير، والتقويم، والألعاب التعليمية، والعروض، كلها في مكان واحد.</p>'
   '<div class="tq-cta"><a class="tq-btn" href="/teqany/login">دخول المنصة <span aria-hidden="true">←</span></a><a class="tq-btn ghost" href="/teqany/tahdir">التحضير مباشرة</a></div></section>'
   '<section class="tq-cards" aria-label="الأقسام">' + ''.join(f'<a class="tq-c" href="{h}"' + (' target="_blank" rel="noopener"' if h.startswith('http') else '') + f' style="animation-delay:{i*.06:.2f}s"><span class="tq-ci">{ic}</span><b>{t}</b><small>{d}</small></a>' for i, (h, ic, t, d) in enumerate(TQ_SECTIONS)) + '</section>')
-TQ_LOGIN = tq_shell('<section class="tq-auth"><form class="tq-card" id="loginForm" novalidate>'
+TQ_LOGIN = tq_shell(PROMO_TQ + '<section class="tq-auth"><form class="tq-card" id="loginForm" novalidate>'
   '<div class="tq-card-mark">' + TEQANY_LOGO + '</div><h2>تسجيل الدخول</h2><p class="tq-sub">ادخل بحسابك في المنصة.</p>'
   '<div class="err" id="loginErr" role="alert" hidden></div>'
   '<label class="tq-f"><span>اسم المستخدم</span><input id="username" name="username" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>'
@@ -2097,6 +2105,8 @@ def brand_tq(h):
     h = h.replace('<body>', '<body class="tqb">', 1)
     h = h.replace('content="#f6f4ee"', 'content="#ffffff"')
     h = h.replace('الكبسولة', 'تقني حذيفة')
+    # رابط تحميل APK: الكبسولة → تقني حذيفة
+    h = h.replace('/download/tahdir.apk', '/download/teqany.apk')
     # "/app" أو '/quiz' → "/teqany/app"
     h = re.sub(r'(["\'])/(' + _TQ_PAGES + r')(?=["\'?#/])', r'\1/teqany/\2', h)
     # جذر الموقع → واجهة تقني
@@ -2153,6 +2163,8 @@ subprocess.run([sys.executable, os.path.join(HERE, '..', 'tools', 'build_ext.py'
 _ext_zip = os.path.join(HERE, '..', 'dist', 'tahdir-ext-' + TOOL_VER + '.zip')
 src = src.replace('__EXTZIP__', json.dumps(_b64.b64encode(open(_ext_zip, 'rb').read()).decode() if os.path.exists(_ext_zip) else ''))
 src = src.replace('__APK__', json.dumps(_b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
+_tq_apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'teqany.apk')
+src = src.replace('__APK_TQ__', json.dumps(_b64.b64encode(open(_tq_apk_path, 'rb').read()).decode() if os.path.exists(_tq_apk_path) else _b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
 out = os.path.join(DIST, 'worker.js')
 open(out, 'w', encoding='utf-8').write(src)
 print('worker.js', round(len(src.encode('utf-8')) / 1024), 'KB')

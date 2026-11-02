@@ -43,10 +43,11 @@ import java.nio.charset.StandardCharsets;
  * التطبيق لا يضغط حفظ أو نشر في نور أبدًا؛ هذا يبقى للمعلم.
  */
 public class MainActivity extends Activity {
-    static final String SITE = "https://tahdir.hudhaifa-bio.workers.dev/";
+    static final String SITE = BuildConfig.SITE_URL;
     static final String NOUR = "https://lms.moe.gov.om/teacher";
-    static final String TOOL_URL = SITE + "tool/tahdir-noor.user.js";
-    static final int GREEN = Color.parseColor("#0B3B33");
+    static final String TOOL_URL = "https://elkabsula.site/tool/tahdir-noor.user.js";
+    static final int GREEN = Color.parseColor(BuildConfig.TAB_COLOR);
+    static final int ACTIVE = Color.parseColor(BuildConfig.TAB_ACTIVE);
     static final int FILE_REQ = 7;
     static final int CAM_REQ = 8;
     PermissionRequest camPending;
@@ -94,7 +95,7 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         int pad = dp(6);
         bar.setPadding(pad, pad, pad, pad);
-        tabSite = tab("الكبسولة");
+        tabSite = tab(BuildConfig.APP_LABEL);
         tabNour = tab("منصة نور");
         Button reload = tab("↻");
         bar.addView(tabSite, new LinearLayout.LayoutParams(0, dp(42), 1f));
@@ -149,8 +150,8 @@ public class MainActivity extends Activity {
         current = w;
         site.setVisibility(w == site ? View.VISIBLE : View.GONE);
         nour.setVisibility(w == nour ? View.VISIBLE : View.GONE);
-        tabSite.setBackgroundColor(w == site ? Color.parseColor("#1F8A70") : Color.TRANSPARENT);
-        tabNour.setBackgroundColor(w == nour ? Color.parseColor("#1F8A70") : Color.TRANSPARENT);
+        tabSite.setBackgroundColor(w == site ? ACTIVE : Color.TRANSPARENT);
+        tabNour.setBackgroundColor(w == nour ? ACTIVE : Color.TRANSPARENT);
     }
 
     WebView makeWebView() {
@@ -178,7 +179,7 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri u = req.getUrl();
                 String host = u.getHost() == null ? "" : u.getHost();
-                if (host.endsWith("moe.gov.om") || host.endsWith("workers.dev")) {
+                if (host.endsWith("moe.gov.om") || host.endsWith("workers.dev") || host.endsWith("elkabsula.site")) {
                     // روابط نور تفتح في شاشة نور، وروابط الموقع في شاشة الموقع
                     WebView target = host.endsWith("moe.gov.om") ? nour : site;
                     if (target != view) { target.loadUrl(u.toString()); show(target); return true; }
@@ -212,7 +213,7 @@ public class MainActivity extends Activity {
             public void onPermissionRequest(PermissionRequest r) {
                 runOnUiThread(() -> {
                     boolean ours = false, video = false;
-                    try { String h = r.getOrigin().getHost(); ours = h != null && (h.equals("tahdir.hudhaifa-bio.workers.dev") || h.equals("elkabsula.site") || h.equals("www.elkabsula.site")); } catch (Exception ignored) { }
+                    try { String h = r.getOrigin().getHost(); ours = h != null && (h.endsWith("workers.dev") || h.endsWith("elkabsula.site")); } catch (Exception ignored) { }
                     for (String x : r.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(x)) video = true;
                     if (!ours || !video) { r.deny(); return; }
                     if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {

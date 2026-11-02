@@ -27,21 +27,27 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           if [ -f app/tahdir.keystore ]; then
-            gradle assembleRelease bundleRelease --no-daemon && cp app/build/outputs/apk/release/app-release.apk tahdir.apk && cp app/build/outputs/bundle/release/app-release.aab tahdir.aab
+            gradle assembleKabsulaRelease assembleTeqanyRelease bundleKabsulaRelease --no-daemon \
+              && cp app/build/outputs/apk/kabsula/release/app-kabsula-release.apk tahdir.apk \
+              && cp app/build/outputs/apk/teqany/release/app-teqany-release.apk teqany.apk \
+              && cp app/build/outputs/bundle/kabsulaRelease/app-kabsula-release.aab tahdir.aab
           else
-            echo "::warning::no signing key yet - building a debug APK (test only)"
-            gradle assembleDebug --no-daemon && cp app/build/outputs/apk/debug/app-debug.apk tahdir.apk
+            echo "::warning::no signing key yet - building debug APKs (test only)"
+            gradle assembleKabsulaDebug assembleTeqanyDebug --no-daemon \
+              && cp app/build/outputs/apk/kabsula/debug/app-kabsula-debug.apk tahdir.apk \
+              && cp app/build/outputs/apk/teqany/debug/app-teqany-debug.apk teqany.apk
           fi
-          ls -la tahdir.apk
+          ls -la tahdir.apk teqany.apk
       - uses: actions/upload-artifact@v4
         with:
           name: tahdir-apk
           path: |
             tahdir.apk
             tahdir.aab
-      - name: Publish APK to the dist branch
+            teqany.apk
+      - name: Publish APKs to the dist branch
         run: |
-          mkdir -p /tmp/dist && cp tahdir.apk /tmp/dist/ && (cp tahdir.aab /tmp/dist/ 2>/dev/null || true) && echo "${{ github.sha }} run ${{ github.run_number }}" > /tmp/dist/BUILD.txt
+          mkdir -p /tmp/dist && cp tahdir.apk teqany.apk /tmp/dist/ && (cp tahdir.aab /tmp/dist/ 2>/dev/null || true) && echo "${{ github.sha }} run ${{ github.run_number }}" > /tmp/dist/BUILD.txt
           cd /tmp/dist && git init -q -b dist && git add . \
             && git -c user.name=build-bot -c user.email=build-bot@users.noreply.github.com commit -qm "APK build ${{ github.run_number }}" \
             && git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" dist
