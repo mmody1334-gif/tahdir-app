@@ -1413,6 +1413,7 @@ export default {
         return json({ ok: true });
       }
       if (p === '/quiz') return html('quiz');
+      if (p === '/homework') return html('homework');
       if (p === '/games') return html('games');
       if (p === '/grading') return html('grading');
       if (p === '/api/nour/tasks') {

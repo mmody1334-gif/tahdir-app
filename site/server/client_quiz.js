@@ -103,6 +103,82 @@ function prepPool(pool,sp){
     .filter(function(x){return x.type==='mcq'||(x.type==='short'&&x.marks<=sp.shortMax)||(x.type==='long'&&sp.long.count&&sp.long.marks.indexOf(x.marks)>=0&&x.ao!=='معرفة'&&x.ao!=='تذكر وفهم');});
 }
 
+// ---------- مواصفات الواجب المنزلي (وثيقة تقويم تعلم الطلبة 2026/2027) ----------
+// لكل مادة وصف درجةٌ ثابتة للواجب الواحد (تُرصد مرتين في الفصل غالبًا)، وعدد مفردات 3–5
+// متنوّعة في أهداف التقويم ومستويات الصعوبة. وبعض المواد/الصفوف تكوينيّة بلا درجة.
+// • العلوم/الأحياء/الفيزياء/الكيمياء/العلوم البيئية (5–12): 5 درجات للواجب، 3–5 مفردات.
+// • الرياضيات (5–11): 5 درجات؛ الصف 12 تكوينيّ (لا تُرصد درجته).
+// • التربية الإسلامية (5–9): 8 درجات = 3 مفردات مقالية (2 لكل) + درجتان للمناقشة؛ 10–12 تكوينيّ.
+// • اللغة العربية (5–11): 5 درجات؛ الصف 12 تكوينيّ.
+// • تقنية المعلومات: لا واجب منزلي في الوثيقة (يُخفى).
+// • اللغة الإنجليزية: تكوينيّ (بلا درجة رصد).
+function hwSpec(c){
+  c=c||course; if(!c) return null;
+  var g=gnum(c.grade), s=c.subject||'';
+  var sci=/علوم|أحياء|فيزياء|كيمياء|بيئ/.test(s), it=/تقنية/.test(s), isl=/إسلام/.test(s),
+      ar=/العربية/.test(s), en=/انجليز|إنجليز|English/i.test(s), math=/رياض/.test(s);
+  var hi = g>=11 && !it && !isl && !ar && !en; // صفوف AO1/AO2
+  var aos = hi ? ['AO1','AO2'] : (it ? ['تذكر وفهم','تطبيق','استدلال'] : ['معرفة','تطبيق','استدلال']);
+  if(it) return {none:true, label:'تقنية المعلومات'}; // بلا واجب منزلي
+  if(isl){
+    if(g>=10) return {formative:true, items:[3,4], ao:aos, label:'التربية الإسلامية (10–12)'};
+    // 5–9: 3 مفردات مقالية × 2 + درجتان للمناقشة = 8
+    return {essay:true, count:3, marksEach:2, discuss:2, total:6, items:[3,3], ao:['تطبيق','استدلال'], label:'التربية الإسلامية (5–9)'};
+  }
+  if(en) return {formative:true, items:[3,4], ao:aos, label:'اللغة الإنجليزية'};
+  if(math){
+    if(g>=12) return {formative:true, items:[3,5], ao:aos, label:'الرياضيات (12)'};
+    return {total:5, items:[3,5], ao:aos, allowLong:true, label:'الرياضيات (5–11)'};
+  }
+  if(ar){
+    if(g>=12) return {formative:true, items:[3,5], ao:aos, label:'اللغة العربية (12)'};
+    return {total:5, items:[3,5], ao:aos, allowLong:true, label:'اللغة العربية (5–11)'};
+  }
+  // العلوم وفروعها (وأي مادة علمية أخرى): 5 درجات لكل الصفوف
+  if(sci) return {total:5, items:[3,5], ao:aos, allowLong:true, label:'العلوم (5–12)'};
+  // الافتراضي: 5 درجات
+  return {total:5, items:[3,5], ao:aos, allowLong:true, label:(s||'')+' '+c.grade};
+}
+// وصف نصّي لمواصفة الواجب (يظهر في لوحة الإعداد)
+function hwSpecText(sp){
+  if(!sp) return '';
+  if(sp.none) return 'مادة «'+sp.label+'» ليس لها واجب منزلي يُرصد في وثيقة التقويم.';
+  if(sp.essay) return 'حسب الوثيقة ('+sp.label+'): الواجب المنزلي '+(sp.total+sp.discuss)+' درجات — '+sp.count+' مفردات مقالية (درجتان لكل مفردة) + '+sp.discuss+' درجتان للمناقشة مع المعلم.';
+  if(sp.formative) return 'حسب الوثيقة ('+sp.label+'): الواجب المنزلي تكوينيّ (لا تُرصد له درجة) — '+sp.items[0]+'–'+sp.items[1]+' مفردات متنوّعة للتدرّب.';
+  return 'حسب الوثيقة ('+sp.label+'): الواجب المنزلي '+sp.total+' درجات، '+sp.items[0]+'–'+sp.items[1]+' مفردات متنوّعة في أهداف التقويم ومستويات الصعوبة.';
+}
+// تجميع مفردات الواجب من الدروس المختارة بحيث يبلغ المجموعُ درجةَ الوثيقة بالضبط
+function assembleHw(pool,sp,ids){
+  var p=pool.filter(function(x){return x.stem;});
+  var byL=function(arr){var m={};arr.forEach(function(x){(m[x.lesson_id]=m[x.lesson_id]||[]).push(x);});return m;};
+  // توزيع متوازن على الدروس المختارة (دورة من كل درس)
+  var roundRobin=function(arr,cap){var by=byL(arr),out=[],k=0;Object.keys(by).forEach(function(id){by[id]=shuffleP(by[id]);});
+    while(out.length<cap&&k<80){var any=false;ids.forEach(function(id){if(by[id]&&by[id].length&&out.length<cap){out.push(by[id].shift());any=true;}});if(!any)break;k++;}return out;};
+  if(sp.essay){ // التربية الإسلامية: 3 مفردات مقالية، درجتان لكل مفردة
+    var es=roundRobin(p.filter(function(x){return x.type!=='mcq';}),sp.count);
+    if(es.length<sp.count)es=roundRobin(p,sp.count);
+    return es.slice(0,sp.count).map(function(x){var y=clone(x);y.marks=sp.marksEach;if(y.type==='mcq'){y.type='short';delete y.choices;delete y.correct;}return y;});
+  }
+  if(sp.formative){ // واجب تكويني: مفردات متنوّعة بلا مجموع محدد
+    var pf=p.filter(function(x){return x.type!=='long'||sp.allowLong;});
+    return roundRobin(pf,sp.items[1]).map(clone);
+  }
+  // واجب برصد: نبلغ المجموع المطلوب بعدد مفردات ضمن [min,max]
+  var usable=p.filter(function(x){return x.type==='mcq'||x.type==='short'||(x.type==='long'&&sp.allowLong&&x.marks<=3);});
+  var sols=subsets(usable,sp.total,160).filter(function(s){return s.length>=sp.items[0]&&s.length<=sp.items[1];});
+  if(sols.length){ // اختر الحل الأفضل: أوسع تغطية للدروس وأكثر تنوّعًا في الأهداف
+    var best=null,bs=-1;
+    sols.forEach(function(s){var lz={},az={};s.forEach(function(x){lz[x.lesson_id]=1;az[x.ao]=1;});
+      var sc=Object.keys(lz).length*10+Object.keys(az).length*4+(s.some(function(x){return x.img;})?2:0)+Math.random()*2;
+      if(sc>bs){bs=sc;best=s;}});
+    var ord={};ids.forEach(function(id,i){ord[id]=i;});
+    return best.slice().sort(function(a,b){return (ord[a.lesson_id]-ord[b.lesson_id])||(tOrd(a)-tOrd(b));}).map(clone);
+  }
+  // احتياطي: اقترب من المجموع قدر الإمكان بمفردات متوازنة
+  var out=[],sum=0;roundRobin(usable,sp.items[1]).forEach(function(x){if(sum>=sp.total||out.length>=sp.items[1])return;if(sum+x.marks<=sp.total){out.push(clone(x));sum+=x.marks;}});
+  return out;
+}
+
 // ---------- تكوين الاختبار تلقائيًا (بحث دقيق يطابق جدول المواصفات) ----------
 function subsets(items,target,maxSol){ // مجموعات عشوائية من المفردات مجموع درجاتها = target
   var out=[],seen={};
@@ -186,18 +262,28 @@ function lineCount(it){if(it.type==='mcq')return 0;var m=+it.marks||1;if(it.line
 // ---------- ورقة الاختبار (تُستخدم للشاشة والطباعة وملف Word) ----------
 function titleText(d,key){
   var subj=d.subject,gr=d.grade;
+  if(d.kind==='homework'){
+    var pre=key?'نموذج إجابة ':'';
+    var base=d.hwFormative?'الواجب المنزلي لمادة '+subj+' للصف '+gr:'الواجب المنزلي '+(d.quizNo||'الأول')+' لمادة '+subj+' للصف '+gr;
+    return pre+base+(d.model&&!key?' (نموذج '+d.model+')':'');
+  }
   if(d.kind==='diff')return (key?'نموذج إجابة ':'')+'أوراق عمل متمايزة — مادة '+subj+' للصف '+gr;
   if(d.kind==='remedy')return (key?'نموذج إجابة ':'')+'ورقة عمل علاجية — مادة '+subj+' للصف '+gr;
   if(d.kind==='review')return (key?'نموذج إجابة ':'')+'مراجعة نهاية الوحدة '+(d.unit||'')+(d.unit_name?': '+d.unit_name:'')+' — مادة '+subj+' للصف '+gr;
   return (key?'نموذج إجابة ':'')+'الاختبار القصير '+d.quizNo+' لمادة '+subj+' للصف '+gr;
 }
 function headerHtml(d,key,word){
-  var h=d.hdr||hdr,tot=sumMarks(d.items);
-  var box=key?'':'<table class="sbox" style="border-collapse:collapse;margin:0 auto"><tr><td style="border:1.5px solid #000;width:64px;height:28px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:28px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
+  var h=d.hdr||hdr,tot=d.kind==='homework'?hwTotal(d):sumMarks(d.items);
+  var noBox=key||(d.kind==='homework'&&d.hwFormative);
+  var box=noBox?'':'<table class="sbox" style="border-collapse:collapse;margin:0 auto"><tr><td style="border:1.5px solid #000;width:64px;height:28px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:28px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
+  var stu=d.kind==='homework'
+    ? (key?false:'اسم الطالب: ________________________ &nbsp; الصف: ______ &nbsp; التاريخ: __________')
+    : !(key||d.kind==='review'&&!d.studentLine);
   return OFFICIAL_HEAD({dir:h.dir,school:h.school,title:titleText(d,key),line2:'الفصل الدراسي: '+h.term+' - العام الدراسي: '+h.year+'م',
-    student:!(key||d.kind==='review'&&!d.studentLine),box:box,word:word});
+    student:stu,box:box,word:word});
 }
 function sumMarks(items){return items.reduce(function(s,x){return s+(+x.marks||0);},0);}
+function hwTotal(d){return sumMarks(d.items)+(d.hwDiscuss||0);}
 function itemHtml(it,n,tno,word,ctrl){
   var stem=it.table?relabel(it.stem,tno):it.stem;
   // أساس الأمان للطباعة: الرقم لا ينفصل عن سؤال. يُرفع للطباعة عبر #printArea،
@@ -248,7 +334,12 @@ function quizHtml(d,word,withCtrl){
     if(it.table)tno++;
     h+=itemHtml(it,i+1,tno,word,withCtrl?ctrlHtml(i):'');
   });
-  return h+'<p style="text-align:center;font-weight:bold;margin-top:18px">ـ انتهت الأسئلة ـ</p>';
+  var foot='';
+  if(d.kind==='homework'){
+    if(d.hwDiscuss)foot+='<div style="margin:12px 0 4px;padding:6px 10px;border:1px dashed #000;page-break-inside:avoid"><b>المناقشة مع المعلم:</b> يناقش المعلمُ الطالبَ في حلّه ويرصد له <b>['+d.hwDiscuss+']</b> ضمن درجة الواجب.</div>';
+    if(d.hwFormative)foot+='<p style="font-size:.9em;color:#444;margin:8px 0">هذا واجب تكوينيّ للتدرّب — لا تُرصد له درجة في سجل التقويم المستمر وفق الوثيقة.</p>';
+  }
+  return h+foot+'<p style="text-align:center;font-weight:bold;margin-top:18px">ـ انتهت الأسئلة ـ</p>';
 }
 function keyHtml(d,word){
   if(d.kind==='diff'&&!d._one)return diffHtml(d,word,false,true);
@@ -265,7 +356,8 @@ function keyHtml(d,word){
     var L=lessonOf(it);
     h+='<tr>'+td(i+1,'center')+td(ans)+td(it.marks,'center')+(hi?td(notes)+td(esc(L.unit||''),'center'):'')+td(esc(it.outcome||''),'center')+td(esc(it.ao||''),'center')+(hi?td(esc(it.difficulty||''),'center'):'')+'</tr>';
   });
-  h+='<tr>'+td('<b>المجموع</b>','center')+td('')+td('<b>'+sumMarks(d.items)+'</b>','center')+(hi?td('')+td(''):'')+td('')+td(aoSummary(d))+(hi?td(''):'')+'</tr>';
+  if(d.kind==='homework'&&d.hwDiscuss)h+='<tr>'+td('المناقشة','center')+td('مناقشة الطالب في حلّه')+td(d.hwDiscuss,'center')+(hi?td('')+td(''):'')+td('')+td('')+(hi?td(''):'')+'</tr>';
+  h+='<tr>'+td('<b>المجموع</b>','center')+td('')+td('<b>'+(d.kind==='homework'?hwTotal(d):sumMarks(d.items))+'</b>','center')+(hi?td('')+td(''):'')+td('')+td(aoSummary(d))+(hi?td(''):'')+'</tr>';
   return h+'</tbody></table><p style="text-align:center;font-weight:bold;margin-top:14px">ـ نهاية نموذج الإجابة ـ</p>';
 }
 // كل مستوى ورقة مستقلة بترويستها، وتبدأ في صفحة جديدة عند الطباعة
@@ -299,6 +391,18 @@ function ctrlHtml(i){
 function checks(d){
   var out=[],items=d.items,tot=sumMarks(items),mc=items.filter(function(x){return x.type==='mcq';}),lg=items.filter(function(x){return x.type==='long';}),sh=items.filter(function(x){return x.type==='short';});
   var ao={};items.forEach(function(x){ao[x.ao]=(ao[x.ao]||0)+(+x.marks||0);});
+  if(d.kind==='homework'){
+    var hs=hwSpec({subject:d.subject,grade:d.grade});
+    if(!hs||hs.none){out.push([true,'لا واجب منزلي لهذه المادة في الوثيقة']);return out;}
+    var az={},lz={};items.forEach(function(x){az[x.ao]=1;lz[x.lesson_id]=1;});
+    if(hs.formative){out.push([items.length>=hs.items[0],'واجب تكوينيّ — '+items.length+' مفردة (لا تُرصد درجة)']);out.push([Object.keys(az).length>=2,'تنوّع أهداف التقويم: '+Object.keys(az).join('، ')]);return out;}
+    if(hs.essay){out.push([items.length===hs.count,items.length+' مفردات مقالية (المطلوب '+hs.count+')']);out.push([tot===hs.total,'درجة الأسئلة '+tot+' من '+hs.total]);out.push([true,'+ '+hs.discuss+' درجتان للمناقشة = المجموع '+(hs.total+hs.discuss)]);return out;}
+    out.push([tot===hs.total,'الدرجة الكلية '+tot+' من '+hs.total]);
+    out.push([items.length>=hs.items[0]&&items.length<=hs.items[1],'عدد المفردات '+items.length+' (من '+hs.items[0]+' إلى '+hs.items[1]+')']);
+    out.push([Object.keys(az).length>=2,'تنوّع أهداف التقويم: '+Object.keys(az).join('، ')]);
+    out.push([true,'يغطّي '+Object.keys(lz).length+' درسًا من الدروس المختارة']);
+    return out;
+  }
   if(d.kind==='diff'){DIFF_LV.forEach(function(L,lv){var it=items.filter(function(x){return lvOf(d,x)===lv;});if(it.length)out.push([true,L.name+': '+it.length+' مفردة، '+sumMarks(it)+' درجة']);});return out;}
   if(d.kind==='review'||d.kind==='remedy'){out.push([true,items.length+' مفردة، المجموع '+tot+' درجة'+(d.kind==='remedy'?' — من الدروس والمستويات الأضعف في تحليل النتائج':'')]);return out;}
   var sp=spec();
@@ -323,10 +427,27 @@ function checks(d){
 var QX=function(c){return c.quiz_items?'':' (بدون بنك أسئلة)';};
 function renderSide(){
   var h='<section class="qcard"><h3>1. المادة والصف</h3>'+coursePick(courses,course&&course.key,'courseSel',QX)+
-    '<div class="seg" role="tablist"><button type="button" class="'+(mode==='quiz'?'on':'')+'" data-mode="quiz">اختبار قصير</button><button type="button" class="'+(mode==='review'?'on':'')+'" data-mode="review">مراجعة نهاية الوحدة</button><button type="button" class="'+(mode==='diff'?'on':'')+'" data-mode="diff">أوراق متمايزة</button></div></section>';
+    (HW?'':'<div class="seg" role="tablist"><button type="button" class="'+(mode==='quiz'?'on':'')+'" data-mode="quiz">اختبار قصير</button><button type="button" class="'+(mode==='review'?'on':'')+'" data-mode="review">مراجعة نهاية الوحدة</button><button type="button" class="'+(mode==='diff'?'on':'')+'" data-mode="diff">أوراق متمايزة</button></div>')+'</section>';
   if(!course){$('qside').innerHTML=h;bindSide();return;}
   var units=unitsList();
-  if(mode==='quiz'||mode==='diff'){
+  if(mode==='hw'){
+    var hs=hwSpec();
+    if(hs&&hs.none){
+      h+='<section class="qcard"><p class="muted">'+esc(hwSpecText(hs))+' اختر مادة أخرى.</p></section>';
+    }else{
+      h+='<section class="qcard"><h3>2. الدروس المشمولة <span class="muted">(اختر درسًا أو أكثر)</span></h3><div class="lpick">';
+      units.forEach(function(u){
+        h+='<div class="lp-unit"><div class="lp-uh">الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</div>';
+        u.lessons.forEach(function(l){var n=bank.items.filter(function(x){return x.lesson_id===l.id;}).length;
+          h+='<label class="lp-l'+(n?'':' dim')+'"><input type="checkbox" data-lid="'+l.id+'"'+(cfg.lessons[l.id]?' checked':'')+(n?'':' disabled')+'> <span>'+esc(l.title)+'</span><span class="muted">'+n+'</span></label>';});
+        h+='</div>';
+      });
+      h+='</div></section><section class="qcard"><h3>3. الواجب</h3>'+
+        (hs&&hs.formative?'':'<label class="qrow">رقم الواجب <select id="qnoSel" class="qsel sm">'+QNO.slice(0,2).map(function(q){return '<option'+(cfg.quizNo===q?' selected':'')+'>'+q+'</option>';}).join('')+'</select></label>')+
+        '<p class="muted small">'+hwSpecText(hs)+' أسئلته من بنك الأسئلة والاختبارات النهائية السابقة.</p>'+
+        '<button type="button" class="btn primary go-btn" id="makeBtn">كوّن الواجب</button></section>';
+    }
+  }else if(mode==='quiz'||mode==='diff'){
     h+='<section class="qcard"><h3>2. الدروس المشمولة <span class="muted">'+(mode==='diff'?'(درس أو أكثر)':'(من 2 إلى 5)')+'</span></h3><div class="lpick">';
     units.forEach(function(u){
       h+='<div class="lp-unit"><div class="lp-uh">الوحدة '+esc(u.unit)+(u.name?': '+esc(u.name):'')+'</div>';
@@ -349,7 +470,7 @@ function renderSide(){
   h+='<section class="qcard"><h3>رأس الورقة</h3><div class="hdr-f">'+
     '<label>المديرية<input id="h_dir" value="'+esc(hdr.dir)+'"></label><label>المدرسة<input id="h_school" value="'+esc(hdr.school)+'"></label>'+
     '<label>الفصل الدراسي<select id="h_term"><option'+(hdr.term==='الأول'?' selected':'')+'>الأول</option><option'+(hdr.term==='الثاني'?' selected':'')+'>الثاني</option></select></label><label>العام الدراسي<input id="h_year" value="'+esc(hdr.year)+'" class="ltr"></label></div></section>'+
-    '<section class="qcard"><h3>اختباراتي المحفوظة</h3><ul class="saved" id="savedList"><li class="muted">جارٍ التحميل…</li></ul></section>';
+    '<section class="qcard"><h3>'+(HW?'واجباتي المحفوظة':'اختباراتي المحفوظة')+'</h3><ul class="saved" id="savedList"><li class="muted">جارٍ التحميل…</li></ul></section>';
   $('qside').innerHTML=h;bindSide();loadSaved();
 }
 function specText(){var sp=spec(),t=Object.keys(sp.targets).map(function(k){return k+' '+sp.targets[k];}).join('، ');
@@ -362,7 +483,7 @@ function bindSide(){
   bindCoursePick(courses,'courseSel',selectCourse,QX);
   Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'),function(b){b.onclick=function(){mode=b.getAttribute('data-mode');renderSide();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-lid]'),function(b){b.onchange=function(){var id=+b.getAttribute('data-lid');if(b.checked)cfg.lessons[id]=1;else delete cfg.lessons[id];var n=Object.keys(cfg.lessons).length;if(n>5&&mode==='quiz')toast('الوثيقة: الاختبار القصير يغطي من 2 إلى 5 دروس');};});
-  if($('qnoSel'))$('qnoSel').onchange=function(){cfg.quizNo=this.value;if(doc&&doc.kind==='quiz'){doc.quizNo=this.value;renderDoc();}};
+  if($('qnoSel'))$('qnoSel').onchange=function(){cfg.quizNo=this.value;if(doc&&(doc.kind==='quiz'||doc.kind==='homework')){doc.quizNo=this.value;renderDoc();}};
   if($('totSel'))$('totSel').onchange=function(){cfg.total=+this.value;};
   if($('unitSel'))$('unitSel').onchange=function(){cfg.unit=this.value;};
   if($('rcSel'))$('rcSel').onchange=function(){cfg.reviewCount=+this.value;};
@@ -392,6 +513,14 @@ function selectCourse(key){
 }
 function welcome(){
   var n=bank.items.length;
+  if(HW){
+    var hs=hwSpec();
+    $('qmain').innerHTML='<div class="welcome qwel"><h2>الواجبات المنزلية</h2><p>'+
+      (hs&&hs.none?esc(hwSpecText(hs))+' اختر مادة أخرى من القائمة.':
+       (n?esc(hwSpecText(hs))+' اختر الدرس (أو أكثر) من القائمة ثم اضغط «كوّن الواجب»، فتُسحب الأسئلة من بنك الأسئلة والاختبارات النهائية السابقة.':'لا توجد أسئلة جاهزة لهذا الصف بعد في بنك الأسئلة.'))+'</p>'+
+      '<div class="welcome-steps"><span>1. اختر الدرس</span><span>2. كوّن الواجب</span><span>3. استبدل أو عدّل</span><span>4. اطبع بالترويسة أو Word</span></div></div>';
+    return;
+  }
   $('qmain').innerHTML='<div class="welcome qwel"><h2>التقويم: اختبارات قصيرة ومراجعات</h2><p>'+(n?'في بنك الأسئلة '+n+' مفردة لهذا الصف، مكتوبة من مخرجات التعلم في كل درس ووفق «وثيقة تقويم تعلم الطلبة». اختر الدروس من القائمة ثم اضغط «كوّن الاختبار».':'لا توجد أسئلة جاهزة لهذا الصف بعد. يمكنك تكوين اختبار وكتابة مفرداتك بنفسك.')+'</p>'+
     '<div class="welcome-steps"><span>1. اختر الدروس</span><span>2. كوّن الاختبار</span><span>3. استبدل أو عدّل ما تريد</span><span>4. اطبع أو حمّل Word</span></div>'+(n?'':'<p><button type="button" class="btn primary" id="blankBtn">اختبار فارغ أكتب مفرداته</button></p>')+'</div>';
   if($('blankBtn'))$('blankBtn').onclick=function(){newDoc('quiz',[]);};
@@ -409,8 +538,15 @@ function remakeDoc(){
   var ids=(doc.lessons&&doc.lessons.length?doc.lessons:doc.items.map(function(x){return x.lesson_id;})).map(Number).filter(function(v,i,a){return a.indexOf(v)===i;});
   if(!course||course.key!==doc.course){var c=courses.filter(function(x){return x.key===doc.course;})[0];if(c){selectCourse(c.key).then(remakeDoc);return;}}
   var cur={};doc.items.forEach(function(x){cur[x.qid]=1;});
-  var pool=poolFor(ids),fresh=pool.filter(function(x){return !cur[x.qid];}),it=assemble(fresh,spec(),ids);
-  if(!it.length||!checks(Object.assign({},doc,{items:it})).every(function(c){return c[0];}))it=assemble(pool,spec(),ids);
+  var it;
+  if(doc.kind==='homework'){
+    var hs=hwSpec(),pool0=poolFor(ids),fresh0=pool0.filter(function(x){return !cur[x.qid];});
+    it=assembleHw(fresh0,hs,ids);if(it.length<hs.items[0])it=assembleHw(pool0,hs,ids);
+    doc.model=doc.model==='أ'?'ب':'أ';
+  }else{
+    var pool=poolFor(ids),fresh=pool.filter(function(x){return !cur[x.qid];});it=assemble(fresh,spec(),ids);
+    if(!it.length||!checks(Object.assign({},doc,{items:it})).every(function(c){return c[0];}))it=assemble(pool,spec(),ids);
+  }
   if(!it.length){toast('لا توجد مفردات كافية لنموذج آخر');return;}
   var same=it.filter(function(x){return cur[x.qid];}).length;
   doc.items=it;doc.lessons=ids;doc.id=null;doc.title='';dirty=true;renderDoc();
@@ -436,6 +572,17 @@ function makeDiff(ids){
 }
 function make(){
   if(!course)return;
+  if(mode==='hw'){
+    var hs=hwSpec();
+    if(!hs||hs.none){toast('لا يوجد واجب منزلي لهذه المادة في وثيقة التقويم');return;}
+    var idsH=lessonOrder().filter(function(id){return cfg.lessons[id];});
+    if(!idsH.length){toast('اختر درسًا واحدًا على الأقل');return;}
+    var itH=assembleHw(poolFor(idsH),hs,idsH);
+    if(itH.length<hs.items[0]){toast('لا توجد مفردات كافية في الدروس المختارة لتكوين الواجب');return;}
+    newDoc('homework',itH,{lessons:idsH,hwDiscuss:hs.discuss||0,hwFormative:!!hs.formative,model:'أ'});
+    track('hw_make',idsH.length+' دروس',titleText(doc));
+    return;
+  }
   if(mode==='quiz'){
     var ids=lessonOrder().filter(function(id){return cfg.lessons[id];});
     if(!ids.length){toast('اختر درسًا واحدًا على الأقل');return;}
@@ -465,9 +612,9 @@ function renderDoc(){
   if(!doc){welcome();return;}
   var ck=checks(doc),allOk=ck.every(function(c){return c[0];});
   var h='<div class="qbar no-print"><div class="qbar-t"><input class="title-in sm" id="docTitle" value="'+esc(doc.title||titleText(doc))+'" aria-label="اسم الاختبار في قائمتك"><div class="muted small">'+(doc.id?'محفوظ في اختباراتي':'غير محفوظ بعد')+(dirty&&doc.id?' · فيه تعديلات لم تُحفظ':'')+'</div></div>'+
-    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'?'<button type="button" class="btn" id="remakeBtn">🔁 نموذج آخر</button>':'')+(doc.kind!=='remedy'?'<button type="button" class="btn" id="analBtn" title="أدخل درجات الطلاب واحصل على تقرير تحليل النتائج">📊 تحليل النتائج</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
-    '<div class="checks no-print '+(allOk?'ok':'warn')+'"><b>'+(doc.kind==='review'?'المراجعة':(allOk?'✓ مطابق لمواصفات الاختبار القصير في وثيقة التقويم':'⚠ راجع النقاط المعلّمة'))+'</b><ul>'+ck.map(function(c){return '<li class="'+(c[0]?'y':'n')+'">'+(c[0]?'✓':'⚠')+' '+esc(c[1])+'</li>';}).join('')+'</ul></div>'+
-    '<div class="ptabs no-print" role="tablist"><button type="button" class="ltab'+(paperView==='quiz'?' on':'')+'" data-pv="quiz">ورقة '+(doc.kind==='review'?'المراجعة':'الاختبار')+'</button><button type="button" class="ltab'+(paperView==='key'?' on':'')+'" data-pv="key">نموذج الإجابة</button></div>'+
+    '<div class="qbar-b"><button type="button" class="btn primary" id="printBtn">🖨 طباعة / PDF</button><button type="button" class="btn" id="wordBtn">⬇ تحميل Word</button><button type="button" class="btn" id="saveBtn">حفظ</button>'+(doc.kind==='quiz'||doc.kind==='homework'?'<button type="button" class="btn" id="remakeBtn">🔁 نموذج آخر</button>':'')+(doc.kind!=='remedy'?'<button type="button" class="btn" id="analBtn" title="أدخل درجات الطلاب واحصل على تقرير تحليل النتائج">📊 تحليل النتائج</button>':'')+'<button type="button" class="btn" id="addBtn">+ مفردة</button></div></div>'+
+    '<div class="checks no-print '+(allOk?'ok':'warn')+'"><b>'+(doc.kind==='review'?'المراجعة':(doc.kind==='homework'?(allOk?'✓ مطابق لمواصفات الواجب المنزلي في وثيقة التقويم':'⚠ راجع النقاط المعلّمة'):(allOk?'✓ مطابق لمواصفات الاختبار القصير في وثيقة التقويم':'⚠ راجع النقاط المعلّمة')))+'</b><ul>'+ck.map(function(c){return '<li class="'+(c[0]?'y':'n')+'">'+(c[0]?'✓':'⚠')+' '+esc(c[1])+'</li>';}).join('')+'</ul></div>'+
+    '<div class="ptabs no-print" role="tablist"><button type="button" class="ltab'+(paperView==='quiz'?' on':'')+'" data-pv="quiz">ورقة '+(doc.kind==='review'?'المراجعة':doc.kind==='homework'?'الواجب':'الاختبار')+'</button><button type="button" class="ltab'+(paperView==='key'?' on':'')+'" data-pv="key">نموذج الإجابة</button></div>'+
     '<div class="paper" id="paper">'+(paperView==='quiz'?quizHtml(doc,false,true):keyHtml(doc,false))+'</div>';
   $('qmain').innerHTML=h;
   Array.prototype.forEach.call(document.querySelectorAll('[data-meta]'),function(el){var it=doc.items[+el.getAttribute('data-meta')],L=lessonOf(it);el.textContent=TYPE_TXT[it.type]+' · '+(AO_TXT[it.ao]||it.ao||'')+' · '+(it.difficulty||'')+' · '+it.marks+' درجة'+(L.title?' · '+L.title:'');});
@@ -551,7 +698,7 @@ function addItem(){
 // القيمة: 'both' أو 'quiz' أو 'key'، و null يعني أن المعلم ألغى.
 function chooseParts(title){
   return dialog({title:title,cancelText:'إلغاء',okText:'متابعة',group:'pp',
-    html:'<div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':(doc.kind==='diff'?'العمل':(doc.kind==='remedy'?'العمل العلاجية':'الاختبار')))+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div>'})
+    html:'<div class="parts"><label><input type="radio" name="pp" value="both" checked> الورقة ونموذج الإجابة</label><label><input type="radio" name="pp" value="quiz"> ورقة '+(doc.kind==='review'?'المراجعة':(doc.kind==='diff'?'العمل':(doc.kind==='remedy'?'العمل العلاجية':(doc.kind==='homework'?'الواجب':'الاختبار'))))+' فقط</label><label><input type="radio" name="pp" value="key"> نموذج الإجابة فقط</label></div>'})
     .then(function(v){return (v&&v.length)?v[0]:null;});
 }
 var leavingOk=0,MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
@@ -596,7 +743,7 @@ function saveDoc(){
 }
 function loadSaved(){
   if(!$('savedList'))return;
-  api('/api/quizzes?kind=quiz,review,diff,remedy').then(function(r){
+  api('/api/quizzes?kind='+(HW?'homework':'quiz,review,diff,remedy')).then(function(r){
     var l=r.quizzes||[];var el=$('savedList');if(!el)return;
     el.innerHTML=l.length?l.map(function(q){return '<li><button type="button" class="link-btn" data-open="'+q.id+'"><b>'+esc(q.title)+'</b></button><span class="muted small">'+esc(fmtDate(q.updated_at))+'</span><button type="button" class="x" data-delq="'+q.id+'" aria-label="حذف">×</button></li>';}).join(''):'<li class="muted">لا يوجد. بعد تكوين اختبار اضغط «حفظ».</li>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-open]'),function(b){b.onclick=function(){openSaved(+b.getAttribute('data-open'));};});

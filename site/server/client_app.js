@@ -349,6 +349,7 @@ function openSettings(){
 var HOME_CARDS=[
   {key:'prep',title:'التحضير',icon:'📋',sub:'دروس جاهزة للإرسال إلى نور',route:''},
   {key:'quiz',title:'التقويم والاختبارات',icon:'📝',sub:'اختبارات قصيرة وفق الوثيقة',route:'/quiz'},
+  {key:'homework',title:'الواجبات المنزلية',icon:'📒',sub:'ورقة واجب بدرجات وأنواع وفق الوثيقة',route:'/homework'},
   {key:'cards',title:'كروت الأسئلة (بليكرز)',icon:'🪪',sub:'بطاقة لكل طالب وامسح الصف بالجوال',route:'/cards'},
   {key:'games',title:'الألعاب التعليمية',icon:'🎲',sub:'شد الحبل، العداء، كرة القدم…',route:'/games'},
   {key:'slides',title:'العروض التقديمية',icon:'📽️',sub:'عروض كل مادة وصف',route:'/slides'},

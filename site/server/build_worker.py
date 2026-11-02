@@ -1734,7 +1734,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('homework', '/homework', '📒', 'الواجبات المنزلية'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'كروت الأسئلة (بليكرز)'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
 # «تصحيح الواجبات تلقائيًا» (/grading و /teqany/grading) مخفي من كل القوائم والبطاقات: يُفتح بالرابط المباشر فقط.
@@ -1763,6 +1763,7 @@ def NAV(active, extra=''):
 _KB_DESC = {
   '/app': 'دروس كل المواد جاهزة — عدّلها واطبعها وأرسلها إلى نور.',
   '/quiz': 'اختبارات قصيرة ومراجعات وفق الوثيقة، بالترويسة الرسمية.',
+  '/homework': 'ورقة واجب منزلي بالدرجات وأنواع الأسئلة حسب وثيقة التقويم، بترويسة رسمية.',
   '/diag': 'اختبار تشخيصي للمادة كاملة: علوم ورياضيات مع تقرير بالطباعة.',
   '/grading': 'ارفع صورة أو ملف الواجب ويُصحَّح تلقائيًا بالمعايير.',
   '/games': 'ألعاب صفية للسبورة والتحدي المباشر بالجوالات.',
@@ -1849,6 +1850,12 @@ QUIZ = TOP('<div class="stats"><span class="stat">التقويم: الاختبا
   <div class="chk-row"><button class="btn primary" id="chkRun" type="button">افحص الورقة</button><span id="chkStat" class="chk-stat"></span></div>
   <div id="chkOut" class="chk-out"></div>
 </section>
+<div id="printArea"></div>'''
+# «الواجبات المنزلية»: نفس محرّك التقويم (client_quiz.js) في وضع الواجب (PAGE_MODE='hw')
+HOMEWORK = TOP('<div class="stats"><span class="stat">الواجبات المنزلية</span><span class="stat">درجات وأنواع الأسئلة وفق وثيقة التقويم 2026/2027</span></div>').replace('%BTNS%',
+  NAV('homework')) + '''
+<div class="wrap qlayout"><aside class="qside" id="qside" aria-label="إعداد الواجب المنزلي"></aside>
+<main class="panel" id="qmain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
 
 GAMES = TOP('<div class="stats"><span class="stat">ركن الألعاب التعليمية</span><span class="stat">لكل درس ولكل صف</span></div>').replace('%BTNS%',
@@ -2001,6 +2008,7 @@ def tq_shell(inner, cls=''):
             + inner +
             '<footer class="tq-ft">إعداد أ. محمد مجدي · معلم الأحياء · مدرسة حذيفة بن محصن</footer></main>')
 TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة للإرسال إلى نور'), ('/teqany/quiz', '✅', 'التقويم والاختبارات', 'اختبارات قصيرة وفق الوثيقة'),
+  ('/teqany/homework', '📒', 'الواجبات المنزلية', 'بدرجات وأنواع وفق الوثيقة'),
   ('/teqany/games', '🎮', 'الألعاب التعليمية', 'شدّ الحبل، العدّاء، كرة القدم…'), ('/teqany/slides', '📽️', 'العروض التقديمية', 'عروض كل مادة وصف'),
   ('/teqany/finals', '🗂', 'الاختبارات النهائية', 'أسئلة الوزارة حسب الدرس'), ('/teqany/remedial', '🩹', 'الخطط العلاجية', 'للطلاب دون المستوى'),
   ('/teqany/summaries', '📚', 'ملخصات الدروس', 'وفق مخرجات التعلم'), ('/teqany/cando', '☑️', 'أستطيع أن ✓', 'قوائم التقييم الذاتي'),
@@ -2008,7 +2016,7 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
 # أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا.
 # الروابط الخارجية (مثل باحث المدرسة) لا تُبنى ببادئة /teqany ولا تُستبعد:
 # شرط h.startswith('/') القديم كان يحذفها، فغابت من كروت الواجهة رغم وجودها في «المزيد».
-_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال'}
+_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال', '/homework': 'ورقة واجب بدرجات وأنواع وفق الوثيقة'}
 TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, _TQ_DESC.get(h, '')) for _k, h, ic, t in MENU_ITEMS
                 if _k != 'grading' and (h if h.startswith('http') else '/teqany' + h) not in {x[0] for x in TQ_SECTIONS}]
 # باحث المدرسة خاص بـ «تقني حذيفة» فقط: غير موجود في MENU_ITEMS (أُخفي من الكبسولة)،
@@ -2045,6 +2053,7 @@ PAGES = {
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
+  'homework': page('الواجبات المنزلية · الكبسولة', HOMEWORK, "window.PAGE_MODE='hw';" + chr(10) + rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@FX@@', rd('client_fx.js')).replace('// @@TUG@@', rd('client_tug.js') + chr(10) + rd('client_arcade.js') + chr(10) + rd('client_runner.js'))),
   'play': page('تحدي الكبسولة', PLAY, rd('client_play.js')),
   'grading': page('تصحيح الواجبات · الكبسولة', GRADING, rd('client_grading.js')),

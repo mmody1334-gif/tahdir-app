@@ -8,6 +8,7 @@ const http = require('http');
 const DIR = __dirname;
 const PORT = +(process.env.PORT || 8787);
 const TESTS = [
+  ['homework', 'homework.cjs', 'الواجبات المنزلية: قسم مستقل، درجة ثابتة لكل مادة وفق الوثيقة، اختيار درس محدد، طباعة بالترويسة'],
   ['fixes', 'regress_fixes.cjs', 'أحداث /api/event، سجل النشاط، ورقة المراجعة، النوافذ، تبديل المقرر'],
   ['labels', 'regress_labels.cjs', 'تسمية الصفوف (لا «الصف الصف») ونطاق الصلاحيات'],
   ['play', 'regress_play.cjs', 'تحدٍّ مباشر كامل: دخول طالب، إجابة، كشف، نهاية، عدّاد'],

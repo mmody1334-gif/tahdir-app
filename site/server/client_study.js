@@ -362,7 +362,7 @@ function renderSide(){
     if(REM)h+='<label class="qrow">عدد صفوف الطلاب <input id="rowsIn" type="number" min="1" max="30" value="'+rows+'" class="qsel sm" style="width:80px"></label>';
     h+='<button type="button" class="btn primary go-btn" id="makeBtn">'+(REM?'كوّن الخطة والأنشطة':'اعرض الملخص')+'</button></section>';
     if(REM)h+='<section class="qcard"><h3>👥 نشاط جماعي</h3><label class="qrow">عدد أفراد المجموعة <select id="gSize" class="qsel sm">'+[2,3,4,5,6].map(function(n){return '<option'+(n===gsize?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label><label class="qrow">أسئلة كل طالب <select id="gPer" class="qsel sm"><option value="1"'+(gper===1?' selected':'')+'>سؤال واحد</option><option value="2"'+(gper===2?' selected':'')+'>سؤالان</option></select></label><label class="qrow" style="flex-direction:column;align-items:stretch">أسماء الأعضاء (اختياري، اسم في كل سطر — الأول يأخذ الأسهل)<textarea id="gNames" class="qsel" rows="4" placeholder="الطالب الأول&#10;الطالب الثاني">'+esc(gnames)+'</textarea></label><button type="button" class="btn primary go-btn" id="grpBtn">كوّن النشاط الجماعي</button><div class="muted small" style="margin-top:6px">أسئلة سهلة ومتوسطة وتحدٍّ خفيف، بالأشكال والجداول ونموذج إجابة.</div></section>';
-    if(REM&&isSciC())h+='<section class="qcard"><h3>🎯 واجب سريع (علوم)</h3><label class="qrow">الوحدة <select id="hwUnit" class="qsel sm">'+units.map(function(u){return '<option value="'+esc(u.unit)+'"'+(u.unit===hwUnit?' selected':'')+'>الوحدة '+esc(u.unit)+(u.name?' — '+esc(u.name):'')+'</option>';}).join('')+'</select></label><label class="qrow">تُسحب الأسئلة من <select id="hwCount" class="qsel sm">'+[['1','الدرس الأول'],['3','أول 3 دروس'],['5','أول 5 دروس'],['10','أول 10 دروس'],['all','الوحدة كاملة']].map(function(o){return '<option value="'+o[0]+'"'+(hwCount===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label><button type="button" class="btn primary go-btn" id="hwBtn">كوّن الواجب (5 أسئلة عشوائية)</button><div class="muted small" style="margin-top:6px">أسئلة عشوائية موزّعة على الدروس المختارة مع نموذج إجابة؛ كل ضغطة تولّد تركيبة جديدة.</div></section>';
+    // «الواجبات المنزلية» صار قسمًا مستقلًا في القائمة الرئيسية (/homework) بدرجات وأنواع وفق الوثيقة
   }
   h+='<section class="qcard"><h3>بيانات الورقة</h3><div class="hdr-f">'+(REM?'<label>اسم معلم المادة<input id="h_teacher" value="'+esc(hdr.teacher)+'"></label>':'')+
     '<label>المديرية<input id="h_dir" value="'+esc(hdr.dir)+'"></label><label>المدرسة<input id="h_school" value="'+esc(hdr.school)+'"></label>'+
@@ -381,9 +381,6 @@ function bindSide(){
   if($('gPer'))$('gPer').onchange=function(){gper=this.value==='2'?2:1;};
   if($('gNames'))$('gNames').onchange=function(){gnames=this.value;};
   if($('grpBtn'))$('grpBtn').onclick=function(){if($('gNames'))gnames=$('gNames').value;makeGroup();};
-  if($('hwUnit'))$('hwUnit').onchange=function(){hwUnit=this.value;};
-  if($('hwCount'))$('hwCount').onchange=function(){hwCount=this.value;};
-  if($('hwBtn'))$('hwBtn').onclick=makeHw;
   ['dir','school','year','term','teacher'].forEach(function(k){var el=$('h_'+k);if(el)el.onchange=function(){hdr[k]=el.value.trim()||DEF_HDR[k];lsSet(hdrKey(),hdr);};});
 }
 var studySeq=0; // رقم طلب حزمة الدراسة: يمنع نتيجة صف قديم من الكتابة فوق الصف الحالي
