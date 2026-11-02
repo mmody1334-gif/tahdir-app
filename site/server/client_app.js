@@ -181,9 +181,10 @@ function buildCopyAll(l){
   ESSENTIAL.forEach(function(f){if(f.key==='weekly'&&!l.weekly)return;out+='— '+f.label+' —\n'+(l[f.key]||'')+'\n\n';});
   return out.trim();
 }
+function lessonFieldValue(l,k){var e=$('f_'+k);return e?e.value:String(l&&l[k]||'');}
 function buildCopyJson(l){
   useSettingsFor(subjOf(l));   // القيم الثابتة لمادة هذا الدرس: لكل مادة قيمها الخاصة
-  var c=function(k){return hwVal(l,k);};
+  var c=function(k){return lessonFieldValue(l,k);};
   var pre=c('pre_learning'),preOnly=(pre.match(/(^|\n)\s*التعلم القبلي\s*[:：][^\n]*/)||[''])[0].trim();
   var objective='';
   if(isEn(l)){objective=c('outcomes').split('\n').map(function(x){return x.replace(/^[•◆\-\s]+/,'').trim();}).filter(Boolean).join('\n');}

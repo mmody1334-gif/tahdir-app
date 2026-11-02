@@ -1525,12 +1525,12 @@ export default {
         if (data.length > 400000) return json({ error: 'الاختبار كبير جدًا.' }, 400);
         if (b.id) {
           const r = await env.DB.prepare('UPDATE quizzes SET title=?, grade=?, subject=?, kind=?, data=?, updated_at=? WHERE id=? AND user_id=?').bind(title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, +b.id, me.id).run();
-          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id });
+          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id, updated_at: t });
         }
         const n = await env.DB.prepare('SELECT COUNT(*) n FROM quizzes WHERE user_id = ?').bind(me.id).first();
         if (n && n.n >= 400) return json({ error: 'وصلت إلى الحد الأقصى للملفات المحفوظة. احذف بعضها أولًا.' }, 400);
         const r = await env.DB.prepare('INSERT INTO quizzes(user_id,title,grade,subject,kind,data,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id').bind(me.id, title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, t).first();
-        return json({ ok: true, id: r && r.id });
+        return json({ ok: true, id: r && r.id, updated_at: t });
       }
       if ((mm0 = p.match(/^\/api\/quizzes\/(\d+)$/))) {
         const id = +mm0[1];
