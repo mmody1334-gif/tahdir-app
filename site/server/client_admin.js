@@ -211,7 +211,7 @@ function teacherRows(){
   if(!list.length)return '<div class="empty-state">'+(VAULT?'لا يوجد معلمون في اللوحة الشاملة بعد. افتح أي معلم في لوحة التحكم الأساسية واضغط السهم ⬅ بجوار «كلمة مرور جديدة» لنقله إلى هنا.':'لا يوجد معلمون بعد. أضف المعلمين من زر «إضافة معلمين».')+'</div>';
   return '<div class="t-wrap"><table class="tbl"><thead><tr><th>المعلم</th><th>مرات الدخول</th><th>آخر دخول</th><th>المواد والصفوف المسموحة</th><th>الصفوف المستخدمة</th><th>دروس منسوخة</th><th>الأجهزة</th><th></th></tr></thead><tbody>'+
     list.map(function(u){
-      var st=!u.active?'<span class="pill off">موقوف</span>':u.role==='admin'?'<span class="pill adm">مدير</span>':'';
+      var st=!u.active?'<span class="pill off">موقوف</span>':u.role==='admin'?(+u.delegated?'<span class="pill adm">مدير مفوَّض</span>':'<span class="pill adm">مدير</span>'):'';
       var dv=u.devices.length,warn=u.blocked?'<span class="pill warn" title="آخر محاولة '+esc(fmtDate(u.blocked.last))+'">'+u.blocked.n+' محاولة من جهاز آخر</span>':'';
       return '<tr><td><button type="button" class="link-btn" data-open="'+u.id+'"><b>'+esc(u.name)+'</b></button> '+st+'<div class="sub ltr">'+esc(u.username)+'</div></td>'+
         '<td class="num">'+u.logins+'</td><td>'+esc(ago(u.last_login))+'</td>'+
@@ -357,6 +357,8 @@ function addTeachers(){
 }
 function openTeacher(id){
   var u=data.users.filter(function(x){return x.id===id;})[0];if(!u)return;
+  // المدير المفوَّض: صلاحيات المدير كاملة، لكن لا يعدّل المدير الرئيسي ولا مفوَّضًا آخر
+  var isDel=u.role==='admin'&&+u.delegated===1,meOwner=!ME.delegated,locked=!meOwner&&u.role==='admin'&&u.id!==ME.id;
   var dev=u.devices.map(function(d){return '<li><div><b>'+esc(d.label||'جهاز')+'</b><div class="sub">أول دخول '+esc(fmtDate(d.first_seen))+' · آخر استخدام '+esc(ago(d.last_seen))+(d.ip?' · <span class="ltr">'+esc(d.ip)+'</span>':'')+'</div></div><button type="button" class="btn small danger" data-rmdev="'+d.id+'">إزالة</button></li>';}).join('')||'<li class="muted">لم يسجّل دخولًا من أي جهاز بعد.</li>';
   var top=u.top.map(function(t){return '<li>'+esc(t.grade)+' — '+esc(t.title)+' <span class="muted">('+t.n+')</span></li>';}).join('')||'<li class="muted">لم ينسخ أي درس بعد.</li>';
   var html='<div class="t-stats"><div><b>'+u.logins+'</b><span>مرة دخول</span></div><div><b>'+u.lessons_viewed+'</b><span>درس فتحه</span></div><div><b>'+u.lessons_copied+'</b><span>درس نسخه</span></div><div><b>'+u.copies+'</b><span>عملية نسخ</span></div></div>'+
@@ -364,12 +366,14 @@ function openTeacher(id){
     '<h4>المواد والصفوف المسموحة</h4>'+scopeFull(u)+
     '<h4>الأجهزة ('+u.devices.length+' من '+(u.role==='admin'?'غير محدود':u.max_devices)+')</h4><ul class="devs">'+dev+'</ul>'+
     '<h4>أكثر الدروس نسخًا</h4><ul class="toplist">'+top+'</ul>'+
-    '<h4>إجراءات</h4><div class="acts">'+
+    '<h4>إجراءات</h4>'+(locked?'<p class="muted">🔒 هذا حساب '+(isDel?'مدير مفوَّض آخر':'المدير الرئيسي')+'، ولا يمكنك تعديله.</p>':'<div class="acts">'+
+      (meOwner&&u.role!=='admin'?'<button type="button" class="btn small primary" data-act="delegate">⭐ تفويض كمدير</button>':'')+
+      (meOwner&&isDel?'<button type="button" class="btn small danger" data-act="undelegate">سحب صلاحية المدير</button><button type="button" class="btn small" data-act="toggle">'+(u.active?'إيقاف الحساب':'تفعيل الحساب')+'</button><button type="button" class="btn small danger" data-act="delete">حذف الحساب</button>':'')+
       (u.role!=='admin'?'<button type="button" class="btn small vault-btn" data-act="vault" title="'+(VAULT?'إرجاع إلى لوحة التحكم الأساسية':'نقل إلى لوحة التحكم الشاملة')+'" aria-label="'+(VAULT?'إرجاع إلى لوحة التحكم الأساسية':'نقل إلى لوحة التحكم الشاملة')+'">'+(VAULT?'➡':'⬅')+'</button>':'')+
       '<button type="button" class="btn small" data-act="password">كلمة مرور جديدة</button>'+
       '<button type="button" class="btn small" data-act="rename">تعديل الاسم</button>'+
       (u.role!=='admin'?'<button type="button" class="btn small primary" data-act="scope">المواد والصفوف المسموحة</button><button type="button" class="btn small" data-act="clean_stale">مسح الأجهزة المهملة</button><button type="button" class="btn small" data-act="reset_devices">مسح كل الأجهزة</button><button type="button" class="btn small" data-act="max_devices">عدد الأجهزة المسموح</button><button type="button" class="btn small" data-act="toggle">'+(u.active?'إيقاف الحساب':'تفعيل الحساب')+'</button><button type="button" class="btn small danger" data-act="delete">حذف المعلم</button>':'')+
-    '</div>';
+    '</div>');
   dialog({title:u.name,message:u.username,html:html,okText:'إغلاق',cancelText:false});
   setTimeout(function(){
     Array.prototype.forEach.call(document.querySelectorAll('[data-rmdev]'),function(b){b.onclick=function(){act1(u,{action:'remove_device',device:+b.getAttribute('data-rmdev')},'أُزيل الجهاز');};});
@@ -388,6 +392,8 @@ function doAct(u,a){
   if(a==='clean_stale')return api('/api/admin/teachers/'+u.id,{action:'clean_stale'}).then(function(r){toast(r.removed?('أُزيل '+r.removed+' جهازًا مهملًا'):'لا توجد أجهزة مهملة');load();},function(e){toast(e.message);});
   if(a==='reset_devices')return dialog({title:'مسح أجهزة '+u.name,message:'سيُسجَّل خروجه من كل الأجهزة، ويستطيع الدخول من جهازين جديدين.',okText:'مسح الأجهزة',danger:true}).then(function(ok){if(ok)act1(u,{action:'reset_devices'},'مُسحت الأجهزة');});
   if(a==='scope')return scopeDialog(u);
+  if(a==='delegate')return dialog({title:'تفويض '+u.name+' كمدير',message:'سيصبح له نفس صلاحياتك في لوحة التحكم، وأجهزته غير محدودة. لا يستطيع حذفك أو تعديل حسابك، وتستطيع سحب التفويض منه في أي وقت.',okText:'تفويض كمدير'}).then(function(ok){if(ok)act1(u,{action:'delegate',value:1},'صار '+u.name+' مديرًا مفوَّضًا');});
+  if(a==='undelegate')return dialog({title:'سحب صلاحية المدير من '+u.name,message:'يرجع معلمًا عاديًا بحد الأجهزة المعتاد، ويُسجَّل خروجه من كل الأجهزة.',okText:'سحب الصلاحية',danger:true}).then(function(ok){if(ok)act1(u,{action:'delegate',value:0},'سُحبت صلاحية المدير');});
   if(a==='vault')return act1(u,{action:'vault',value:VAULT?0:1},VAULT?'أُرجع '+u.name+' إلى لوحة التحكم الأساسية':'نُقل '+u.name+' إلى اللوحة الشاملة');
   if(a==='toggle')return act1(u,{action:'toggle'},u.active?'أُوقف الحساب':'فُعّل الحساب');
   if(a==='delete')return dialog({title:'حذف '+u.name,message:'سيُحذف الحساب نهائيًا ولن يستطيع الدخول. تبقى إحصائياته القديمة محفوظة.',okText:'حذف',danger:true}).then(function(ok){if(ok)api('/api/admin/teachers/'+u.id,null,'DELETE').then(function(){toast('حُذف المعلم');load();},function(e){toast(e.message);});});
@@ -401,6 +407,7 @@ function doAct(u,a){
   st.parentNode.replaceChild(a,st);
 })();
 $('refreshBtn').onclick=function(){load().then(function(){toast('تم التحديث');});};
-api('/api/me').then(function(m){initNav(m);});
+var ME={};
+api('/api/me').then(function(m){ME=m||{};initNav(m);});
 load();
 })();

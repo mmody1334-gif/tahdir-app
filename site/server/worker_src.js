@@ -196,6 +196,9 @@ async function ensureSchema(db) {
   try { await db.prepare('ALTER TABLE users ADD COLUMN scope TEXT').run(); } catch (e) { /* already there */ }
   // «الشاملة»: معلمون نُقلوا إلى لوحة التحكم المخفية (/elkabsula) فلا يظهرون في اللوحة الأساسية
   try { await db.prepare('ALTER TABLE users ADD COLUMN vault INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
+  // «مدير مفوَّض»: معلم رُقّي إلى مدير (role='admin', delegated=1) — نفس صلاحيات المدير وأجهزة غير محدودة،
+  // لكنه لا يستطيع المساس بالمدير الرئيسي، والمدير الرئيسي وحده يمنح التفويض ويسحبه.
+  try { await db.prepare('ALTER TABLE users ADD COLUMN delegated INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
   // فتح «الشاملة» بكلمة مرورها يُحفظ على الجلسة نفسها (يعمل حتى مع حجب الكوكيز)
   try { await db.prepare('ALTER TABLE sessions ADD COLUMN vault_ok INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
   // الإشعارات: فيديو اختياري (يُعرض في الجرس ونافذة عند فتح الصفحة) ومنصة مستهدفة: k الكبسولة · t تقني حذيفة · فارغ = الاثنتان
@@ -328,7 +331,7 @@ async function currentUser(req, env) {
   const sid = c.sid || String(req.headers.get('X-Tahdir-Sid') || '').trim();
   if (!sid) return null;
   const row = await env.DB.prepare(
-    `SELECT s.token, s.device_id, s.expires_at, s.last_seen, s.vault_ok, u.id, u.name, u.username, u.role, u.active, u.scope
+    `SELECT s.token, s.device_id, s.expires_at, s.last_seen, s.vault_ok, u.id, u.name, u.username, u.role, u.active, u.scope, u.delegated
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).bind(sid).first();
   if (!row || row.expires_at < now() || !row.active) return null;
   // device must still be registered (admin may have removed it)
@@ -743,7 +746,7 @@ const VAULT_PW_SHA = 'b7d6b125623bd91adbe6793c8df91eb88f90182b85717c5cbf8ba6ec6b
 const inVault = (u, vault) => vault ? (+u.vault === 1 && u.role !== 'admin') : !(+u.vault === 1 && u.role !== 'admin');
 async function adminStats(env, vault) {
   const DB = env.DB;
-  const users = ((await DB.prepare("SELECT id,name,username,role,active,max_devices,created_at,scope,vault FROM users ORDER BY role='admin' DESC, name").all()).results || []).filter(u => inVault(u, vault));
+  const users = ((await DB.prepare("SELECT id,name,username,role,active,max_devices,created_at,scope,vault,delegated FROM users ORDER BY role='admin' DESC, name").all()).results || []).filter(u => inVault(u, vault));
   const agg = (await DB.prepare(`SELECT user_id,
       SUM(type='login') logins,
       SUM(type LIKE 'copy%') copies,
@@ -1392,7 +1395,7 @@ export default {
           const r = await env.DB.prepare("SELECT COUNT(*) n FROM events WHERE user_id = ? AND type = 'login'").bind(me.id).first();
           lg = (r && r.n) || 0;
         } catch (e) { lg = 0; }
-        return json({ name: me.name, username: me.username, role: me.role, first: lg <= 1 });
+        return json({ name: me.name, username: me.username, role: me.role, delegated: +me.delegated === 1, id: me.id, first: lg <= 1 });
       }
       // ---------- مركز الإشعارات (الجرس) ----------
       // قائمة الرسائل الموجهة للمعلمين من المدير: الأخيرة أولاً مع حالة «مقروء» الخاصة بهذا المستخدم
@@ -1628,7 +1631,7 @@ export default {
       }
       if (p === '/api/admin/teachers' && m === 'POST') {
         const b = await body(req);
-        try { await createUser(env, b); } catch (e) { return json({ error: /UNIQUE/i.test(e.message) ? 'اسم المستخدم مستخدم من قبل.' : e.message }, 400); }
+        try { await createUser(env, { ...b, role: 'teacher' }); } catch (e) { return json({ error: /UNIQUE/i.test(e.message) ? 'اسم المستخدم مستخدم من قبل.' : e.message }, 400); }
         return json({ ok: true });
       }
       if (p === '/api/admin/import' && m === 'POST') {
@@ -1647,8 +1650,11 @@ export default {
         const id = +mm[1];
         const u = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
         if (!u) return json({ error: 'غير موجود' }, 404);
+        // المدير المفوَّض لا يعدّل أي حساب مدير غير حسابه (لا المدير الرئيسي ولا مفوَّضًا آخر)
+        const owner = !+me.delegated, tDel = u.role === 'admin' && +u.delegated === 1;
+        if (!owner && u.role === 'admin' && u.id !== me.id) return json({ error: 'لا يمكنك تعديل حساب المدير الرئيسي أو مدير آخر.' }, 403);
         if (m === 'DELETE') {
-          if (u.role === 'admin') return json({ error: 'لا يمكن حذف حساب المدير.' }, 400);
+          if (u.role === 'admin' && !(tDel && owner)) return json({ error: 'لا يمكن حذف حساب المدير.' }, 400);
           await env.DB.batch(['users WHERE id', 'devices WHERE user_id', 'sessions WHERE user_id'].map(t => env.DB.prepare(`DELETE FROM ${t} = ?`).bind(id)));
           return json({ ok: true });
         }
@@ -1667,8 +1673,17 @@ export default {
             return json({ ok: true, removed: dead.length });
           }
           else if (b.action === 'remove_device') await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND device_id = (SELECT device_id FROM devices WHERE id = ? AND user_id = ?)').bind(id, +b.device, id), env.DB.prepare('DELETE FROM devices WHERE id = ? AND user_id = ?').bind(+b.device, id)]);
+          else if (b.action === 'delegate') {
+            // منح/سحب صلاحية المدير — للمدير الرئيسي فقط
+            if (!owner) return json({ error: 'منح التفويض وسحبه للمدير الرئيسي فقط.' }, 403);
+            if (u.role === 'admin' && !tDel) return json({ error: 'هذا هو حساب المدير الرئيسي.' }, 400);
+            if (b.value) await env.DB.prepare("UPDATE users SET role = 'admin', delegated = 1, vault = 0, active = 1 WHERE id = ?").bind(id).run();
+            else await env.DB.batch([
+              env.DB.prepare("UPDATE users SET role = 'teacher', delegated = 0 WHERE id = ?").bind(id),
+              env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id)]);
+          }
           else if (b.action === 'toggle') {
-            if (u.role === 'admin') return json({ error: 'لا يمكن إيقاف حساب المدير.' }, 400);
+            if (u.role === 'admin' && !(tDel && owner)) return json({ error: 'لا يمكن إيقاف حساب المدير.' }, 400);
             await env.DB.prepare('UPDATE users SET active = 1 - active WHERE id = ?').bind(id).run();
             await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
           } else if (b.action === 'password') {
