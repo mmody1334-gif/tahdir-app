@@ -20,6 +20,11 @@ jobs:
         with: { python-version: '3.12' }
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
+      - name: Fetch APKs from dist branch
+        run: |
+          git fetch origin dist --depth=1 2>/dev/null || true
+          git show origin/dist:teqany.apk > site/server/teqany.apk 2>/dev/null || echo "::warning::teqany.apk not on dist yet — using fallback"
+          git show origin/dist:tahdir.apk > site/server/tahdir.apk 2>/dev/null || true
       - name: Build worker.js
         run: python3 site/server/build_worker.py
       - name: Check syntax
