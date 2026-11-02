@@ -1029,6 +1029,8 @@ body.ck-noscroll{overflow:hidden}body.ck-noscroll #modal{z-index:3000}body.ck-no
 .ck-cam video,.ck-cam canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .ck-msg{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);padding:8px 16px;border-radius:12px;text-align:center;max-width:90%;transition:opacity .6s}.ck-msg.fade{opacity:0;pointer-events:none}
 .ck-leg{position:absolute;top:8px;left:8px;right:8px;text-align:center;font-size:.76rem;color:#fff;background:rgba(0,0,0,.5);border-radius:8px;padding:4px 8px;pointer-events:none;line-height:1.5}
+.ck-markbtn{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:3;border:0;border-radius:999px;padding:9px 18px;font:inherit;font-weight:800;font-size:.9rem;background:#2563eb;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer}
+.ck-markbtn.on{background:#16a34a}
 .ck-lb{display:grid;grid-template-columns:1fr 1fr 1fr 1.2fr;gap:6px;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:rgba(0,0,0,.6)}
 .ck-lb .btn{justify-content:center;padding:10px 6px;font-size:.88rem}.ck-lb .btn:not(.primary){background:rgba(255,255,255,.12);color:#fff;border-color:transparent}
 .ck-sheet{position:absolute;inset:auto 0 0 0;max-height:62vh;overflow:auto;background:#fff;color:#111;border-radius:16px 16px 0 0;padding:12px;box-shadow:0 -10px 30px rgba(0,0,0,.4)}

@@ -248,10 +248,10 @@ function openScan(id){
 function live(S,C){
   var restoredPending=!!S._pendingRestore;delete S._pendingRestore;S.answers=S.answers||{};S.cur=Math.min(S.cur||0,S.questions.length-1);S.reveal=false;
   var roster={};C.students.forEach(function(s){roster[s.n]=s.name;});
-  var st={stream:null,run:false,maxW:1280,pend:{},showLet:true,wake:null,dirty:false,lastPush:0,saveT:null,ms:0,rev:0,saving:false,savePromise:null,retryT:null,retryN:0,liveBusy:false,liveNext:null,liveRetryT:null,liveRetryN:0,closing:false,closed:false,toRes:false,syncText:'جارٍ الاتصال بالسبورة'};
+  var st={stream:null,run:false,maxW:1280,pend:{},showLet:true,mark:false,wake:null,dirty:false,lastPush:0,saveT:null,ms:0,rev:0,saving:false,savePromise:null,retryT:null,retryN:0,liveBusy:false,liveNext:null,liveRetryT:null,liveRetryN:0,closing:false,closed:false,toRes:false,syncText:'جارٍ الاتصال بالسبورة'};
   var o=document.createElement('div');o.className='ck-live';o.id='cdLive';
   o.innerHTML='<div class="ck-lh"><button type="button" class="ck-x" id="lvX" aria-label="إنهاء">✕</button><div class="ck-lq"><b id="lvN"></b><span id="lvQ"></span></div><div class="ck-lc" id="lvC"></div></div>'+
-    '<div class="ck-cam" id="lvCam"><video id="lvV" playsinline muted autoplay></video><canvas id="lvO"></canvas><div class="ck-msg" id="lvM">جارٍ تشغيل الكاميرا…</div><div class="ck-leg">🟦 سُجِّلت إجابته · اضغط «👁 الإجابة» لإظهار 🟩 الصح و🟥 الخطأ</div></div>'+
+    '<div class="ck-cam" id="lvCam"><video id="lvV" playsinline muted autoplay></video><canvas id="lvO"></canvas><div class="ck-msg" id="lvM">جارٍ تشغيل الكاميرا…</div><div class="ck-leg" id="lvLeg">🟦 سُجِّلت إجابته · اضغط «أرِني الصح والخطأ» لتراها على جوالك وحدك</div><button type="button" class="ck-markbtn" id="lvMk">✓✗ أرِني الصح والخطأ</button></div>'+
     '<div class="ck-lb"><button type="button" class="btn" id="lvP">→ السابق</button><button type="button" class="btn" id="lvR">👁 الإجابة</button><button type="button" class="btn" id="lvL">👥 <span id="lvLn"></span></button><button type="button" class="btn primary" id="lvNx">التالي ←</button></div>'+
     '<div class="ck-sheet" id="lvSh" hidden></div>';
   document.body.appendChild(o);document.body.classList.add('ck-noscroll');
@@ -263,7 +263,7 @@ function live(S,C){
     $('lvN').textContent='السؤال '+(S.cur+1)+' / '+S.questions.length+(S.reveal?' · الإجابة: '+LET[q.correct]:'');
     $('lvQ').textContent=q.stem;
     var okN=Object.keys(a).filter(function(x){return a[x]===q.correct;}).length;
-    $('lvC').innerHTML='<span class="ck-sync-note" id="lvSync" aria-live="polite">'+esc(st.syncText)+'</span><span class="ck-cnt"><b>'+n+'</b> / '+tot+'</span>'+(S.reveal&&n?'<span class="ck-dist ok">✓ '+okN+'</span><span class="ck-dist">✗ '+(n-okN)+'</span>':'');
+    $('lvC').innerHTML='<span class="ck-sync-note" id="lvSync" aria-live="polite">'+esc(st.syncText)+'</span><span class="ck-cnt"><b>'+n+'</b> / '+tot+'</span>'+((S.reveal||st.mark)&&n?'<span class="ck-dist ok">✓ '+okN+'</span><span class="ck-dist">✗ '+(n-okN)+'</span>':'');
     $('lvLn').textContent=tot-n?(tot-n)+' بقي':'سُجِّل الكل';
     $('lvP').disabled=S.cur===0;$('lvNx').textContent=S.cur===S.questions.length-1?'إنهاء ✓':'التالي ←';
     $('lvR').textContent=S.reveal?'🙈 إخفاء':'👁 الإجابة';
@@ -273,7 +273,7 @@ function live(S,C){
   function sheet(){
     var a=A(),q=S.questions[S.cur];
     $('lvSh').innerHTML='<div class="ck-sh-h"><b>'+esc(C.title)+'</b><button type="button" class="btn small" id="lvShX">إغلاق</button></div><div class="ck-sh-g">'+C.students.map(function(s){var v=a[s.n];
-      return '<span class="ck-st'+(v==null?'':' on'+(S.reveal?(v===q.correct?' ok':' no'):''))+'"><i>'+s.n+'</i>'+esc(s.name)+(v!=null&&(S.reveal||st.showLet)?' <b>'+LET[v]+'</b>':'')+'</span>';}).join('')+'</div>'+
+      return '<span class="ck-st'+(v==null?'':' on'+((S.reveal||st.mark)?(v===q.correct?' ok':' no'):''))+'"><i>'+s.n+'</i>'+esc(s.name)+(v!=null&&(S.reveal||st.mark||st.showLet)?' <b>'+LET[v]+'</b>':'')+'</span>';}).join('')+'</div>'+
       '<label class="ck-sh-o"><input type="checkbox" id="lvSL"'+(st.showLet?' checked':'')+'> إظهار حرف كل طالب على الجوال</label>';
     $('lvShX').onclick=function(){$('lvSh').hidden=true;};
     $('lvSL').onchange=function(){st.showLet=this.checked;sheet();};
@@ -310,6 +310,11 @@ function live(S,C){
   $('lvP').onclick=function(){if(S.cur>0){S.cur--;S.reveal=false;st.pend={};markDirty();head();}};
   $('lvNx').onclick=function(){if(S.cur<S.questions.length-1){S.cur++;S.reveal=false;st.pend={};markDirty();head();}else close(true);};
   $('lvR').onclick=function(){S.reveal=!S.reveal;markDirty();head();};
+  // زر خاص بالمعلم: يُظهر الصح/الخطأ على جوّاله فقط (لا يكشف للطلاب على السبورة)
+  $('lvMk').onclick=function(){st.mark=!st.mark;$('lvMk').classList.toggle('on',st.mark);
+    $('lvMk').textContent=st.mark?'🙈 إخفاء الصح والخطأ':'✓✗ أرِني الصح والخطأ';
+    var lg=$('lvLeg');if(lg)lg.innerHTML=st.mark?'🟩 صح · 🟥 خطأ (تظهر لك وحدك) — «👁 الإجابة» تكشفها للطلاب على السبورة':'🟦 سُجِّلت إجابته · اضغط «أرِني الصح والخطأ» لتراها على جوالك وحدك';
+    if(!$('lvSh').hidden)sheet();head();};
   $('lvL').onclick=function(){var sh=$('lvSh');sh.hidden=!sh.hidden;if(!sh.hidden)sheet();};
   head();if(restoredPending)markDirty();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('lvM').innerHTML='المتصفح لا يدعم الكاميرا. افتح الصفحة من Chrome أو Safari على الجوال.';return;}
@@ -351,14 +356,16 @@ function live(S,C){
     octx.font='700 '+fs+'px Tajawal,Arial';octx.textAlign='center';octx.textBaseline='bottom';
     hits.forEach(function(h){
       if(!roster[h.n])return;
-      // الألوان: برتقالي = جارٍ القراءة · أزرق = سُجِّلت إجابته (ليست صحّة بعد) · بعد «الإجابة»: أخضر صح · أحمر خطأ
+      // الألوان: برتقالي = جارٍ القراءة · أزرق = سُجِّلت إجابته (ليست صحّة) · عند إظهار الصح/الخطأ: أخضر صح · أحمر خطأ
+      // showRW = إظهار الصح والخطأ: إمّا كشف للطلاب (S.reveal) أو عرض خاص بالمعلم على جواله (st.mark)
+      var showRW=S.reveal||st.mark;
       var c=h.corners,rec=a[h.n]===h.ans&&h.ok;
-      var col=!rec?'#f59e0b':(S.reveal?(h.ans===q.correct?'#16a34a':'#dc2626'):'#2563eb');
+      var col=!rec?'#f59e0b':(showRW?(h.ans===q.correct?'#16a34a':'#dc2626'):'#2563eb');
       octx.beginPath();octx.moveTo(c[0][0],c[0][1]);for(var i=1;i<4;i++)octx.lineTo(c[i][0],c[i][1]);octx.closePath();
       octx.lineWidth=lw;octx.strokeStyle=col;octx.stroke();octx.fillStyle=col+'33';octx.fill();
       var mx=(c[0][0]+c[1][0]+c[2][0]+c[3][0])/4,my=Math.min(c[0][1],c[1][1],c[2][1],c[3][1])-4;
-      // قبل كشف الإجابة: اسم الطالب + حرفه المختار (بلا ✓ حتى لا يُفهَم أنه صحيح). بعد الكشف: ✓ صح / ✗ خطأ
-      var mark=!rec?'':(S.reveal?(h.ans===q.correct?'✓ ':'✗ '):'');
+      // بلا إظهار: اسم الطالب + حرفه المختار (بلا ✓ حتى لا يُفهَم أنه صحيح). عند الإظهار: ✓ صح / ✗ خطأ
+      var mark=!rec?'':(showRW?(h.ans===q.correct?'✓ ':'✗ '):'');
       var label=mark+roster[h.n]+(rec?' · '+LET[h.ans]:'');
       var tw=octx.measureText(label).width+12;octx.fillStyle='rgba(0,0,0,.7)';octx.fillRect(mx-tw/2,my-fs-6,tw,fs+6);
       octx.fillStyle='#fff';octx.fillText(label,mx,my-2);
