@@ -14,23 +14,16 @@ const B='http://localhost:8787';
   await ap.waitForSelector('#mText[readonly]'); console.log('import result:\n'+await ap.inputValue('#mText')); await ap.click('#mCancel');
   // 3 teacher device 1
   let [c1,p1]=await mk(); await p1.goto(B+'/'); await p1.fill('#username','ahmed.b'); await p1.fill('#password','123456'); await p1.click('#loginBtn'); await p1.waitForURL(B+'/app');
-  await p1.waitForSelector('[data-home="prep"]'); await p1.click('[data-home="prep"]'); await p1.waitForSelector('.g-btn'); await p1.click('.g-btn'); await p1.click('.u-btn'); await p1.click('.l-item');
-  await p1.click('#copyJsonBtn'); await p1.waitForTimeout(500);
-  console.log('copy JSON action available:', await p1.$('#copyJsonBtn')!==null);
-  await p1.click('#homeBackBtn'); await p1.click('[data-home="homework"]'); await p1.waitForSelector('#hwLesson');
-  const emptyPickers=await p1.evaluate(()=>['#hwSubject','#hwGrade','#hwUnit','#hwLesson'].map(s=>document.querySelector(s).value));
-  if(emptyPickers.some(Boolean)) throw new Error('homework selectors must not auto-select a course or first lesson');
-  const subject=await p1.locator('#hwSubject option').nth(1).getAttribute('value'); await p1.selectOption('#hwSubject',subject);
-  const grade=await p1.locator('#hwGrade option').nth(1).getAttribute('value'); await p1.selectOption('#hwGrade',grade);
-  const unit=await p1.locator('#hwUnit option').nth(1).getAttribute('value'); await p1.selectOption('#hwUnit',unit);
-  const lesson=await p1.locator('#hwLesson option').nth(1).getAttribute('value'); await p1.selectOption('#hwLesson',lesson);
-  await p1.waitForSelector('#homeworkEditor [data-hw-item]'); await p1.screenshot({path:'s_hw.png',fullPage:true});
-  console.log('homework section:', await p1.textContent('#hwScoreState'), 'selected lesson:', await p1.textContent('#homeworkEditor h2'));
-  await p1.click('#hwCopyText'); await p1.waitForTimeout(300);
-  console.log('homework copy action available:', await p1.$('#hwCopyText')!==null);
-  // حفظ محلي للواجب مرتبط بالدرس المحدد واستعادته بعد إعادة التحميل
-  const draftText='سؤال اختبار لحفظ واجب هذا الدرس';await p1.locator('[data-hw-text]').first().fill(draftText);await p1.locator('[data-hw-mark]').first().fill('1');await p1.click('#hwSave');await p1.waitForTimeout(300);await p1.reload();await p1.waitForSelector('[data-home="homework"]');await p1.click('[data-home="homework"]');await p1.waitForSelector('#hwSubject');await p1.selectOption('#hwSubject',subject);await p1.selectOption('#hwGrade',grade);await p1.selectOption('#hwUnit',unit);await p1.selectOption('#hwLesson',lesson);await p1.waitForSelector('#homeworkEditor [data-hw-item]');
-  const savedDraft=await p1.locator('[data-hw-text]').first().inputValue();if(savedDraft!==draftText)throw new Error('homework draft was not restored for the selected lesson: '+savedDraft);console.log('homework draft persisted per selected lesson:',savedDraft);
+  await p1.waitForSelector('.g-btn'); await p1.click('.g-btn'); await p1.click('.u-btn'); await p1.click('.l-item');
+  await p1.click('#copyAllBtn'); await p1.click('#copyJsonBtn'); await p1.waitForTimeout(300);
+  console.log('clipboard json ok:', JSON.parse(await p1.evaluate(()=>navigator.clipboard.readText())).source);
+  await p1.click('[data-ltab="hw"]'); await p1.waitForSelector('#copyHwBtn'); await p1.click('#copyHwBtn'); await p1.waitForTimeout(300);
+  { const hw=JSON.parse(await p1.evaluate(()=>navigator.clipboard.readText())); console.log('hw json:', hw.kind, hw.items.length, hw.items.map(i=>i.text.slice(0,40))); }
+  await p1.screenshot({path:'s_hw.png',fullPage:true});
+  await p1.click('[data-ltab="prep"]'); await p1.waitForSelector('#copyJsonBtn');
+  // teacher local edit
+  await p1.fill('#f_homework','واجب المعلم أحمد'); await p1.click('[data-save="homework"]'); await p1.reload(); await p1.waitForSelector('.g-btn');
+  await p1.click('.g-btn'); await p1.click('.u-btn'); await p1.click('.l-item'); console.log('teacher local edit kept:', await p1.inputValue('#f_homework'));
   // security checks as teacher
   console.log('teacher->admin api:', (await p1.evaluate(()=>fetch('/api/admin/stats').then(r=>r.status))));
   console.log('teacher->/admin goes to:', (await (await c1.request.get(B+'/admin',{maxRedirects:0})).headers().location));

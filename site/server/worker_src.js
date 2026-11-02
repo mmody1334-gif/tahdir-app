@@ -125,7 +125,7 @@ function staleSeconds(env) {
   const v = env && env.STALE_SECONDS ? parseInt(env.STALE_SECONDS, 10) : NaN;
   return Number.isFinite(v) && v >= 0 ? v : STALE_DAYS * 86400;
 }
-const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','hw_items_1','hw_items_2','hw_items_custom','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
+const LESSON_FIELDS = ['title','unit_name','hw_type','weekly','hw_q1','hw_a1','hw_q2','hw_a2','concepts','pre_learning','outcomes','strategies','activities_teach','resources','formative','enrich','closing','homework','misconceptions'];
 // أنواع الأحداث المقبولة في /api/event. أي نوع غير مذكور هنا يُرفض، فيضيع الحدث بصمت.
 // عند إضافة track() جديد في client_*.js أضف نوعه هنا وأضف تسميته العربية في TYPES داخل client_admin.js.
 const EVENT_TYPES = new Set([
@@ -1525,12 +1525,12 @@ export default {
         if (data.length > 400000) return json({ error: 'الاختبار كبير جدًا.' }, 400);
         if (b.id) {
           const r = await env.DB.prepare('UPDATE quizzes SET title=?, grade=?, subject=?, kind=?, data=?, updated_at=? WHERE id=? AND user_id=?').bind(title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, +b.id, me.id).run();
-          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id, updated_at: t });
+          if (r.meta && r.meta.changes) return json({ ok: true, id: +b.id });
         }
         const n = await env.DB.prepare('SELECT COUNT(*) n FROM quizzes WHERE user_id = ?').bind(me.id).first();
         if (n && n.n >= 400) return json({ error: 'وصلت إلى الحد الأقصى للملفات المحفوظة. احذف بعضها أولًا.' }, 400);
         const r = await env.DB.prepare('INSERT INTO quizzes(user_id,title,grade,subject,kind,data,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id').bind(me.id, title, String(b.grade || ''), String(b.subject || ''), String(b.kind || ''), data, t, t).first();
-        return json({ ok: true, id: r && r.id, updated_at: t });
+        return json({ ok: true, id: r && r.id });
       }
       if ((mm0 = p.match(/^\/api\/quizzes\/(\d+)$/))) {
         const id = +mm0[1];
