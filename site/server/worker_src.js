@@ -1305,7 +1305,8 @@ export default {
         await markNewLive(env);
         if (p === '/__move') return moveLanding(req, env, url);
       }
-      if (url.hostname === OLD_HOST && isPageNav(req, p) && await isNewLive(env)) return moveRedirect(req, env, url);
+      // على النطاق القديم: أي صفحة ليست تحت /teqany تُحوَّل إلى /teqany (لأن هذا النطاق مخصص لتقني حذيفة)
+      if (url.hostname === OLD_HOST && isPageNav(req, p) && !p.startsWith('/teqany')) return redirect('/teqany');
       if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live|courses)/.test(p)) await loadPacks(env, url);
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 

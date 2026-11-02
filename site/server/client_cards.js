@@ -251,7 +251,7 @@ function live(S,C){
   var st={stream:null,run:false,maxW:1280,pend:{},showLet:true,mark:false,wake:null,dirty:false,lastPush:0,saveT:null,ms:0,rev:0,saving:false,savePromise:null,retryT:null,retryN:0,liveBusy:false,liveNext:null,liveRetryT:null,liveRetryN:0,closing:false,closed:false,toRes:false,syncText:'جارٍ الاتصال بالسبورة'};
   var o=document.createElement('div');o.className='ck-live';o.id='cdLive';
   o.innerHTML='<div class="ck-lh"><button type="button" class="ck-x" id="lvX" aria-label="إنهاء">✕</button><div class="ck-lq"><b id="lvN"></b><span id="lvQ"></span></div><div class="ck-lc" id="lvC"></div></div>'+
-    '<div class="ck-cam" id="lvCam"><video id="lvV" playsinline muted autoplay></video><canvas id="lvO"></canvas><div class="ck-msg" id="lvM">جارٍ تشغيل الكاميرا…</div><div class="ck-leg" id="lvLeg">🟦 سُجِّلت إجابته · اضغط «أرِني الصح والخطأ» لتراها على جوالك وحدك</div><button type="button" class="ck-markbtn" id="lvMk">✓✗ أرِني الصح والخطأ</button></div>'+
+    '<div class="ck-cam" id="lvCam"><video id="lvV" playsinline muted autoplay></video><canvas id="lvO"></canvas><div class="ck-msg" id="lvM">جارٍ تشغيل الكاميرا…</div><div class="ck-ans-popup" id="lvAns" hidden></div><div class="ck-leg" id="lvLeg">🟦 سُجِّلت إجابته · اضغط «أرِني الصح والخطأ» لتراها على جوالك وحدك</div><button type="button" class="ck-markbtn" id="lvMk">✓✗ أرِني الصح والخطأ</button></div>'+
     '<div class="ck-lb"><button type="button" class="btn" id="lvP">→ السابق</button><button type="button" class="btn" id="lvR">👁 الإجابة</button><button type="button" class="btn" id="lvL">👥 <span id="lvLn"></span></button><button type="button" class="btn primary" id="lvNx">التالي ←</button></div>'+
     '<div class="ck-sheet" id="lvSh" hidden></div>';
   document.body.appendChild(o);document.body.classList.add('ck-noscroll');
@@ -267,6 +267,9 @@ function live(S,C){
     $('lvLn').textContent=tot-n?(tot-n)+' بقي':'سُجِّل الكل';
     $('lvP').disabled=S.cur===0;$('lvNx').textContent=S.cur===S.questions.length-1?'إنهاء ✓':'التالي ←';
     $('lvR').textContent=S.reveal?'🙈 إخفاء':'👁 الإجابة';
+    // مستطيل منبثق يُظهر الإجابة الصحيحة فوق الكاميرا (خاص بالمعلم على جواله)
+    var ap=$('lvAns'),showRW=S.reveal||st.mark;
+    if(showRW){ap.innerHTML='<span class="ck-ans-let">'+LET[q.correct]+'</span><span class="ck-ans-txt">'+esc(q.choices[q.correct])+'</span>';ap.hidden=false;ap.className='ck-ans-popup show';}else{ap.hidden=true;ap.className='ck-ans-popup';}
     if(!$('lvSh').hidden)sheet();
     push();
   }
