@@ -209,17 +209,17 @@ function usedGrades(u){
 function teacherRows(){
   var list=data.users.filter(function(u){return !q||(u.name+u.username).toLowerCase().indexOf(q)>=0;});
   if(!list.length)return '<div class="empty-state">'+(VAULT?'لا يوجد معلمون في اللوحة الشاملة بعد. افتح أي معلم في لوحة التحكم الأساسية واضغط السهم ⬅ بجوار «كلمة مرور جديدة» لنقله إلى هنا.':'لا يوجد معلمون بعد. أضف المعلمين من زر «إضافة معلمين».')+'</div>';
-  return '<div class="t-wrap"><table class="tbl"><thead><tr><th>المعلم</th><th>مرات الدخول</th><th>آخر دخول</th><th>المواد والصفوف المسموحة</th><th>الصفوف المستخدمة</th><th>دروس منسوخة</th><th>الأجهزة</th><th></th></tr></thead><tbody>'+
+  return '<div class="t-wrap t-cards-wrap"><table class="tbl t-cards"><thead><tr><th>المعلم</th><th>مرات الدخول</th><th>آخر دخول</th><th>المواد والصفوف المسموحة</th><th>الصفوف المستخدمة</th><th>دروس منسوخة</th><th>الأجهزة</th><th></th></tr></thead><tbody>'+
     list.map(function(u){
       var st=!u.active?'<span class="pill off">موقوف</span>':u.role==='admin'?(+u.delegated?'<span class="pill adm">مدير مفوَّض</span>':'<span class="pill adm">مدير</span>'):'';
       var dv=u.devices.length,warn=u.blocked?'<span class="pill warn" title="آخر محاولة '+esc(fmtDate(u.blocked.last))+'">'+u.blocked.n+' محاولة من جهاز آخر</span>':'';
       return '<tr><td><button type="button" class="link-btn" data-open="'+u.id+'"><b>'+esc(u.name)+'</b></button> '+st+'<div class="sub ltr">'+esc(u.username)+'</div></td>'+
-        '<td class="num">'+u.logins+'</td><td>'+esc(ago(u.last_login))+'</td>'+
-        '<td class="sc-cell">'+(u.role==='admin'?'<span class="muted">الكل</span>':scopeChips(u))+'</td>'+
-        '<td class="sc-used-cell">'+usedGrades(u)+'</td>'+
-        '<td class="num">'+u.lessons_copied+'<span class="sub"> درس · '+u.copies+' نسخة</span></td>'+
-        '<td><span class="num">'+dv+'/'+(u.role==='admin'?'∞':u.max_devices)+'</span> '+warn+'</td>'+
-        '<td><button type="button" class="btn small" data-open="'+u.id+'">التفاصيل</button></td></tr>';
+        '<td class="num" data-l="مرات الدخول">'+u.logins+'</td><td data-l="آخر دخول">'+esc(ago(u.last_login))+'</td>'+
+        '<td class="sc-cell" data-l="المواد والصفوف">'+(u.role==='admin'?'<span class="muted">الكل</span>':scopeChips(u))+'</td>'+
+        '<td class="sc-used-cell" data-l="الصفوف المستخدمة">'+usedGrades(u)+'</td>'+
+        '<td class="num" data-l="دروس منسوخة">'+u.lessons_copied+'<span class="sub"> درس · '+u.copies+' نسخة</span></td>'+
+        '<td data-l="الأجهزة"><span class="num">'+dv+'/'+(u.role==='admin'?'∞':u.max_devices)+'</span> '+warn+'</td>'+
+        '<td class="t-act"><button type="button" class="btn small" data-open="'+u.id+'">التفاصيل</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 function typeLabel(t){return TYPES[t]||('نشاط: '+String(t==null?'':t).replace(/_/g,' '));}

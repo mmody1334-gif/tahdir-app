@@ -1550,15 +1550,24 @@ extra_css += '''
   .top .brand{max-width:100%}
   .top .brand>div{min-width:0}
   .top .stats{width:100%}
-  .stats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .stats{flex-wrap:wrap;justify-content:center}
   .stats::-webkit-scrollbar{display:none}
   .stat{white-space:nowrap}
   /* لوحة التحكم: تبويبات الأقسام تمرر أفقيًا بدل أن توسّع الشاشة كلها إلى 477px */
   .dash>*{min-width:0}
-  .dash .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .dash .tabs::-webkit-scrollbar{display:none}
-  .dash .tabs .tab{padding:8px 10px;font-size:.86rem;flex:none;white-space:nowrap}
+  /* بلا تمرير أفقي: داخل التطبيق (WebView) كان التمرير يتوقف قبل آخر تبويب، فتلتفّ التبويبات في صفّين */
+  .dash .tabs{flex-wrap:wrap;overflow:visible;gap:6px}
+  .dash .tabs .tab{padding:8px 10px;font-size:.86rem;flex:1 1 auto;white-space:nowrap;text-align:center}
   .t-wrap{max-width:100%}
+  /* جدول المعلمين على الجوال: بطاقة لكل معلم بدل جدول يحتاج تمريرًا أفقيًا (كان زر «التفاصيل» في آخر عمود لا يُوصَل إليه في التطبيق) */
+  .t-cards-wrap{overflow:visible;background:none;border:0;box-shadow:none}
+  .t-cards thead{display:none}
+  .t-cards,.t-cards tbody{display:block;width:100%;min-width:0!important}
+  .t-cards tr{display:block;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px;margin-bottom:10px}
+  .t-cards td{display:flex;align-items:center;justify-content:space-between;gap:10px;border:0!important;padding:5px 0!important;text-align:start;white-space:normal}
+  .t-cards td:first-child{display:block;border-bottom:1px solid var(--line)!important;padding-bottom:8px!important;margin-bottom:4px}
+  .t-cards td[data-l]::before{content:attr(data-l);color:var(--mute);font-size:.8rem;font-weight:600;flex:none}
+  .t-cards td.t-act{padding-top:8px!important}.t-cards td.t-act .btn{width:100%}
   .wrap{padding-inline:12px}
   .app-bar{padding:0 12px}
   .get-app{padding:12px 14px;border-radius:16px}
