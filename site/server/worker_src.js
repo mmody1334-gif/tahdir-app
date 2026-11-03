@@ -829,13 +829,97 @@ function genPass() {
 }
 
 // ---------- exports (Word / print pages) ----------
+// ملف Word كان HTML يشير إلى الصور بروابط على الموقع، فيظهر مكانها ✗ أحمر:
+// Word يحجب الصور الخارجية في «طريقة العرض المحمية»، ولا يقرأ صيغة WebP أصلًا
+// (أغلب صور أسئلة الاختبارات النهائية WebP). الحل: ملف «صفحة ويب في ملف واحد» (MHTML)
+// بامتداد .doc — الصور **مضمَّنة داخل الملف نفسه** فتظهر بلا إنترنت وتُعدَّل وتُحفظ مع المستند.
+// صور WebP تُقرأ من نسختها PNG التي تُولَّد عند النشر (site/tools/fin_png.py ← «x.webp.png»).
+const MHT_BASE = 'file:///C:/kabsula/';
+const b64Of = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+function imgInfo(u8) { // النوع والأبعاد من رأس الملف (PNG/JPEG/GIF/BMP)
+  const n = u8.length, be16 = i => (u8[i] << 8) | u8[i + 1], be32 = i => ((u8[i] << 24) >>> 0) + (u8[i + 1] << 16) + (u8[i + 2] << 8) + u8[i + 3];
+  if (n > 24 && u8[0] === 0x89 && u8[1] === 0x50) return { type: 'image/png', ext: 'png', w: be32(16), h: be32(20) };
+  if (n > 10 && u8[0] === 0x47 && u8[1] === 0x49) return { type: 'image/gif', ext: 'gif', w: u8[6] | (u8[7] << 8), h: u8[8] | (u8[9] << 8) };
+  if (n > 26 && u8[0] === 0x42 && u8[1] === 0x4d) return { type: 'image/bmp', ext: 'bmp', w: u8[18] | (u8[19] << 8), h: Math.abs((u8[22] | (u8[23] << 8) | (u8[24] << 16) | (u8[25] << 24))) };
+  if (n > 4 && u8[0] === 0xff && u8[1] === 0xd8) {
+    for (let i = 2; i + 9 < n;) {
+      if (u8[i] !== 0xff) { i++; continue; }
+      const mk = u8[i + 1];
+      if (mk >= 0xc0 && mk <= 0xcf && mk !== 0xc4 && mk !== 0xc8 && mk !== 0xcc) return { type: 'image/jpeg', ext: 'jpg', w: be16(i + 7), h: be16(i + 5) };
+      if (mk === 0xd8 || mk === 0x01 || (mk >= 0xd0 && mk <= 0xd7)) { i += 2; continue; }
+      i += 2 + be16(i + 2);
+    }
+    return { type: 'image/jpeg', ext: 'jpg', w: 0, h: 0 };
+  }
+  return null;
+}
+async function wordMht(env, html, origin) {
+  const own = u => u.origin === origin || /(^|\.)elkabsula\.site$|\.workers\.dev$/.test(u.hostname);
+  const load = async src => {
+    let u8 = null, m = src.match(/^data:image\/[a-z+.-]+;base64,([\s\S]+)$/i);
+    if (m) { try { u8 = Uint8Array.from(atob(m[1].replace(/\s+/g, '')), c => c.charCodeAt(0)); } catch (e) { return null; } }
+    else {
+      let u; try { u = new URL(src.replace(/&amp;/g, '&'), origin); } catch (e) { return null; }
+      if (!own(u)) return null;
+      const p = u.pathname;
+      if (ICONS[p]) u8 = Uint8Array.from(atob(ICONS[p]), c => c.charCodeAt(0));
+      else if (env.ASSETS) {
+        const r = await env.ASSETS.fetch(new Request(new URL(/\.webp$/i.test(p) ? p + '.png' : p, origin)));
+        if (r.ok) u8 = new Uint8Array(await r.arrayBuffer());
+      }
+    }
+    const inf = u8 && imgInfo(u8);
+    return inf ? { ...inf, data: b64Of(u8) } : null;
+  };
+  // كل صورة تُحمَّل مرة واحدة حتى لو تكرّرت (شعار الوزارة في الورقة ونموذج الإجابة)
+  const srcs = [...new Set([...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(["'])([\s\S]*?)\1/gi)].map(x => x[2]))].slice(0, 45);
+  const got = new Map();
+  for (let i = 0; i < srcs.length; i += 8) {
+    const batch = srcs.slice(i, i + 8), res = await Promise.all(batch.map(s => load(s).catch(() => null)));
+    batch.forEach((s, k) => { if (res[k]) got.set(s, { ...res[k], loc: MHT_BASE + 'img' + got.size + '.' + res[k].ext }); });
+  }
+  // الأبعاد صريحة (width/height): Word يتجاهل max-width و width:auto فتخرج الصورة أكبر من الصفحة
+  const MAXW = 640; // ≈ 480pt، داخل عرض صفحة A4 بهوامشها
+  html = html.replace(/<img\b[^>]*>/gi, tag => {
+    const sm = tag.match(/\ssrc\s*=\s*(["'])([\s\S]*?)\1/i), im = sm && got.get(sm[2]);
+    if (!im) return tag;
+    const st = (tag.match(/\sstyle\s*=\s*"([^"]*)"/i) || [])[1] || '';
+    const num = re => { const x = tag.match(re) || st.match(re); return x ? +x[1] : 0; };
+    let w = num(/(?:^|[\s;])width\s*:\s*(\d+(?:\.\d+)?)px/i) || num(/\swidth\s*=\s*["']?(\d+)/i);
+    let h = num(/(?:^|[\s;])height\s*:\s*(\d+(?:\.\d+)?)px/i) || num(/\sheight\s*=\s*["']?(\d+)/i);
+    if (im.w && im.h) {
+      if (w && !h) h = w * im.h / im.w; else if (h && !w) w = h * im.w / im.h; else if (!w && !h) { w = Math.min(im.w, MAXW); h = w * im.h / im.w; }
+      if (w > MAXW) { h = h * MAXW / w; w = MAXW; }
+    }
+    const st2 = st.replace(/(?:^|;)\s*(?:max-|min-)?(?:width|height)\s*:[^;]*/gi, '').replace(/^;+/, '');
+    let t = tag.replace(/\s(?:width|height|style)\s*=\s*(["'])[\s\S]*?\1/gi, '').replace(/\s(?:width|height)\s*=\s*\d+/gi, '')
+      .replace(sm[0], ' src="' + im.loc + '"');
+    if (w && h) t = t.replace(/^<img/i, `<img width="${Math.round(w)}" height="${Math.round(h)}" style="${st2 ? st2 + ';' : ''}width:${Math.round(w)}px;height:${Math.round(h)}px"`);
+    else if (st2) t = t.replace(/^<img/i, `<img style="${st2}"`);
+    return t;
+  });
+  // جزء HTML بترميز quoted-printable (كما يحفظه Word نفسه). نحوّل الحروف غير اللاتينية إلى
+  // كيانات رقمية (&#1575;) فيصبح النص ASCII خالصًا ولا يتأثّر بأي ترميز.
+  const ascii = html.replace(/[^\x00-\x7f]/gu, c => '&#' + c.codePointAt(0) + ';');
+  const qp = ascii.replace(/\r\n?/g, '\n').split('\n').map(l => {
+    const ch = l.replace(/=/g, '=3D').replace(/[ \t]$/, c => c === ' ' ? '=20' : '=09').match(/=3D|=20|=09|[\s\S]/g) || [];
+    const out = []; let cur = '';
+    for (const c of ch) { if (cur.length + c.length > 75) { out.push(cur + '='); cur = ''; } cur += c; }
+    out.push(cur); return out.join('\r\n');
+  }).join('\r\n');
+  const B = '----=_NextPart_Kabsula_' + rand(8), wrap = s => s.replace(/.{76}/g, '$&\r\n');
+  let mht = `MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="${B}"; type="text/html"\r\n\r\nThis is a multi-part message in MIME format.\r\n\r\n` +
+    `--${B}\r\nContent-Location: ${MHT_BASE}doc.htm\r\nContent-Transfer-Encoding: quoted-printable\r\nContent-Type: text/html; charset="us-ascii"\r\n\r\n${qp}\r\n\r\n`;
+  for (const im of got.values()) mht += `--${B}\r\nContent-Location: ${im.loc}\r\nContent-Transfer-Encoding: base64\r\nContent-Type: ${im.type}\r\n\r\n${wrap(im.data)}\r\n\r\n`;
+  return mht + `--${B}--\r\n`;
+}
 // رابط غير قابل للتخمين وصالح 6 ساعات: يعمل في التطبيق والمتصفح الخارجي بدون تسجيل دخول
 async function exportFile(req, env, id) {
   const r = await env.DB.prepare('SELECT * FROM exports WHERE id = ?').bind(id).first();
   if (!r || r.created_at < now() - 6 * 3600000) return new Response('انتهت صلاحية الرابط. ارجع للموقع واضغط الزر مرة أخرى.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   const ua = req.headers.get('User-Agent') || '', fname = encodeURIComponent(r.name + (r.format === 'doc' ? '.doc' : '.html'));
   const disp = (inline) => (inline ? 'inline' : 'attachment') + `; filename="${r.format === 'doc' ? 'tahdir.doc' : 'tahdir.html'}"; filename*=UTF-8''${fname}`;
-  if (r.format === 'doc') return new Response('\ufeff' + r.body, { headers: { 'Content-Type': 'application/msword; charset=utf-8', 'Content-Disposition': disp(false), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+  if (r.format === 'doc') return new Response(await wordMht(env, r.body, new URL(req.url).origin), { headers: { 'Content-Type': 'application/msword', 'Content-Disposition': disp(false), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
   // صفحة الطباعة: داخل التطبيق نُرجعها كتحميل فيفتحها أندرويد في Chrome حيث تعمل الطباعة وحفظ PDF
   const nonce = rand(16), inApp = /TahdirApp/.test(ua);
   const page = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + r.name.replace(/</g, '') + '</title>' +
