@@ -1049,3 +1049,69 @@ function appShell(){
   window.addEventListener('scroll',function(){top.classList.toggle('sh',window.scrollY>4);},{passive:true});
 }
 if(IN_APP){try{appShell();}catch(e){}}
+
+// ---------- أرقام الأشكال والجداول في صور أسئلة الاختبارات النهائية ----------
+// السؤال المأخوذ من امتحان نهائي يحمل في صورته رقمه الأصلي داخل اسم الشكل («الشكل ٦-١»).
+// حين يأخذ السؤال رقمًا آخر في ورقة المعلم (٣ مثلًا) نرسم الرقم الجديد مكان القديم
+// فيصبح «الشكل ٣-١». مواضع الأرقام (lb) تُحسب مسبقًا بـ site/tools/fin_labels.py.
+// رقم السؤال المطبوع في أول الصورة («٦)») يُبيَّض عند النشر (fin_qno.py).
+var FIN_FIX={},FIN_LB={},FIN_FONT='"Traditional Arabic","Simplified Arabic","Times New Roman","Noto Naskh Arabic",serif';
+function finDigits(n,e){return String(n).replace(/\d/g,function(d){return e?String.fromCharCode(0x660+ +d):d;});}
+function finNeedsFix(it,n){return !!(it&&it.img&&it.lb&&it.lb.length&&it.srcno&&String(it.srcno)!==String(n));}
+// يعيد src المناسب الآن + سمة data-fx لتُستبدل الصورة حين يجهز الرسم
+function finImgAttr(it,n,base){
+  var u=(base||'')+'/fin/'+esc(it.img);
+  if(!finNeedsFix(it,n))return 'src="'+u+'"';
+  var k=it.img+'|'+n;FIN_LB[it.img]=it.lb;
+  return 'src="'+(FIN_FIX[k]||u)+'" data-fx="'+esc(k)+'"';
+}
+function finRelabel(s,old,n){ // «الشكل 6-1» في النصوص (نموذج الإجابة/نص السؤال)
+  if(!old||String(old)===String(n))return s;
+  return String(s||'').replace(/((?:شكل|جدول)\s*\(?\s*)(\d+)(\s*[-–]\s*)(\d+)/g,function(m,a,x,dsh,y){
+    if(x===String(old))return a+n+dsh+y;if(y===String(old))return a+x+dsh+n;return m;});
+}
+function finMake(k){
+  if(FIN_FIX[k])return Promise.resolve(FIN_FIX[k]);
+  var i=k.lastIndexOf('|'),img=k.slice(0,i),n=k.slice(i+1),lb=FIN_LB[img];
+  if(!lb)return Promise.resolve(null);
+  return new Promise(function(res){
+    var im=new Image();
+    im.onload=function(){
+      try{
+        var c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;
+        var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);
+        lb.forEach(function(b){
+          var bx=b[0],by=b[1],bw=b[2],bh=b[3],e=b[4],bold=b[5],anchor=b[6],t=finDigits(n,e);
+          var f=function(px){return (bold?'bold ':'')+px+'px '+FIN_FONT;};
+          x.textAlign='left';try{x.direction='ltr';}catch(_){}x.font=f(100);var m=x.measureText(t),hh=(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent)||70;
+          var px=Math.max(6,100*bh/hh);x.font=f(px);m=x.measureText(t);
+          var tw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)||m.width;
+          // الرقم الأطول (١٢ بدل ٦) يمتد في المسافة المجاورة دون أن يلمس الكلمة التالية
+          var free=0,d=x.getImageData(0,by,c.width,bh).data,col=function(cx){for(var r=0;r<bh;r++){var o=(r*c.width+cx)*4;if(d[o]<170)return true;}return false;};
+          for(var cx=anchor==='l'?bx+bw+1:bx-2;cx>=0&&cx<c.width&&free<60&&!col(cx);cx+=anchor==='l'?1:-1)free++;
+          var avail=bw+Math.max(0,free-Math.max(3,bh*0.3)),sx=tw>avail?avail/tw:1,w2=tw*sx;
+          var dx=anchor==='l'?bx:bx+bw-w2;
+          x.fillStyle='#fff';x.fillRect(Math.min(bx,dx)-1,by-1,Math.max(bx+bw,dx+w2)-Math.min(bx,dx)+2,bh+2);
+          x.fillStyle='#000';x.textBaseline='alphabetic';x.textAlign='left';try{x.direction='ltr';}catch(_){}
+          x.save();x.translate(dx,by+bh-(m.actualBoundingBoxDescent||0));x.scale(sx,1);x.fillText(t,m.actualBoundingBoxLeft||0,0);x.restore();
+        });
+        FIN_FIX[k]=c.toDataURL('image/png');res(FIN_FIX[k]);
+      }catch(err){res(null);}
+    };
+    im.onerror=function(){res(null);};
+    im.src=location.origin+'/fin/'+img;
+  });
+}
+// يستبدل صور الصفحة المعروضة حين يجهز رسمها
+function finPatch(root){
+  Array.prototype.forEach.call((root||document).querySelectorAll('img[data-fx]'),function(el){
+    var k=el.getAttribute('data-fx');if(FIN_FIX[k]&&el.src===FIN_FIX[k])return;
+    finMake(k).then(function(u){if(u&&el.getAttribute('data-fx')===k)el.src=u;});
+  });
+}
+// للطباعة وملف Word: يبني الـ HTML، ويجهّز كل الصور المعدّلة، ثم يبنيه من جديد بها
+function finReady(build){
+  var h=build(),ks={};h.replace(/data-fx="([^"]+)"/g,function(m,k){ks[k.replace(/&amp;/g,'&')]=1;});
+  var L=Object.keys(ks);if(!L.length)return Promise.resolve(h);
+  return Promise.all(L.map(finMake)).then(function(){return build();});
+}

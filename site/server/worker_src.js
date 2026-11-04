@@ -71,7 +71,8 @@ function normAO(raw, hi, m) {
   return (hi ? AO_HI : AO_LO)[top];
 }
 // نص سؤال الوزارة يبدأ برقمه الأصلي («2) ...»). الواجهة ترقّم الاختبار من جديد،
-// فنُزيل الرقم هنا حتى لا يظهر مرتين. الصورة تحتفظ بالرقم الأصلي كما في الورقة.
+// فنُزيل الرقم هنا حتى لا يظهر مرتين. وفي الصورة يُبيَّض الرقم عند النشر (fin_qno.py)،
+// وتُرسم أرقام الأشكال («الشكل ٦-١») بالرقم الجديد في المتصفح (lb، انظر finMake في common.js).
 function stripQNo(t) {
   return String(t || '').replace(/^\s*\(?\s*\d{1,2}\s*[\)\u002e\-]\s*/, '').trim();
 }
@@ -99,7 +100,7 @@ function finQuizItems(key) {
     else if (lr.includes(m) && ao !== 'معرفة' && ao !== 'AO1') type = 'long';
     else continue;
     const pa = G.papers[q.p] || {};
-    out.push({ qid: 'f' + q.id, lesson_id: q.l, type, stem: stripQNo(q.x), img: q.im, iw: q.w, ih: q.h, srcno: String(q.n || ''), src: 'امتحان الوزارة ' + (pa.year || '') + (pa.session ? ' - ' + pa.session : ''),
+    out.push({ qid: 'f' + q.id, lesson_id: q.l, type, stem: stripQNo(q.x), img: q.im, iw: q.w, ih: q.h, srcno: String(q.n || ''), lb: q.lb || undefined, src: 'امتحان الوزارة ' + (pa.year || '') + (pa.session ? ' - ' + pa.session : ''),
       answer: q.a || '', fig: !!q.fig, choices: Array.isArray(q.ch) ? q.ch : [], correct: (typeof q.cor === 'number' ? q.cor : 0), marks: m, ao, difficulty: '', outcome: q.c || '', notes: '' });
   }
   return out;

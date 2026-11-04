@@ -284,8 +284,15 @@ function headerHtml(d,key,word){
 }
 function sumMarks(items){return items.reduce(function(s,x){return s+(+x.marks||0);},0);}
 function hwTotal(d){return sumMarks(d.items)+(d.hwDiscuss||0);}
+// الاختبارات المحفوظة قبل إضافة مواضع أرقام الأشكال: نأخذها من بنك الأسئلة الحالي
+function withLb(it){
+  if(it&&it.img&&!it.lb&&bank&&bank.items){for(var j=0;j<bank.items.length;j++){var b=bank.items[j];if(b.img===it.img){if(b.lb)it.lb=b.lb;if(!it.srcno&&b.srcno)it.srcno=b.srcno;break;}}}
+  return it;
+}
 function itemHtml(it,n,tno,word,ctrl){
+  withLb(it);
   var stem=it.table?relabel(it.stem,tno):it.stem;
+  stem=finRelabel(stem,it.srcno,n);
   // أساس الأمان للطباعة: الرقم لا ينفصل عن سؤال. يُرفع للطباعة عبر #printArea،
   // ولأن .qi عنصر واحد فلا يتقسّم على صفحتين (page-break-inside:avoid في CSS).
   var h='<div class="qi" data-i="'+(n-1)+'" style="margin:0 0 '+(word?'10pt':'16px')+';page-break-inside:avoid;break-inside:avoid">';
@@ -299,7 +306,7 @@ function itemHtml(it,n,tno,word,ctrl){
     // سؤاله. ونمنع انقسام السؤال على صفحتين فلا يبقى الرقم وحده أسفل الورقة.
     h+='<div style="page-break-inside:avoid;break-inside:avoid">'+
       '<p style="margin:0;line-height:1"><b>'+n+')</b></p>'+
-      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="display:block;max-width:100%;vertical-align:top;'+(W?'width:'+W+'px;':'')+'margin:0 auto"></div>';
+      '<img '+finImgAttr(it,n,location.origin)+' alt="" style="display:block;max-width:100%;vertical-align:top;'+(W?'width:'+W+'px;':'')+'margin:0 auto"></div>';
     return h+'</div>';
   }
   h+='<p style="margin:0 0 4px"><b>'+n+')</b> '+rich(stem)+'</p>';
@@ -308,7 +315,7 @@ function itemHtml(it,n,tno,word,ctrl){
   if(it.img){
     var W2=word?Math.min(520,it.iw||520):0;
     h+='<div style="page-break-inside:avoid;break-inside:avoid;text-align:center;margin:6px 0 8px">'+
-      '<img src="'+location.origin+'/fin/'+esc(it.img)+'" alt="" style="max-width:100%;'+(W2?'width:'+W2+'px;':'')+'"></div>';
+      '<img '+finImgAttr(it,n,location.origin)+' alt="" style="max-width:100%;'+(W2?'width:'+W2+'px;':'')+'"></div>';
   }
   if(it.table&&it.table.rows){
     h+='<table class="qt" style="border-collapse:collapse;margin:6px auto 6px;min-width:55%">'+(it.table.caption?'<caption style="font-weight:bold;padding:2px">'+esc(relabel(it.table.caption,tno))+'</caption>':'');
@@ -350,8 +357,9 @@ function keyHtml(d,word){
   h+='<table class="keyt" style="width:100%;border-collapse:collapse"><thead><tr>'+th('المفردة')+th('الإجابة')+th('الدرجة')+(hi?th('المعلومات الإضافية')+th('الوحدة'):'')+th('هدف التعلم')+th('هدف التقويم')+(hi?th('مستوى الصعوبة'):'')+'</tr></thead><tbody>';
   d.items.forEach(function(it,i){
     if(it.table)tno++;
-    var ans=(it.type==='mcq'&&!it.img)?rich((it.choices||[])[it.correct]||''):rich(it.table?relabel(it.answer,tno):it.answer);
-    var notes=it.notes?rich(it.table?relabel(it.notes,tno):it.notes):'';
+    withLb(it);
+    var ans=(it.type==='mcq'&&!it.img)?rich(finRelabel((it.choices||[])[it.correct]||'',it.srcno,i+1)):rich(finRelabel(it.table?relabel(it.answer,tno):it.answer,it.srcno,i+1));
+    var notes=it.notes?rich(finRelabel(it.table?relabel(it.notes,tno):it.notes,it.srcno,i+1)):'';
     if(!hi&&notes)ans+='<div style="font-size:.85em;color:#444">'+notes+'</div>';
     var L=lessonOf(it);
     h+='<tr>'+td(i+1,'center')+td(ans)+td(it.marks,'center')+(hi?td(notes)+td(esc(L.unit||''),'center'):'')+td(esc(it.outcome||''),'center')+td(esc(it.ao||''),'center')+(hi?td(esc(it.difficulty||''),'center'):'')+'</tr>';
@@ -616,7 +624,7 @@ function renderDoc(){
     '<div class="checks no-print '+(allOk?'ok':'warn')+'"><b>'+(doc.kind==='review'?'المراجعة':(doc.kind==='homework'?(allOk?'✓ مطابق لمواصفات الواجب المنزلي في وثيقة التقويم':'⚠ راجع النقاط المعلّمة'):(allOk?'✓ مطابق لمواصفات الاختبار القصير في وثيقة التقويم':'⚠ راجع النقاط المعلّمة')))+'</b><ul>'+ck.map(function(c){return '<li class="'+(c[0]?'y':'n')+'">'+(c[0]?'✓':'⚠')+' '+esc(c[1])+'</li>';}).join('')+'</ul></div>'+
     '<div class="ptabs no-print" role="tablist"><button type="button" class="ltab'+(paperView==='quiz'?' on':'')+'" data-pv="quiz">ورقة '+(doc.kind==='review'?'المراجعة':doc.kind==='homework'?'الواجب':'الاختبار')+'</button><button type="button" class="ltab'+(paperView==='key'?' on':'')+'" data-pv="key">نموذج الإجابة</button></div>'+
     '<div class="paper" id="paper">'+(paperView==='quiz'?quizHtml(doc,false,true):keyHtml(doc,false))+'</div>';
-  $('qmain').innerHTML=h;
+  $('qmain').innerHTML=h;finPatch($('qmain'));
   Array.prototype.forEach.call(document.querySelectorAll('[data-meta]'),function(el){var it=doc.items[+el.getAttribute('data-meta')],L=lessonOf(it);el.textContent=TYPE_TXT[it.type]+' · '+(AO_TXT[it.ao]||it.ao||'')+' · '+(it.difficulty||'')+' · '+it.marks+' درجة'+(L.title?' · '+L.title:'');});
   Array.prototype.forEach.call(document.querySelectorAll('[data-pv]'),function(b){b.onclick=function(){paperView=b.getAttribute('data-pv');renderDoc();};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-act]'),function(b){b.onclick=function(){itemAct(b.getAttribute('data-act'),+b.getAttribute('data-i'));};});
@@ -717,24 +725,27 @@ function printDoc(){
     if(!p)return;
     track('quiz_print',p,titleText(doc));
     if(!IN_APP&&!MOBILE){ // الكمبيوتر: طباعة مباشرة من الصفحة
-      var a=$('printArea');a.innerHTML=(p!=='key'?'<div class="ppage">'+quizHtml(doc,false,false)+'</div>':'')+(p!=='quiz'?'<div class="ppage">'+keyHtml(doc,false)+'</div>':'');
-      doPrint(fileName());
+      finReady(function(){return (p!=='key'?'<div class="ppage">'+quizHtml(doc,false,false)+'</div>':'')+(p!=='quiz'?'<div class="ppage">'+keyHtml(doc,false)+'</div>':'');}).then(function(h){
+        $('printArea').innerHTML=h;doPrint(fileName());
+      });
       return;
     }
     // الموبايل والتطبيق: صفحة طباعة مستقلة (في التطبيق تُفتح في Chrome)
     var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}
-    serverFile('print',partsHtml(p,false),w).then(function(){if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');});
+    finReady(function(){return partsHtml(p,false);}).then(function(h){return serverFile('print',h,w);}).then(function(){if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');});
   });
 }
 function wordDoc(){
   chooseParts('تحميل ملف Word').then(function(p){
     if(!p)return;
+    finReady(function(){return partsHtml(p,true);}).then(function(body){
     var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(titleText(doc))+'</title>'+
       '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
       '<style>@page WordSection1{size:595.3pt 841.9pt;margin:36pt 40pt 36pt 40pt}div.WordSection1{page:WordSection1}body{font-family:"Simplified Arabic","Traditional Arabic",Arial;font-size:13pt;direction:rtl}p{margin:0 0 4pt}table{direction:rtl}.oval{display:inline-block;width:16pt;height:9pt;border:1pt solid #000;border-radius:5pt}</style></head>'+
-      '<body dir="rtl" lang="AR-OM"><div class="WordSection1" dir="rtl">'+partsHtml(p,true)+'</div></body></html>';
+      '<body dir="rtl" lang="AR-OM"><div class="WordSection1" dir="rtl">'+body+'</div></body></html>';
     track('quiz_word',p,titleText(doc));
     serverFile('doc',html,null).then(function(){toast(IN_APP?'يُحمَّل ملف Word عبر المتصفح، ستجده في «التنزيلات»':'تم تحميل ملف Word');});
+    });
   });
 }
 function saveDoc(){

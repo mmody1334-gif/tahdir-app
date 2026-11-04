@@ -80,8 +80,8 @@ function printHtml(qs,title,abs){
   var H=schoolHdr(),tot=qs.reduce(function(s,q){return s+(+q.m||0);},0);
   var box='<table style="border-collapse:collapse;margin:0 auto"><tr><td style="border:1.5px solid #000;width:64px;height:28px"></td></tr><tr><td style="border:1.5px solid #000;width:64px;height:28px;text-align:center;font-weight:bold">'+tot+'</td></tr></table>';
   return '<div class="ppage pg">'+OFFICIAL_HEAD({dir:H.dir,school:H.school,title:title+' — '+course.subject+' للصف '+gLabel(course.grade),line2:'الفصل الدراسي: '+H.term+' - العام الدراسي: '+H.year+'م',student:true,box:box})+
-    qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img src="'+O+'/fin/'+esc(q.im)+'" style="max-width:100%"></div>';}).join('')+'</div>'+
-    (showAns?'<div class="ppage pg"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+supify(esc(q.a)).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
+    qs.map(function(q,i){return '<div class="fin-pq"><div class="fin-pn">'+(i+1)+') <small>['+esc(srcLabel(q))+' · س'+esc(q.n)+' · '+esc(q.m)+' د]</small></div><img '+finImgAttr({img:q.im,lb:q.lb,srcno:q.n},i+1,O)+' style="max-width:100%"></div>';}).join('')+'</div>'+
+    (showAns?'<div class="ppage pg"><h2 style="text-align:center">الإجابات</h2>'+qs.map(function(q,i){return '<p><b>'+(i+1)+')</b> '+supify(esc(finRelabel(q.a,q.n,i+1))).replace(/\n/g,'<br>')+'</p>';}).join('')+'</div>':'');
 }
 function printQs(qs,title){
   if(!qs.length)return;
@@ -89,18 +89,20 @@ function printQs(qs,title){
   if(IN_APP||MOBILE){ // التطبيق والموبايل: صفحة طباعة مستقلة تُفتح في المتصفح
     var w=null;if(!IN_APP){try{w=window.open('','_blank');}catch(e){w=null;}}
     toast('جارٍ التجهيز…');
-    api('/api/export',{format:'print',name:finName(title),html:printHtml(qs,title,true)}).then(function(r){
+    finReady(function(){return printHtml(qs,title,true);}).then(function(h){return api('/api/export',{format:'print',name:finName(title),html:h});}).then(function(r){
       if(w){try{w.location.href=r.url;return;}catch(e){}}
       var a=document.createElement('a');a.href=r.url;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},1000);
       if(IN_APP)toast('تُفتح صفحة الطباعة في المتصفح… اختر «حفظ PDF» أو الطابعة');
     },function(e){if(w)try{w.close();}catch(x){}toast(e.message);});
     return;
   }
-  var a=$('printArea');a.innerHTML=printHtml(qs,title,false);
+  finReady(function(){return printHtml(qs,title,false);}).then(function(h){
+  var a=$('printArea');a.innerHTML=h;
   var imgs=a.querySelectorAll('img'),left=imgs.length;
   function go(){doPrint(finName(title));}
   if(!left)return go();
   Array.prototype.forEach.call(imgs,function(im){if(im.complete){if(--left===0)go();}else im.onload=im.onerror=function(){if(--left===0)go();};});
+  });
 }
 function bindSide(){
   bindCoursePick(courses,'courseSel',selectCourse);
