@@ -179,8 +179,11 @@ def _bio_bank():
             if lid is None: raise SystemExit('bio_bank/%s: سطر قبل رقم الدرس: %s' % (fn, ln))
             k, _, v = ln.partition(':'); v = v.strip()
             hi = G[str(lid)] in ('الحادي عشر', 'الثاني عشر')
-            def aod(c):
+            def aod(c, mk=1, long=False):
                 ao, dif = _AO[c]
+                # الصفان 11-12: مستوى الصعوبة مستقل عن هدف التقويم — سؤال معرفة وفهم
+                # بثلاث درجات فأكثر (وصف/شرح/مقارنة من الكتاب) متوسط الصعوبة لا منخفض
+                if hi and c == 'ع' and (long or mk >= 3): dif = 'متوسطة'
                 return (('AO1' if c == 'ع' else 'AO2') if hi else ao), dif
             nl = lambda x: x.replace(' // ', '\n').strip()
             if k == 's': src = v; continue
@@ -201,7 +204,7 @@ def _bio_bank():
             elif k in ('w', 'l'):
                 head, _, rest = v.partition('|'); q, _, a = rest.partition('=>')
                 if not a.strip(): raise SystemExit('bio_bank/%s #%d: سؤال بلا إجابة: %s' % (fn, lid, v))
-                ao, dif = aod(head[0]); mk = int(head[1:] or (2 if k == 'w' else (4 if hi else 3)))
+                mk = int(head[1:] or (2 if k == 'w' else (4 if hi else 3))); ao, dif = aod(head[0], mk, k == 'l')
                 items.append({'lesson_id': lid, 'type': 'short' if k == 'w' else 'long', 'stem': nl(q), 'answer': '\n'.join(x.strip() for x in a.split(';;') if x.strip()),
                               'marks': mk, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': 'تُقبل أي إجابة تؤدي المعنى نفسه.', 'qid': qid, 'src': src})
             else: raise SystemExit('bio_bank/%s #%d: مفتاح غير معروف: %s' % (fn, lid, ln))
