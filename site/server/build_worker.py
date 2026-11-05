@@ -179,13 +179,17 @@ def _bio_bank():
             if lid is None: raise SystemExit('bio_bank/%s: سطر قبل رقم الدرس: %s' % (fn, ln))
             k, _, v = ln.partition(':'); v = v.strip()
             hi = G[str(lid)] in ('الحادي عشر', 'الثاني عشر')
-            def aod(c, mk=1, long=False):
-                ao, dif = _AO[c]
-                # الصفان 11-12 (وثيقة تقويم العلوم 9-12، ص 4-5): مستوى الصعوبة مستقل عن هدف التقويم.
-                # AO1: إجابة/تفسير بسيط = منخفضة · معرفة وفهم جيدان (وصف/مقارنة 3-4 درجات) = متوسطة
-                # · معرفة تفصيلية (شرح مفصّل 5 درجات) = مرتفعة
-                if hi and c == 'ع': dif = 'مرتفعة' if mk >= 5 else ('متوسطة' if (long or mk >= 3) else 'منخفضة')
+            LVL = {'ن': 'منخفضة', 'م': 'متوسطة', 'ر': 'مرتفعة'}
+            def aod(h, mk=1, long=False):
+                # h = رمز الهدف (ع/ط/س) ثم حرف مستوى الصعوبة اختياريًا (ن/م/ر).
+                # الصفان 11-12: المستوى مستقل عن الهدف ويُحدَّد لكل مفردة بأعلى عملية معرفية تتطلبها
+                # (وثيقة تقويم تعلم الطلبة في مواد العلوم 11-12، إصدار 2026/2027، ص 10-11).
+                c = h[0]; ao, dif = _AO[c]
+                if len(h) > 1 and h[1] in LVL: dif = LVL[h[1]]
                 return (('AO1' if c == 'ع' else 'AO2') if hi else ao), dif
+            def marks(h, d):
+                h = h[2:] if len(h) > 1 and h[1] in LVL else h[1:]
+                return int(h or d)
             nl = lambda x: x.replace(' // ', '\n').strip()
             if k == 's': src = v; continue
             if k == 'n': items[-1]['notes'] = v; continue
@@ -195,7 +199,7 @@ def _bio_bank():
             n += 1; qid = 'b%d_%d' % (lid, n)
             if k == 'm':
                 p = [x.strip() for x in v.split('|')]
-                ao, dif = aod(p[0][0]); ch = [x for x in p[2:] if x]
+                ao, dif = aod(p[0]); ch = [x for x in p[2:] if x]
                 if len(ch) < 3 or len(set(ch)) != len(ch): raise SystemExit('bio_bank/%s #%d: خيارات ناقصة/مكررة: %s' % (fn, lid, v))
                 h = int(hashlib.md5(p[1].encode('utf-8')).hexdigest(), 16)
                 order = sorted(range(len(ch)), key=lambda i: (h >> (i * 7)) % 997)
@@ -205,7 +209,7 @@ def _bio_bank():
             elif k in ('w', 'l'):
                 head, _, rest = v.partition('|'); q, _, a = rest.partition('=>')
                 if not a.strip(): raise SystemExit('bio_bank/%s #%d: سؤال بلا إجابة: %s' % (fn, lid, v))
-                mk = int(head[1:] or (2 if k == 'w' else (4 if hi else 3))); ao, dif = aod(head[0], mk, k == 'l')
+                mk = marks(head, 2 if k == 'w' else (4 if hi else 3)); ao, dif = aod(head, mk, k == 'l')
                 items.append({'lesson_id': lid, 'type': 'short' if k == 'w' else 'long', 'stem': nl(q), 'answer': '\n'.join(x.strip() for x in a.split(';;') if x.strip()),
                               'marks': mk, 'ao': ao, 'difficulty': dif, 'outcome': '', 'notes': 'تُقبل أي إجابة تؤدي المعنى نفسه.', 'qid': qid, 'src': src})
             else: raise SystemExit('bio_bank/%s #%d: مفتاح غير معروف: %s' % (fn, lid, ln))
