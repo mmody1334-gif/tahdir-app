@@ -145,21 +145,22 @@ function evoHtml(e) {
   const lvls = e.levels || [];
   const all = lvls.flatMap(l => l.upgrades || []);
   const ovr = all.find(u => u.upgrade === 'overall');
-  if (ovr) ups.push(`<span class="ovr">+${ovr.value} OVR</span>`);
+  if (ovr) ups.push(`<span class="ovr">+${ovr.maxValue} OVR</span>`);
   for (const u of all.filter(u => u.upgrade !== 'overall').slice(0, 14)) {
     const nm = u.upgrade.replace('attribute_', '').replace(/_/g, ' ').replace('sprint speed', 'سرعة').replace('def awareness', 'وعي دفاعي').replace('standing tackle', 'تبخيص').replace('sliding tackle', 'انزلاق').replace('short passing', 'تمرير قصير').replace('long passing', 'تمرير طويل').replace('ball control', 'استقبالكرة').replace('fk accuracy', 'منحنيات').replace('heading acc.', 'رأسية');
     ups.push(`<span>${nm} +${u.value}${u.maxValue ? '→' + u.maxValue : ''}</span>`);
   }
   const req = e.requirements || {};
   const reqBits = [];
-  if (req.minMaxOverall || req.maxOverall) reqBits.push(`OVR ${req.minOverall || 0}–${req.maxOverall ?? '∞'}`);
+  if (req.maxOverall) reqBits.push(`OVR ${req.minOverall || 0}–${req.maxOverall}`);
   if (Array.isArray(req.positions) && req.positions.length) reqBits.push(`مراكز: ${req.positions.length}`);
   const calc = e.repeatable && e.repeatable > 1 ? `<b>تكراري ×${e.repeatable}</b> · ` : '';
-  return `<div class="card evo" data-e="${e.slug}" data-closing="${cd(e).cls !== 'ended' && new Date(e.endSubmissionTime || e.endTime).getTime() - Date.now() < 86400000 * 3 ? 1 : 0}" data-cosmetic="${e.cosmetics || /cosmetic/i.test(e.description || '') ? 1 : 0}">
+  const closing = (new Date(e.endSubmissionTime || e.endTime).getTime() - Date.now()) < 86400000 * 3 ? 1 : 0;
+  return `<div class="card evo" data-e="${e.slug}" data-closing="${closing}" data-cosmetic="${e.cosmetics || /cosmetic/i.test(e.description || '') ? 1 : 0}">
     <div class="t">
       <h3><a href="${e.url}" target="_blank">${e.name}</a></h3>
       <div class="desc">${calc}${e.description || ''}</div>
-      <div class="cd">⏳ ${cd(e).txt} · تقديم قبل ${fmtDate(e.endSubmissionTime || e.endTime)}</div>
+      <div class="cd">⏳ ${cd.txt} · تقديم قبل ${fmtDate(e.endSubmissionTime || e.endTime)}</div>
       <div class="up">${ups.join('')}</div>
       <div class="summary-line">${reqBits.join(' · ')}${e.trainingTime ? ' · ' + e.trainingTime : ''}</div>
     </div>
@@ -172,8 +173,7 @@ function filterEvos() {
     let ok = !q || el.textContent.toLowerCase().includes(q);
     if (f === 'closing') ok = ok && el.dataset.closing === '1';
     if (f === 'cosmetic') ok = ok && el.dataset.cosmetic === '1';
-    if (f === 'big') ok = ok && /ovr">\\+\d{2}</.test(el.innerHTML.replace(/[+]/g, '+'));
-    if (f === 'open') ok = ok;
+    if (f === 'big') ok = ok && el.querySelector('.up .ovr')?.textContent.includes('+') && Number(el.querySelector('.up .ovr')?.textContent.match(/\+(\d+)/)?.[1] || 0) >= 5;
     el.hidden = !ok;
   }
 }
