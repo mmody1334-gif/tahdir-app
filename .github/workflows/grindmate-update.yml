@@ -1,0 +1,50 @@
+name: grindmate-update
+# GrindMate 27: يجيب الأوبجكتيف والتطورات والتسريبات من FUT.GG، يحفظ JSON،
+# يقرر commit ويبعث تنبيهات تليجرام (أوبجكتيف جديد / قرب ينتهي / تسريبات).
+on:
+  schedule:
+    - cron: "0 */4 * * *" # كل 4 ساعات
+  workflow_dispatch:
+    inputs:
+      run:
+        description: 'all | objectives | evolutions | market | leaks'
+        default: 'all'
+permissions:
+  contents: write
+concurrency: { group: grindmate-update, cancel-in-progress: false }
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.GRINDMATE_TG_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ vars.GRINDMATE_TG_CHAT }}
+    defaults:
+      run:
+        working-directory: grindmate27/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Update data
+        id: upd
+        run: node futgg.mjs "${{ inputs.run || 'all' }}"
+      - name: Commit data
+        id: cmt
+        run: |
+          git config user.name "grindmate-bot"
+          git config user.email "bot@grindmate.local"
+          git add ../data
+          if git diff --cached --quiet; then
+            echo "CHANGED=no" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "grindmate: تحديث بيانات $(date -u '+%Y-%m-%d %H:%M')"
+            git push
+            echo "CHANGED=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Send pending alerts (after push failure)
+        if: always()
+        run: |
+          if [ -f ../data/_pending_alerts.json ]; then
+            node futgg.mjs notify || true
+          fi

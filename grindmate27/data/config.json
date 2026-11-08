@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "telegram": {
+    "chatId": ""
+  },
+  "leaks": {
+    "accounts": ["FutSheriff", "FuttFocus", "FUTxGG", "FutArcade", "OfficialFUT"],
+    "nitterInstances": [
+      "https://nitter.poast.org",
+      "https://nitter.privacydev.net",
+      "https://nitter.tiekoetter.com",
+      "https://nitter.space"
+    ]
+  },
+  "objectives": {
+    "sitemapUrl": "https://www.fut.gg/sitemap-objectives.xml",
+    "groupUrlTemplate": "https://www.fut.gg/objectives/{cat}/{slug}/",
+    "maxNewDays": 8,
+    "maxGroupsPerRun": 14,
+    "expiringSoonHours": 24
+  },
+  "evolutions": {
+    "hubUrl": "https://www.fut.gg/evolutions/",
+    "expiringSoonHours": 48
+  },
+  "market": {
+    "watchlist": [
+      { "name": "RTTK Group Stage Reward example", "url": "" }
+    ]
+  }
+}
