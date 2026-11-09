@@ -1444,6 +1444,20 @@ export default {
         '/teqany/admin': 'admin', '/teqany/login': 'login', '/teqany/setup': 'setup',
       };
       if (p === '/teqany' || p === '/teqany/') return html('teqany');
+      if (p === '/teqany/initiatives' || p === '/teqany/initiatives/') {
+        if (env.ASSETS) {
+          const r = await env.ASSETS.fetch(new Request(new URL('/promo/hudhayfa_initiatives.html', url.origin)));
+          if (r.ok) {
+            const h = await r.text();
+            return new Response(h, {
+              headers: {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'no-cache'
+              }
+            });
+          }
+        }
+      }
       if (p === '/play') return html('play');
       if (/^\/s\/[A-Za-z0-9]{6}\/?$/.test(p) || p === '/s' || p === '/s/') return html('student');
       if (p.startsWith('/api/s/')) { const r = await studentApi(req, env, p, m, url); if (r) return r; }
