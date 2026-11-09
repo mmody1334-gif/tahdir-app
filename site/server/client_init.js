@@ -9,6 +9,26 @@ var isTeqany = location.pathname.indexOf('/teqany') >= 0 || location.hostname.in
 
 var FEATURED_TQ = [
   {
+    id: 'f_ain',
+    isFeatured: true,
+    cat: 'ai',
+    badge: 'ذكاء اصطناعي وابتكار',
+    title: 'مشروع «عَيْن حُذَيْفَة» الذَّكِيَّة',
+    sub: 'ابتكار ذكاء اصطناعي ونظارة بصرية-ليزرية لتمكين الصم والمكفوفين',
+    teacher: 'أ. محمد مجدي · معلم الأحياء | أ. أحمد النعيمي · معلم التقنية',
+    supervisor: 'د. بدري الكعبي · مدير المدرسة',
+    created_at: 1731155000000,
+    app_link: 'https://ain-app.ain-app.workers.dev/',
+    summary: 'منظومة ابتكارية وطنية متكاملة تجمع بين خوارزميات الذكاء الاصطناعي التوليدي، تقنيات الرؤية الحاسوبية (Computer Vision)، ونظارة ذكية بصرية-ليزرية متطورة لتمكين الطلبة الصم والمكفوفين. تدمج المنظومة: ترجمة فورية لإشارات اليد عبر تتبع 21 نقطة حساسة وتحويلها لنصوص وكلام منطوق، ورادار ليزري مع قارئ عملات نقدية عمانية ينبه الكفيف من العوائق ويقرأ فئات النقود بالصوت، إلى جانب بيئة تفاعلية ثلاثية الأبعاد 360° لتعلم لغة الإشارة.\n\n🌐 رابط التطبيق المباشر: https://ain-app.ain-app.workers.dev/',
+    goals: '• الدمج الأكاديمي والمجتمعي الشامل للطلبة الصم والمكفوفين داخل الفصول المدرسية والمختبرات.\n• كسر حاجز التواصل عبر ترجمة ثنائية فورية بين لغة الإشارة والكلام المنطوق بالذكاء الاصطناعي.\n• تمكين الطالب الكفيف من الاستقلالية التامة في الحركة وتفادي العوائق وقراءة العملات الورقية العمانية.\n• توفير بيئة تعليمية تفاعلية ومحاكي يد ثلاثي الأبعاد (360°) لتسهيل ممارسة وإتقان لغة الإشارة.\n• تكامل حقول العلوم وتقنية المعلومات في إنتاج ابتكارات ذكاء اصطناعي إنسانية تخدم المجتمع العماني.',
+    steps: '1. بناء وتطوير الواجهة السحابية التفاعلية على منصة Cloudflare Workers لضمان سرعة معالجة فائقة: https://ain-app.ain-app.workers.dev/\n2. تدريب وتطبيق نماذج الذكاء الاصطناعي لتتبع 21 مفصلاً ونقطة حرجة لليد (21 Landmarks AI Tracking) لترجمة إشارات الصم الفورية.\n3. تصميم وتجميع النموذج الأولي لـ «نظارة عين حذيفة» بمستشعرات مسافة ليزرية وبصرية مع تنبيهات صوتية واهتزازية ذكية.\n4. دمج خوارزمية التعرف البصري على الفئات النقدية العمانية الورقية وتحويل القيمة تلقائياً إلى نطق صوتي للكفيف.\n5. إطلاق وحدة «اسمع» لتحويل الكلام المباشر لإشارات بصرية ورصد أصوات الخطر وحالات الطوارئ المدرسية.\n6. إتاحة ميدان التحدي التفاعلي واليد ثلاثية الأبعاد 360° لممارسة وتدريب الطلاب على مفردات لغة الإشارة.\n7. التطبيق التجريبي الميداني في مدرسة حذيفة بن محصن (5-12) والتقييم المستمر تحت إشراف إدارة المدرسة.',
+    impact: '• تحقيق نسبة استقلالية ودمج صفي تصل إلى 100% للطلبة ذوي الإعاقة السمعية والبصرية.\n• سهولة التواصل الفوري المباشر بين المعلمين والطلاب الصم دون الحاجة لمترجم بشري متفرغ.\n• حماية وأمان الطلبة المكفوفين أثناء التنقل في الممرات والمرافق المدرسية بفضل الرادار الليزري الذكي.\n• تمثيل مشرف لمدرسة حذيفة بن محصن في مسابقات الابتكار العلمي وحاضنات الذكاء الاصطناعي بسلطنة عُمان.',
+    files: [
+      { id: 'f_p5', name: 'الملصق الرسمي لمشروع عين حذيفة الذكية', src: '/promo/ain_hudhaifa_poster.jpg', mime: 'image/jpeg', size: 463793 },
+      { id: 'f_link_ain', name: 'رابط منظومة عين حذيفة الذكية السحابية', src: 'https://ain-app.ain-app.workers.dev/', mime: 'text/html', size: 0 }
+    ]
+  },
+  {
     id: 'f_teqany',
     isFeatured: true,
     cat: 'teqany',
@@ -133,6 +153,7 @@ function render(){
   if (isTeqany) {
     h += '<div class="in-tabs" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px">' +
       '<button type="button" class="btn small' + (!CAT || CAT === 'all' ? ' primary' : ' ghost') + '" data-cat="all">🌟 كل المبادرات (' + listCount('all') + ')</button>' +
+      '<button type="button" class="btn small' + (CAT === 'ai' ? ' primary' : ' ghost') + '" data-cat="ai">🤖 الذكاء الاصطناعي والتقنية</button>' +
       '<button type="button" class="btn small' + (CAT === 'teqany' ? ' primary' : ' ghost') + '" data-cat="teqany">⚡ تقني حذيفة</button>' +
       '<button type="button" class="btn small' + (CAT === 'bio' ? ' primary' : ' ghost') + '" data-cat="bio">🔬 الأحياء والعلوم</button>' +
       '<button type="button" class="btn small' + (CAT === 'talent' ? ' primary' : ' ghost') + '" data-cat="talent">🎭 المواهب والإبداع</button>' +
@@ -222,6 +243,13 @@ function card(it){
     h += '<div style="padding:8px 12px;background:#182824;color:#fff;font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:6px">🎬 <span>برومو تقني حذيفة الترويجي</span></div>';
     h += '<video controls playsinline preload="metadata" src="' + it.video + '" poster="/promo/teqany_poster.jpg" style="width:100%;max-height:420px;display:block"></video>';
     h += '</div>';
+  }
+
+  if (it.app_link) {
+    h += '<div style="margin:12px 0 16px;padding:12px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+      + '<div><b style="color:#0369a1;display:block">🌐 رابط المنظومة والتطبيق السحابي المباشر:</b><span style="font-size:.86rem;color:#0284c7" dir="ltr">' + esc(it.app_link) + '</span></div>'
+      + '<a href="' + esc(it.app_link) + '" target="_blank" rel="noopener" class="btn small" style="background:#0284c7;color:#fff;font-weight:700;text-decoration:none;border-radius:6px;padding:6px 16px">دخول المنظومة ↗</a>'
+      + '</div>';
   }
 
   if (it.summary) h += '<section style="margin-top:10px"><h4 style="margin:0 0 4px;font-size:.95rem;color:var(--brand,#0e7c66)">نبذة عن المبادرة</h4><p style="margin:0;line-height:1.7">' + nl(it.summary) + '</p></section>';
