@@ -27,7 +27,7 @@ def content_box(a):
     # الترويسة: خط أفقي أسود قرب الأعلى
     dark = (a[:int(H*0.08), x0:x1] < 110).mean(1)
     ln = np.where(dark > 0.5)[0]
-    y0 = ln.max() + 4 if len(ln) else int(H*0.035)
+    y0 = ln[ln <= ln.min() + 6].max() + 4 if len(ln) else int(H*0.035)
     return x0, y0, x1, y1
 def find_q(p):
     ws = p.get_text('words'); out = []; marks = []
