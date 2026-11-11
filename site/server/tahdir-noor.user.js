@@ -95,7 +95,7 @@
     }catch(e){}
   })();
   const VERSION = '3.4.9';
-  const MIN_REQUIRED = '3.1.0'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
+  const MIN_REQUIRED = '3.5.2'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
   const uw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;

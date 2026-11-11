@@ -577,9 +577,18 @@ function toolUpdateNote(){
     .then(function(r){if(r)window.open(TOOL_URL,'_blank');});
 }
 // نُبقي مراقبة الإصدار لتحديث زر «أداة نور» في الشريط، والإعلان يتولّى التنبيه للمعلم.
+// تحديث إجباري: لو الأداة المثبتة أقدم من MIN_REQUIRED تظهر نافذة التحديث في كل صفحة حتى يحدّثها المعلم
+function toolForceNote(){
+  if(IN_APP)return;
+  var v=toolVersion();if(!v||verCmp(v,TOOL_FORCE)>=0)return;
+  var ov=$('modal');if(ov&&(!ov.hidden||ov.classList.contains('locked')))return;
+  dialog({title:'تحديث «أداة نور» إلزامي',html:'<p class="m-msg">عندك الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_FORCE)+'</b> على الأقل لتعمل الأداة مع الموقع بشكل صحيح.</p><ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط «حدّث الآن»؛ تُفتح صفحة Tampermonkey.</li><li>اضغط <b>«تحديث» (Update)</b> فيها.</li><li>ارجع هنا وحدّث الصفحة.</li></ol>',okText:'حدّث الآن',cancelText:false})
+    .then(function(r){if(r===null)return;window.open(TOOL_URL,'_blank');
+      dialog({title:'بعد التحديث',message:'بعد الضغط على «تحديث» في صفحة Tampermonkey، اضغط «تم» لإعادة تحميل الصفحة.',okText:'تم',cancelText:false}).then(function(){location.reload();});});
+}
 function watchTool(){
   if(IN_APP)return;
-  setTimeout(function(){var ov=$('modal');if(!ov||ov.hidden)extUpdateNote();},3000);
+  setTimeout(function(){var ov=$('modal');if(toolVersion()&&verCmp(toolVersion(),TOOL_FORCE)<0)toolForceNote();else if(!ov||ov.hidden)extUpdateNote();},3000);
   var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
   setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},2500);
 }
