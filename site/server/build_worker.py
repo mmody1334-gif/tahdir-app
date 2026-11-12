@@ -1679,6 +1679,172 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
 }
 @keyframes abSheet{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes abIn{from{opacity:0}to{opacity:1}}
+/* ---------- ساحة التحدي (arena) ---------- */
+.ar-wrap{max-width:1040px;margin:18px auto;padding:0 16px}
+.ar-top-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:8px 14px;box-shadow:var(--shadow)}
+.ar-user-info{display:flex;align-items:center;gap:10px}
+.ar-av-badge{font-size:1.6rem;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.ar-wallet-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-l,#fbf0db);border:1px solid #e8cd9b;color:#7a4f07;border-radius:20px;padding:4px 12px;font-size:.92rem}
+.ar-top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ar-notice-strip{background:var(--main-l);border:1px solid #b7dfd2;color:var(--main-d);border-radius:12px;padding:8px 14px;margin-bottom:16px;font-size:.88rem;display:flex;align-items:center;gap:8px}
+.ar-setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:800px){.ar-setup-grid{grid-template-columns:1fr}}
+.ar-setup-card{padding:18px}
+.ar-step-h{font-size:1.15rem;margin:0 0 14px;display:flex;align-items:center;gap:8px;color:var(--main-d)}
+.ar-step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--main);color:#fff;font-size:.85rem;font-weight:700}
+.ar-field{margin-bottom:14px}
+.ar-field label{display:block;margin-bottom:6px;font-size:.9rem}
+.ar-select{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-family:inherit;font-size:.95rem}
+.ar-units-box{max-height:380px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg)}
+.ar-unit-block{margin-bottom:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ar-unit-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.ar-lessons-list{display:grid;gap:6px}
+.ar-lesson-item{display:flex;align-items:center;gap:8px;font-size:.88rem;padding:6px 8px;border-radius:6px;cursor:pointer;min-height:36px}
+.ar-lesson-item:hover{background:var(--main-l)}
+.ar-lesson-item.disabled{opacity:.5;cursor:not-allowed}
+.ar-q-tag{margin-inline-start:auto;font-size:.78rem;background:var(--main-l);color:var(--main-d);padding:2px 6px;border-radius:6px}
+.ar-q-tag.muted{background:var(--line);color:var(--mute)}
+.ar-modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:500px){.ar-modes-grid{grid-template-columns:1fr}}
+.ar-mode-opt{display:flex;flex-direction:column;gap:4px;padding:12px;border:2px solid var(--line);border-radius:12px;cursor:pointer;background:var(--paper);transition:border-color .15s,box-shadow .15s;position:relative}
+.ar-mode-opt input{position:absolute;opacity:0;pointer-events:none}
+.ar-mode-opt.active{border-color:var(--main);background:var(--main-l);box-shadow:0 0 0 2px rgba(31,138,112,.2)}
+.ar-mode-ic{font-size:1.8rem}
+.ar-mode-opt b{font-size:1rem;color:var(--ink)}
+.ar-mode-opt small{font-size:.8rem;color:var(--mute);line-height:1.3}
+.ar-settings-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:500px){.ar-settings-row{grid-template-columns:1fr}}
+.ar-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ar-launch-box{margin-top:16px;text-align:center}
+.ar-avail-hint{font-size:.88rem;color:var(--mute);margin-bottom:10px}
+.ar-start-btn{min-height:48px;font-size:1.05rem;font-weight:700}
+.ar-game-bar{margin-bottom:14px}
+.ar-progress-wrap{width:100%;height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.ar-progress-fill{height:100%;background:linear-gradient(90deg,var(--main),var(--leaf));transition:width .2s ease}
+.ar-game-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.9rem}
+.ar-lesson-badge{background:var(--main-l);color:var(--main-d);padding:4px 10px;border-radius:12px;font-size:.82rem}
+.ar-score-badge{color:var(--accent);font-weight:700}
+.ar-mode-bar{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.9rem}
+.ar-rep-wrap,.ar-tower-hp-bar{display:inline-flex;align-items:center;gap:6px}
+.ar-rep-bar,.ar-tower-hp-bar{width:120px;height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.ar-rep-fill,.ar-tower-hp-fill{height:100%;transition:width .25s ease}
+.ar-question-card{padding:22px;margin-bottom:16px}
+.ar-stem{font-size:1.25rem;font-weight:700;line-height:1.5;margin-bottom:20px;color:var(--ink)}
+.ar-choices-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.ar-choices-grid{grid-template-columns:1fr}}
+.ar-choice-btn{display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:1.05rem;text-align:right;cursor:pointer;transition:transform .1s,border-color .15s,background .15s}
+.ar-choice-btn:hover:not(:disabled){border-color:var(--main);background:var(--main-l);transform:translateY(-1px)}
+.ar-choice-btn:focus-visible{outline:3px solid var(--main);outline-offset:2px}
+.ar-choice-btn .ar-opt-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--line);font-weight:700;font-size:.9rem;flex-shrink:0}
+.ar-choice-btn.correct{border-color:#1f8a70;background:#e1f3ec;color:#0b3b33}
+.ar-choice-btn.correct .ar-opt-num{background:#1f8a70;color:#fff}
+.ar-choice-btn.wrong{border-color:#b23a2b;background:#fde8e8;color:#7a1d1d}
+.ar-choice-btn.wrong .ar-opt-num{background:#b23a2b;color:#fff}
+.ar-stage-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
+.ar-feedback-card{background:var(--paper);border-radius:18px;padding:26px;max-width:440px;width:100%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.ar-fb-ic{font-size:3.2rem;margin-bottom:10px}
+.ar-feedback-card p{font-size:1.1rem;margin-bottom:18px;line-height:1.4}
+.ar-chests-modal{background:var(--paper);border-radius:20px;padding:26px;max-width:500px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.ar-chests-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}
+.ar-chest-box{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:90px;border:2px dashed var(--accent);border-radius:14px;background:var(--accent-l,#fbf0db);font-size:1.8rem;cursor:pointer;transition:transform .15s}
+.ar-chest-box:hover:not(:disabled){transform:scale(1.05);background:#fae5bf}
+.ar-chest-box.opened{background:#e3f1eb;border-color:var(--main);border-style:solid}
+.ar-chest-res{margin-top:14px}
+.ar-prize-alert{font-size:1.15rem;font-weight:700;color:var(--main-d);margin-bottom:14px}
+.ar-result-card{text-align:center;padding:32px 20px;max-width:700px;margin:0 auto}
+.ar-res-trophy{font-size:4rem;margin-bottom:10px}
+.ar-res-lead{color:var(--mute);font-size:1.1rem;margin-bottom:24px}
+.ar-stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:26px}
+.ar-stat-box{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.ar-stat-box b{font-size:1.6rem;color:var(--ink)}
+.ar-stat-box b.gold{color:var(--accent)}
+.ar-stat-box span{font-size:.85rem;color:var(--mute)}
+.ar-mistakes-section{text-align:right;margin:24px 0;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px}
+.ar-mistakes-section h3{font-size:1.05rem;margin:0 0 12px;color:var(--danger)}
+.ar-mistake-item{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.ar-mistake-item b{display:block;margin-bottom:4px;font-size:.95rem}
+.ar-ans-correct{color:var(--main-d);font-size:.9rem}
+.ar-res-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.ar-store-card{padding:24px;max-width:820px;margin:0 auto}
+.ar-store-head{text-align:center;margin-bottom:24px}
+.ar-avatars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:24px}
+.ar-av-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);transition:border-color .15s}
+.ar-av-card.active-av{border-color:var(--main);background:var(--main-l)}
+.ar-av-icon{font-size:2.8rem;margin-bottom:4px}
+.ar-av-card b{font-size:1.05rem}
+.ar-av-card small{font-size:.82rem;color:var(--mute);line-height:1.3;flex:1}
+.ar-av-action{margin-top:10px;width:100%}
+.ar-av-action .btn{width:100%;min-height:38px}
+.ar-tag.active{display:inline-block;padding:4px 8px;border-radius:8px;background:var(--main);color:#fff;font-size:.82rem;font-weight:700}
+.ar-store-foot{text-align:center;padding-top:10px;border-top:1px solid var(--line)}
+.ar-modal-backdrop{position:fixed;inset:0;background:rgba(16,38,31,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)}
+.ar-modal-box{background:var(--paper);border:1px solid var(--line);border-radius:16px;max-width:860px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:var(--shadow);position:relative}
+.ar-modal-box h2{margin:0 0 14px;font-size:1.3rem;display:flex;align-items:center;justify-content:space-between}
+.ar-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0}
+.ar-kpi-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+.ar-kpi-card b{display:block;font-size:1.5rem;color:var(--main)}
+.ar-kpi-card span{font-size:.85rem;color:var(--mute)}
+.ar-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
+.ar-table th,.ar-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start}
+.ar-table th{background:var(--bg);font-weight:700;color:var(--mute);font-size:.82rem}
+.ar-form-row{margin-bottom:12px}
+.ar-form-row label{display:block;font-weight:700;font-size:.88rem;margin-bottom:4px}
+.ar-form-row input,.ar-form-row textarea,.ar-form-row select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
+/* ---------- اللعب المباشر (Live Multiplayer) ---------- */
+.ar-live-code-card{text-align:center;padding:24px 18px;background:var(--paper);border:2px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-bottom:18px}
+.ar-room-code-badge{display:inline-block;font-size:3rem;font-weight:900;letter-spacing:5px;color:var(--main-d);background:var(--main-l);border:2px dashed var(--main);border-radius:18px;padding:8px 24px;margin:12px 0;font-family:monospace;direction:ltr}
+.ar-players-panel{margin:18px 0;text-align:right}
+.ar-players-title{font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.ar-students-roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:240px;overflow-y:auto;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.ar-student-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;font-size:.88rem}
+.ar-kick-btn{margin-inline-start:auto;background:none;border:none;color:var(--danger,#b23a2b);cursor:pointer;padding:2px 4px;font-size:.85rem}
+.ar-host-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.ar-live-q-box{padding:22px;border-radius:18px;margin-bottom:16px}
+.ar-live-q-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.ar-live-timer{font-size:1.5rem;font-weight:800;color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.ar-live-timer.urgent{color:var(--danger,#b23a2b)}
+.ar-live-q-stem{font-size:1.3rem;font-weight:700;line-height:1.5;margin-bottom:20px;color:var(--ink);text-align:right}
+.ar-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.ar-live-grid{grid-template-columns:1fr}}
+.ar-live-btn{display:flex;align-items:center;gap:12px;min-height:72px;padding:14px 18px;border-radius:16px;border:none;color:#fff;font-family:inherit;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .1s,box-shadow .15s;text-align:right;box-shadow:0 3px 10px rgba(0,0,0,.15);touch-action:manipulation}
+.ar-live-btn:active{transform:scale(.97)}
+.ar-live-btn:disabled{opacity:.65;cursor:not-allowed}
+.ar-live-btn.opt-0{background:#d9383a}
+.ar-live-btn.opt-1{background:#1e88e5}
+.ar-live-btn.opt-2{background:#d97706}
+.ar-live-btn.opt-3{background:#10b981}
+.ar-live-btn .ar-shape{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);font-size:1rem;flex-shrink:0}
+.ar-live-btn.selected{outline:4px solid #fff;box-shadow:0 0 0 6px var(--main)}
+.ar-live-btn.correct-choice{outline:5px solid #fff;box-shadow:0 0 0 7px #10b981}
+.ar-reveal-card{text-align:center;padding:24px 18px;background:var(--paper);border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px}
+.ar-reveal-status{font-size:1.6rem;font-weight:800;margin-bottom:10px}
+.ar-reveal-status.ok{color:#10b981}
+.ar-reveal-status.fail{color:#d9383a}
+.ar-reveal-pts{font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:14px}
+.ar-bars-dist{margin:16px 0;text-align:right}
+.ar-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.88rem}
+.ar-bar-label{width:24px;font-weight:700}
+.ar-bar-track{flex:1;height:22px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.ar-bar-fill{height:100%;transition:width .3s ease}
+.ar-bar-fill.opt-0{background:#d9383a}
+.ar-bar-fill.opt-1{background:#1e88e5}
+.ar-bar-fill.opt-2{background:#d97706}
+.ar-bar-fill.opt-3{background:#10b981}
+.ar-bar-cnt{font-size:.82rem;min-width:70px;text-align:left;white-space:nowrap}
+.toast{top:calc(105px + env(safe-area-inset-top,0px));bottom:auto;transform:translateY(-8px);z-index:9999}
+.toast.on{opacity:1;transform:none}
+.ar-ctrl-btn,.ar-top-actions .btn{background:var(--paper,#ffffff)!important;border:1.5px solid var(--line,#e2e0d6)!important;color:var(--main-d,#0b3b33)!important;font-weight:700!important;font-size:.95rem!important;min-height:44px!important;min-width:76px!important;padding:8px 14px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;border-radius:12px!important;box-shadow:0 1px 3px rgba(0,0,0,.06)!important;cursor:pointer!important;transition:background .15s,border-color .15s,color .15s!important}
+.ar-ctrl-btn:hover,.ar-top-actions .btn:hover{background:var(--main-l,#e3f1eb)!important;border-color:var(--main,#1f8a70)!important;color:var(--main-d,#0b3b33)!important}
+.ar-podium-wrap{margin:24px 0;display:flex;align-items:flex-end;justify-content:center;gap:12px;min-height:220px}
+.ar-podium-col{display:flex;flex-direction:column;align-items:center;width:105px;text-align:center}
+.ar-podium-pedestal{width:100%;border-radius:12px 12px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800}
+.ar-podium-col.rank-1 .ar-podium-pedestal{height:140px;background:linear-gradient(180deg,#f59e0b,#d97706);font-size:1.8rem}
+.ar-podium-col.rank-2 .ar-podium-pedestal{height:100px;background:linear-gradient(180deg,#94a3b8,#64748b);font-size:1.5rem}
+.ar-podium-col.rank-3 .ar-podium-pedestal{height:75px;background:linear-gradient(180deg,#d97706,#b45309);font-size:1.3rem}
+.ar-leaderboard-tbl{width:100%;border-collapse:collapse;margin:18px 0;font-size:.92rem}
+.ar-leaderboard-tbl th,.ar-leaderboard-tbl td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right}
+.ar-leaderboard-tbl th{background:var(--bg);font-weight:700}
+@media(prefers-reduced-motion:reduce){.ar-progress-fill,.ar-rep-fill,.ar-tower-hp-fill,.ar-choice-btn,.ar-chest-box{transition:none !important;animation:none !important}}
 '''
 CSS = base_css + extra_css
 
@@ -1722,6 +1888,18 @@ def page(title, body, script):
             '<div class="modal" id="modal" hidden><div class="modal-box" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>'
             '<div class="toast" id="toast" role="status" aria-live="polite"></div>'
             f'<script nonce="%NONCE%">{pack(common + chr(10) + script)}</script></body></html>')
+
+def page_asset(title, body, asset_url):
+    return ('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+            '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#f6f4ee">'
+            '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+            '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
+            '<meta name="apple-mobile-web-app-title" content="الكبسولة"><meta name="apple-mobile-web-app-status-bar-style" content="default">'
+            f'<title>{title}</title>{FONTS}<style>%CSS%</style></head><body>{body}'
+            '<div class="modal" id="modal" hidden><div class="modal-box" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>'
+            '<div class="toast" id="toast" role="status" aria-live="polite"></div>'
+            f'<script nonce="%NONCE%" src="{asset_url}" defer></script></body></html>')
 
 import math
 def _helix():
@@ -1792,7 +1970,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('homework', '/homework', '📒', 'الواجبات المنزلية'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('arena', '/arena', '⚔️', 'ساحة التحدي'), ('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('homework', '/homework', '📒', 'الواجبات المنزلية'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'كروت الأسئلة (بليكرز)'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
 # «تصحيح الواجبات تلقائيًا» (/grading و /teqany/grading) مخفي من كل القوائم والبطاقات: يُفتح بالرابط المباشر فقط.
@@ -1819,6 +1997,7 @@ def NAV(active, extra=''):
 
 # ===== صفحة البداية بعد تسجيل الدخول: عقد أقسام مرتبة بنفس روح «تقني حذيفة» (تُقدّم كل الأدوات بضغطة) =====
 _KB_DESC = {
+  '/arena': 'مسابقات وألعاب تعليمية تفاعلية بأسئلة المنهج الحقيقية.',
   '/app': 'دروس كل المواد جاهزة — عدّلها واطبعها وأرسلها إلى نور.',
   '/quiz': 'اختبارات قصيرة ومراجعات وفق الوثيقة، بالترويسة الرسمية.',
   '/homework': 'ورقة واجب منزلي بالدرجات وأنواع الأسئلة حسب وثيقة التقويم، بترويسة رسمية.',
@@ -1969,6 +2148,10 @@ CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</s
 <main class="panel" id="panel"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
 
+ARENA_PAGE = TOP('<div class="stats"><span class="stat">ساحة التحدي</span><span class="stat">مسابقات وألعاب تفاعلية بأسئلة المنهج</span></div>').replace('%BTNS%', NAV('arena')) + '''
+<main class="wrap ar-wrap" id="arenaMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
+<div id="printArea"></div>'''
+
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
@@ -2074,7 +2257,7 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
 # أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا.
 # الروابط الخارجية (مثل باحث المدرسة) لا تُبنى ببادئة /teqany ولا تُستبعد:
 # شرط h.startswith('/') القديم كان يحذفها، فغابت من كروت الواجهة رغم وجودها في «المزيد».
-_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال', '/homework': 'ورقة واجب بدرجات وأنواع وفق الوثيقة'}
+_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال', '/homework': 'ورقة واجب بدرجات وأنواع وفق الوثيقة', '/arena': 'مسابقات وألعاب تفاعلية بأسئلة المنهج'}
 TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, _TQ_DESC.get(h, '')) for _k, h, ic, t in MENU_ITEMS
                 if _k != 'grading' and (h if h.startswith('http') else '/teqany' + h) not in {x[0] for x in TQ_SECTIONS}]
 # باحث المدرسة خاص بـ «تقني حذيفة» فقط: غير موجود في MENU_ITEMS (أُخفي من الكبسولة)،
@@ -2110,6 +2293,7 @@ PAGES = {
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
+  'arena': page_asset('ساحة التحدي · الكبسولة', ARENA_PAGE, '__ARENA_JS__'),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
   'homework': page('الواجبات المنزلية · الكبسولة', HOMEWORK, "window.PAGE_MODE='hw';" + chr(10) + rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@FX@@', rd('client_fx.js')).replace('// @@TUG@@', rd('client_tug.js') + chr(10) + rd('client_arcade.js') + chr(10) + rd('client_runner.js'))),
@@ -2184,7 +2368,41 @@ def _study_with_mm():
     for k, v in _AR_STUDY.items():
         st['lessons'].setdefault(k, {}).update(v)
     return st
-_PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN)}
+def _arena_pack():
+    by_l, valid = {}, 0
+    for q in qbank:
+        if q.get('type') != 'mcq': continue
+        ch = q.get('choices')
+        if not isinstance(ch, list) or len(ch) < 2: continue
+        c = q.get('correct')
+        if not isinstance(c, int) or c < 0 or c >= len(ch): continue
+        lid = str(q.get('lesson_id'))
+        item = {
+            'qid': q.get('qid'),
+            'lesson_id': q.get('lesson_id'),
+            'stem': q.get('stem') or '',
+            'choices': ch,
+            'correct': c,
+            'difficulty': q.get('difficulty') or 'متوسطة'
+        }
+        by_l.setdefault(lid, []).append(item)
+        valid += 1
+    courses = {}
+    for l in lessons:
+        s = l.get('subject') or ''
+        g = l.get('grade') or ''
+        k = f"{s}|{g}"
+        lid = str(l.get('id'))
+        if lid in by_l:
+            courses.setdefault(k, []).append(int(lid))
+    pack = {'total': valid, 'by_lesson': by_l, 'courses': courses}
+    try:
+        with open(os.path.join(DATA, 'arena_pack.json'), 'w', encoding='utf-8') as f:
+            json.dump(pack, f, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        pass
+    return pack
+_PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN), 'arena': _untat(_arena_pack())}
 _PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
 _PH = _hl.sha256(b''.join(_PB.values())).hexdigest()[:24]
 import shutil as _sh
@@ -2193,6 +2411,12 @@ if os.path.isdir(os.path.join(DIST, 'assets', 'd')):
         if _o != _PH: _sh.rmtree(os.path.join(DIST, 'assets', 'd', _o), ignore_errors=True)
 _PD = os.path.join(DIST, 'assets', 'd', _PH); os.makedirs(_PD, exist_ok=True)
 for k, b in _PB.items(): open(os.path.join(_PD, k + '.json'), 'wb').write(b)
+arena_raw = common + chr(10) + rd('client_arena.js')
+_arena_hash = _hl.sha256(arena_raw.encode('utf-8')).hexdigest()[:12]
+_arena_name = f'arena.{_arena_hash}.js'
+open(os.path.join(DIST, 'assets', _arena_name), 'w', encoding='utf-8').write(arena_raw)
+open(os.path.join(DIST, 'assets', 'arena.js'), 'w', encoding='utf-8').write(arena_raw)
+src = src.replace('__ARENA_JS__', f'/{_arena_name}')
 src = src.replace('__PACKDIR__', json.dumps('/d/' + _PH + '/'))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))
@@ -2208,6 +2432,18 @@ src = src.replace('__EXTZIP__', json.dumps(_b64.b64encode(open(_ext_zip, 'rb').r
 src = src.replace('__APK__', json.dumps(_b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
 _tq_apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'teqany.apk')
 src = src.replace('__APK_TQ__', json.dumps(_b64.b64encode(open(_tq_apk_path, 'rb').read()).decode() if os.path.exists(_tq_apk_path) else _b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
+
+# دمج المحرك النقي وغلاف Durable Object وتصدير ArenaRoom لدعم السبات والمزامنة السحابية
+def _bundle_arena_room():
+    engine_code = rd('arena_engine.js')
+    room_code = rd('arena_room.js')
+    engine_code = re.sub(r'if\s*\(\s*typeof module\s*!==\s*[\'"]undefined[\'"].*?\n\}', '', engine_code, flags=re.DOTALL)
+    room_code = re.sub(r'const\s*\{\s*ArenaEngine,\s*ENGINE_STATES\s*\}\s*=\s*require\(.*?\);?', '', room_code)
+    room_code = re.sub(r'if\s*\(\s*typeof module\s*!==\s*[\'"]undefined[\'"].*?\n\}', '', room_code, flags=re.DOTALL)
+    room_code = re.sub(r'\bclass ArenaRoom\b', 'export class ArenaRoom', room_code, count=1)
+    return chr(10) + '// ===== Arena Live Engine & Durable Object =====' + chr(10) + engine_code + chr(10) + room_code
+
+src = src + _bundle_arena_room()
 out = os.path.join(DIST, 'worker.js')
 open(out, 'w', encoding='utf-8').write(src)
 print('worker.js', round(len(src.encode('utf-8')) / 1024), 'KB')

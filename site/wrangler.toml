@@ -4,6 +4,18 @@ main = "dist/worker.js"
 compatibility_date = "2025-06-01"
 workers_dev = true
 
+[vars]
+ARENA_LIVE_ENABLED = false
+
+[durable_objects]
+bindings = [
+  { name = "ARENA_ROOM", class_name = "ArenaRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ArenaRoom"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "tahdir"
