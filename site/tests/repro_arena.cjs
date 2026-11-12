@@ -304,6 +304,70 @@ const ok = (n, c, extra) => {
 
   srv.stop();
 
+  // 9. فحص المرحلة 3: محرك اللعبة النقي ومحاكاة 12 لاعباً متزامنين (Stage 3 Simulation)
+  console.log('\n=== فحص 5: محرك ساحة التحدي النقي ومحاكاة 12 لاعباً متزامنين (المرحلة 3) ===');
+  const { ArenaEngine, ENGINE_STATES } = require('../server/arena_engine.js');
+  const simEngine = new ArenaEngine({
+    code: 'SIM123',
+    hostId: 'teacher_live',
+    hostName: 'أ. محمد',
+    mode: 'gold_rush',
+    timePerQuestion: 15,
+    revealDuration: 5,
+    startingDuration: 3,
+    questions: [
+      { qid: 'sq1', stem: 'س1', choices: ['أ', 'ب', 'ج', 'د'], correct: 1 },
+      { qid: 'sq2', stem: 'س2', choices: ['1', '2', '3', '4'], correct: 2 }
+    ]
+  });
+
+  ok('تهيئة المحرك النقي في حالة LOBBY', simEngine.state === ENGINE_STATES.LOBBY);
+  simEngine.join('teacher_live', { name: 'المعلم', avatar: '👑' });
+  for (let i = 1; i <= 12; i++) {
+    simEngine.join(`sim_p${i}`, { name: `طالب ${i}`, avatar: '🦅' });
+  }
+  ok('انضمام 12 لاعباً متزامناً بنجاح', simEngine.players.size === 13);
+
+  // سرية الإجابة
+  let simTime = 2000000;
+  simEngine.start('teacher_live', simTime);
+  simTime += 3000;
+  simEngine.tick(simTime); // انتقال لـ QUESTION 1
+  const studentView = simEngine.getStateFor('sim_p1', simTime);
+  ok('حظر إرسال الإجابة الصحيحة أثناء طور السؤال', studentView.question && studentView.question.correct === undefined && studentView.question.answer === undefined);
+
+  // إجابات متزامنة
+  for (let i = 1; i <= 10; i++) {
+    simEngine.submitAnswer(`sim_p${i}`, 1, simTime + i * 500); // إجابة صحيحة
+  }
+  simEngine.submitAnswer('sim_p11', 0, simTime + 6000); // خاطئة
+  simEngine.submitAnswer('sim_p12', 2, simTime + 7000); // خاطئة
+
+  // كشف الإجابات
+  simTime += 15000;
+  simEngine.tick(simTime);
+  ok('الانتقال التلقائي لطور REVEAL بعد انتهاء الوقت', simEngine.state === ENGINE_STATES.REVEAL);
+  const revealView = simEngine.getStateFor('sim_p1', simTime);
+  ok('كشف الإجابة الصحيحة في طور REVEAL فقط', revealView.question && revealView.question.correct === 1 && revealView.myRoundResult.isCorrect === true);
+
+  // لوحة الصدارة
+  const simLb = simEngine.getLeaderboard();
+  ok('ترتيب لوحة المتصدرين بدقة واحتساب النقاط والتتالي', simLb.length === 12 && simLb[0].id === 'sim_p1' && simLb[0].score > 0);
+
+  // طرد لاعب وتحكم المضيف
+  const simKick = simEngine.kick('sim_p12', 'teacher_live');
+  ok('طرد لاعب بواسطة المعلم ينجح فورياً', simKick.ok && simEngine.players.has('sim_p12') === false);
+
+  // السؤال 2 والتتويج
+  simTime += 5000;
+  simEngine.tick(simTime); // س2
+  for (let i = 1; i <= 5; i++) simEngine.submitAnswer(`sim_p${i}`, 2, simTime + 1000);
+  simTime += 15000;
+  simEngine.tick(simTime); // كشف س2
+  simTime += 5000;
+  simEngine.tick(simTime); // منصة التتويج
+  ok('اكتمال تدفق اللعبة والوصول لمنصة التتويج (PODIUM)', simEngine.state === ENGINE_STATES.PODIUM);
+
   console.log('\n=== النتيجة: ' + pass + ' ناجح، ' + fail + ' فاشل ===');
   process.exit(fail ? 1 : 0);
 })().catch(e => {

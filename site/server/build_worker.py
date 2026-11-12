@@ -1835,6 +1835,18 @@ def page(title, body, script):
             '<div class="toast" id="toast" role="status" aria-live="polite"></div>'
             f'<script nonce="%NONCE%">{pack(common + chr(10) + script)}</script></body></html>')
 
+def page_asset(title, body, asset_url):
+    return ('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+            '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#f6f4ee">'
+            '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+            '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
+            '<meta name="apple-mobile-web-app-title" content="الكبسولة"><meta name="apple-mobile-web-app-status-bar-style" content="default">'
+            f'<title>{title}</title>{FONTS}<style>%CSS%</style></head><body>{body}'
+            '<div class="modal" id="modal" hidden><div class="modal-box" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>'
+            '<div class="toast" id="toast" role="status" aria-live="polite"></div>'
+            f'<script nonce="%NONCE%" src="{asset_url}" defer></script></body></html>')
+
 import math
 def _helix():
     pts1=[];pts2=[];rungs=[]
@@ -2227,7 +2239,7 @@ PAGES = {
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
-  'arena': page('ساحة التحدي · الكبسولة', ARENA_PAGE, rd('client_arena.js')),
+  'arena': page_asset('ساحة التحدي · الكبسولة', ARENA_PAGE, '/arena.js'),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
   'homework': page('الواجبات المنزلية · الكبسولة', HOMEWORK, "window.PAGE_MODE='hw';" + chr(10) + rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@FX@@', rd('client_fx.js')).replace('// @@TUG@@', rd('client_tug.js') + chr(10) + rd('client_arcade.js') + chr(10) + rd('client_runner.js'))),
@@ -2345,6 +2357,7 @@ if os.path.isdir(os.path.join(DIST, 'assets', 'd')):
         if _o != _PH: _sh.rmtree(os.path.join(DIST, 'assets', 'd', _o), ignore_errors=True)
 _PD = os.path.join(DIST, 'assets', 'd', _PH); os.makedirs(_PD, exist_ok=True)
 for k, b in _PB.items(): open(os.path.join(_PD, k + '.json'), 'wb').write(b)
+open(os.path.join(DIST, 'assets', 'arena.js'), 'w', encoding='utf-8').write(common + chr(10) + rd('client_arena.js'))
 src = src.replace('__PACKDIR__', json.dumps('/d/' + _PH + '/'))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))

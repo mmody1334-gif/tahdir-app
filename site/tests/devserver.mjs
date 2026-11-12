@@ -24,7 +24,7 @@ const DB = {
 };
 const port = +(process.argv[2] || 8787);
 import { readFileSync, existsSync, statSync } from 'node:fs';
-const ASSETS = { fetch: async rq => { const f = join(dir, '../dist/assets', decodeURIComponent(new URL(rq.url).pathname)); return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': 'application/json' } }) : new Response('nf', { status: 404 }); } };
+const ASSETS = { fetch: async rq => { const p = decodeURIComponent(new URL(rq.url).pathname); const f = join(dir, '../dist/assets', p); const ct = f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/json'; return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': ct } }) : new Response('nf', { status: 404 }); } };
 // بيئة العامل: نمرّر أيضًا إعدادات قابلة للضبط من متغيّرات البيئة حتى نستطيع اختبارها محليًا
 // (مثل STALE_SECONDS: مدة إهمال الجهاز). في الإنتاج تُضبط من إعدادات الـWorker.
 const ENV = { DB, ASSETS, ...(process.env.AI_KEY ? { AI_KEY: process.env.AI_KEY, AI_URL: process.env.AI_URL } : {}) };
@@ -47,6 +47,13 @@ http.createServer(async (req, res) => {
     const rel = decodeURIComponent(req.url.slice(5).split('?')[0]);
     const f = join(dir, '../dist/assets/pdf', rel);
     if (!rel || rel.endsWith('/') || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+    res.end(readFileSync(f)); return;
+  }
+  // أصل ساحة التحدي: يُخدَم كما في الإنتاج (/arena.js → dist/assets/arena.js)
+  if (req.url === '/arena.js' || req.url.startsWith('/arena.js?')) {
+    const f = join(dir, '../dist/assets/arena.js');
+    if (!existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
     res.end(readFileSync(f)); return;
   }

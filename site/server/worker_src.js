@@ -1801,6 +1801,16 @@ export default {
       const adminCount = async () => ((await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE role='admin'").first()) || {}).n || 0;
 
       if (p === '/tool/tahdir-noor.user.js' || p === '/tool/tahdir-noor.meta.js') return new Response(TOOL, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
+      if (p === '/arena.js') {
+        if (env.ASSETS) {
+          const r = await env.ASSETS.fetch(new Request(new URL('/arena.js', url.origin)));
+          if (r.ok) {
+            const js = await r.text();
+            return new Response(js, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400', 'X-Content-Type-Options': 'nosniff' } });
+          }
+        }
+        return new Response('/* arena asset not found */', { status: 404 });
+      }
       if (p === '/privacy' || p === '/support') return new Response(PRIVACY, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'", ...SEC_HEADERS } });
       if (p === '/download/tahdir-ext.zip' && EXTZIP) return new Response(Uint8Array.from(atob(EXTZIP), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="tahdir-ext.zip"', 'Cache-Control': 'no-cache' } });
       if (p === '/download/tahdir.apk') return new Response(Uint8Array.from(atob(APK), c => c.charCodeAt(0)), { headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Disposition': 'attachment; filename="tahdir.apk"', 'Cache-Control': 'no-cache' } });
