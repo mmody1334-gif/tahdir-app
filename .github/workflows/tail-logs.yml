@@ -1,0 +1,47 @@
+name: tail-logs
+# تشخيص: يسجّل طلبات العامل الحيّة (أخطاء، استثناءات، تجاوز الذاكرة/الوقت) لبضع دقائق ويرفعها كملف
+on:
+  workflow_dispatch:
+    inputs:
+      minutes: { description: 'مدة التسجيل بالدقائق', default: '6' }
+jobs:
+  tail:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Tail worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 0000e4925fd52a263ae76a9053eade14
+        run: |
+          mkdir -p out
+          ( for i in $(seq 1 60); do curl -s -o /dev/null -w "$(date +%T) version %{http_code} %{time_total}\n" https://elkabsula.site/version; curl -s -o /dev/null -w "$(date +%T) app %{http_code} %{time_total}\n" https://elkabsula.site/app; sleep 5; done > out/probe.txt ) &
+          timeout $(( ${{ inputs.minutes }} * 60 ))s npx --yes wrangler@3.114.0 tail tahdir --format json > out/tail.jsonl 2> out/tail.err || true
+          wait || true
+          python3 - <<'PY'
+          import json,collections
+          ev=[]
+          for line in open('out/tail.jsonl',encoding='utf-8',errors='ignore'):
+              line=line.strip()
+              if not line.startswith('{'): continue
+              try: ev.append(json.loads(line))
+              except Exception: pass
+          c=collections.Counter(e.get('outcome') for e in ev)
+          print('events',len(ev),dict(c))
+          paths=collections.Counter()
+          bad=[]
+          for e in ev:
+              r=(e.get('event') or {}).get('request') or {}
+              u=r.get('url','').split('?')[0]
+              p='/'+u.split('/',3)[3] if u.count('/')>=3 else u
+              paths[(p,e.get('outcome'))]+=1
+              if e.get('outcome')!='ok' or e.get('exceptions'):
+                  bad.append({'t':e.get('eventTimestamp'),'p':p,'o':e.get('outcome'),'x':[x.get('message') for x in e.get('exceptions') or []],'cpu':e.get('cpuTime'),'wall':e.get('wallTime')})
+          for k,v in paths.most_common(40): print(v,k)
+          print('--- non-ok',len(bad))
+          for b in bad[:200]: print(json.dumps(b,ensure_ascii=False))
+          PY
+          tail -n 40 out/probe.txt; head -c 2000 out/tail.err
+      - uses: actions/upload-artifact@v4
+        with: { name: tail-logs, path: out/, retention-days: 7 }
