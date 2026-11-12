@@ -105,6 +105,16 @@ const tempPersist = fs.mkdtempSync(path.join(os.tmpdir(), 'wrangler-arena-test-'
     };
     ok('تسجيل دخول المعلم (حساب معلم حقيقي) ناجح', lTeacher.status === 200 && !!teacherSid);
 
+    // إنشاء فصل للمعلم لربط الطلاب بالمحفظة
+    const classRes = await fetch(`${BASE}/api/classes`, {
+      method: 'POST',
+      headers: teacherH,
+      body: JSON.stringify({ name: 'تاسع أول', course: 'الأحياء|التاسع' })
+    });
+    const classData = await classRes.json();
+    const teacherClassCode = classData.code;
+    ok('إنشاء فصل للمعلم بنجاح لربط المحفظة', classRes.status === 200 && !!teacherClassCode);
+
     // 2. إنشاء غرفة تحدٍّ مباشر بواسطة المعلم
     const createRes = await fetch(`${BASE}/api/arena/live/create`, {
       method: 'POST',
@@ -129,14 +139,24 @@ const tempPersist = fs.mkdtempSync(path.join(os.tmpdir(), 'wrangler-arena-test-'
     // 3. انضمام 5 طلاب والحصول على رموز موقّعة (playerToken)
     const students = [];
     for (let i = 1; i <= 5; i++) {
+      const joinHeaders = { 'Content-Type': 'application/json' };
+      if (i === 1) {
+        joinHeaders['Cookie'] = 'did=did_real_cookie_123';
+      }
+      const joinBody = {
+        code,
+        name: `<b>طالب ${i}</b>`, // اختبار تنظيف HTML وحد 30 حرفاً
+        avatar: i % 2 === 0 ? 'falcon' : 'wolf'
+      };
+      if (i === 1) {
+        joinBody.class_id = teacherClassCode;
+        joinBody.device_id = 'spoofed_device_id_999'; // يجب تجاهله تماماً
+      }
+
       const joinRes = await fetch(`${BASE}/api/arena/live/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          name: `<b>طالب ${i}</b>`, // اختبار تنظيف HTML وحد 30 حرفاً
-          avatar: i % 2 === 0 ? 'falcon' : 'wolf'
-        })
+        headers: joinHeaders,
+        body: JSON.stringify(joinBody)
       });
       const joinJson = await joinRes.json();
       ok(`انضمام الطالب ${i} وإصدار رمز لاعب موقّع وتنظيف اسمه`, joinRes.status === 200 && joinJson.playerToken && joinJson.name === `طالب ${i}`);
@@ -196,16 +216,18 @@ const tempPersist = fs.mkdtempSync(path.join(os.tmpdir(), 'wrangler-arena-test-'
 
     // 6. تقديم إجابات الطلاب متزامنة بوقت الخادم
     console.log('\n=== إرسال إجابات الطلاب وحساب زمن الخادم ===');
-    studentSockets[0].send(JSON.stringify({ action: 'answer', choiceIndex: 0 }));
-    studentSockets[1].send(JSON.stringify({ action: 'answer', choiceIndex: 1 }));
-    studentSockets[2].send(JSON.stringify({ action: 'answer', choiceIndex: 0 }));
-    studentSockets[3].send(JSON.stringify({ action: 'answer', choiceIndex: 2 }));
-    studentSockets[4].send(JSON.stringify({ action: 'answer', choiceIndex: 3 }));
+    const hostQ = hostMessages.find(m => m.state && m.state.question && m.state.question.hostHintCorrect !== undefined);
+    const correctIdx = hostQ ? hostQ.state.question.hostHintCorrect : 0;
+    studentSockets[0].send(JSON.stringify({ action: 'answer', choiceIndex: correctIdx }));
+    studentSockets[1].send(JSON.stringify({ action: 'answer', choiceIndex: (correctIdx + 1) % 4 }));
+    studentSockets[2].send(JSON.stringify({ action: 'answer', choiceIndex: correctIdx }));
+    studentSockets[3].send(JSON.stringify({ action: 'answer', choiceIndex: (correctIdx + 2) % 4 }));
+    studentSockets[4].send(JSON.stringify({ action: 'answer', choiceIndex: correctIdx }));
 
     // انتظار رسائل التأكيد answer_ack
     await new Promise(r => setTimeout(r, 500));
     const ack1 = studentMessages[0].find(m => m.type === 'answer_ack');
-    ok('الخادم يعالج الإجابة بوقت الخادم ويرجع تأكيد الإجابة answer_ack', !!ack1 && ack1.choiceIndex === 0);
+    ok('الخادم يعالج الإجابة بوقت الخادم ويرجع تأكيد الإجابة answer_ack', !!ack1 && ack1.choiceIndex === correctIdx);
 
     // 7. طور كشف الإجابات (REVEAL)
     console.log('\n=== كشف الإجابات بعد انتهاء الوقت أو إجابة الجميع ===');
@@ -255,6 +277,19 @@ const tempPersist = fs.mkdtempSync(path.join(os.tmpdir(), 'wrangler-arena-test-'
     const liveSessions = (liveReportJson.recent || []).filter(s => s.mode === 'live');
     ok('حفظ جولات اللعبة الحية تلقائياً في D1 من الخادم (بدون طلبات من العميل)', liveSessions.length >= 5);
     ok('جولات اللعبة الحية في التقارير تحمل أسماء الطلاب ونقاطهم الحقيقية', liveSessions.some(s => s.student_name === 'طالب 1'));
+
+    // فحص المحفظة لتأكيد أن did أُخذ من الكوكي حصراً وليس من body
+    const s1WalletRes = await fetch(`${BASE}/api/arena/wallet?class_id=${teacherClassCode}`, {
+      headers: { 'Cookie': 'did=did_real_cookie_123' }
+    });
+    const s1Wallet = await s1WalletRes.json();
+    ok('did في اللعب الحي يؤخذ من الكوكي حصراً ويحدث رصيد المحفظة الصحيح', s1Wallet.balance > 0);
+
+    const spoofedWalletRes = await fetch(`${BASE}/api/arena/wallet?class_id=${teacherClassCode}`, {
+      headers: { 'Cookie': 'did=spoofed_device_id_999' }
+    });
+    const spoofedWallet = await spoofedWalletRes.json();
+    ok('الجهاز المزور المعطى في جسم الطلب لا رصيد له في المحفظة', spoofedWallet.balance === 0);
 
     // إغلاق جميع المقابس
     hostWs.close();

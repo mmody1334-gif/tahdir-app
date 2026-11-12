@@ -523,12 +523,18 @@ const ok = (n, c, extra) => {
   ok('منع تكرار الغرف النشطة: رفض إعادة تهيئة غرفة نشطة بـ HTTP 409 Conflict', initRes2.status === 409);
 
   // 3. فحص حماية DO: عدم استهلاك Storage Puts عند إجابة فردية طالما لم يجب الجميع
+  let mockAttachment = { playerId: 'student_free1', role: 'student', name: 'طالب مجاني 1' };
   const mockWs = {
     deserializeAttachment() {
-      return { playerId: 'student_free1', role: 'student', name: 'طالب مجاني 1' };
+      return mockAttachment;
+    },
+    serializeAttachment(att) {
+      mockAttachment = att;
     },
     send() {}
   };
+  mockCtx.getWebSockets = () => [mockWs];
+
   // تسجيل طالبين لضمان عدم اكتمال الإجابات عند إجابة الأول فقط
   roomInstance.engine.join('student_free1', { name: 'طالب مجاني 1', classId: 'CLS_99', did: 'dev_did_free1' });
   roomInstance.engine.join('student_free2', { name: 'طالب مجاني 2', classId: 'CLS_99', did: 'dev_did_free2' });
@@ -536,11 +542,21 @@ const ok = (n, c, extra) => {
   roomInstance.engine.currentQIndex = 0;
   roomInstance.engine.stateStartedAt = Date.now();
   roomInstance.engine.deadlineAt = Date.now() + 20000;
+  // حفظ حالة بدء السؤال في التخزين (وهو ما يفعله النظام تلقائياً عند بدء السؤال)
+  await roomInstance.saveEngine();
 
   const putsBefore = storagePuts;
   // إرسال إجابة الطالب الأول فقط (لم يجب الطالب الثاني بعد)
   await roomInstance.webSocketMessage(mockWs, JSON.stringify({ action: 'answer', choiceIndex: 0 }));
   ok('حماية DO: الإجابة الفردية لا تستدعي ctx.storage.put (صفر عمليات كتابة إضافية)', storagePuts === putsBefore);
+  ok('حماية DO: حفظ الإجابة في مرفق المقبس (WebSocket Attachment)', !!(mockAttachment.answers && mockAttachment.answers[0]));
+
+  // 3ب. فحص محاكاة السبات (Hibernation Simulation):
+  // تفريغ المحرك بالكامل من الذاكرة العشوائية واستعادته من التخزين مع دمج المرفقات
+  roomInstance.engine = null; // إفراغ الذاكرة لمحاكاة إخماد/سبات الـ DO
+  const restoredEngine = await roomInstance.getEngine();
+  ok('حماية السبات: استعادة المحرك ودمج إجابة الطالب من مرفق المقبس بعد السبات', restoredEngine.roundAnswers.has('student_free1'));
+  ok('حماية السبات: نقاط الطالب لم تضع وظلت محسوبة بدقة بعد الإفاقة', restoredEngine.players.get('student_free1').score > 0);
 
   // 4. فحص الحفظ التلقائي في D1 عند PODIUM (المرحلة 3هـ)
   roomInstance.engine.state = ENGINE_STATES.PODIUM;

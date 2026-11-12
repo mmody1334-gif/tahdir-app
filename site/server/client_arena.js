@@ -148,6 +148,8 @@
         '</div>' +
       '</div>' +
       '<div class="ar-top-actions">' +
+        (state.liveEnabled ? '<button type="button" class="btn primary small" id="arLiveBtn" title="بدء مسابقة حية متعددة اللاعبين">⚔️ لعبة مباشرة</button>' : '') +
+        '<button type="button" class="btn ghost small" id="arJoinLiveBtn" title="انضمام كطالب لغرفة مباشرة بكود الغرفة">🎯 انضمام لغرفة</button>' +
         (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherSetsBtn" title="إدارة حقائب الأسئلة">📚 حقائبي</button>' : '') +
         (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherReportsBtn" title="تقارير الطلاب">📊 التقارير</button>' : '') +
         '<button type="button" class="btn ghost small" id="arSoundToggle" title="كتم/تشغيل الصوت" aria-label="كتم أو تشغيل الصوت">' +
@@ -444,6 +446,18 @@
     var repsBtn = $('arTeacherReportsBtn');
     if (repsBtn) {
       repsBtn.onclick = function() { openTeacherReportsModal(); };
+    }
+    var liveBtn = $('arLiveBtn');
+    if (liveBtn) {
+      liveBtn.onclick = function() {
+        openLiveSetupModal();
+      };
+    }
+    var joinBtn = $('arJoinLiveBtn');
+    if (joinBtn) {
+      joinBtn.onclick = function() {
+        renderStudentJoinForm();
+      };
     }
     var sndBtn = $('arSoundToggle');
     if (sndBtn) {
@@ -1159,9 +1173,801 @@
   }
 
   // ==========================================
+  // المرحلة 4: شاشات اللعب المباشر التفاعلي (Live Multiplayer)
+  // ==========================================
+
+  var live = {
+    role: null,         // 'host' أو 'student'
+    code: null,         // رمز الغرفة
+    token: null,        // hostToken أو playerToken
+    ws: null,
+    state: null,        // كائن sync من الخادم
+    timerId: null,
+    answered: false,
+    selectedChoice: null,
+    myResult: null
+  };
+
+  // 1. AudioContext unlocker على أول لمسة / نقرة
+  var audioUnlocked = false;
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+      var ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') ctx.resume();
+    } catch (e) {}
+    document.removeEventListener('pointerdown', unlockAudio);
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  }
+  document.addEventListener('pointerdown', unlockAudio, { passive: true });
+  document.addEventListener('touchstart', unlockAudio, { passive: true });
+  document.addEventListener('keydown', unlockAudio, { passive: true });
+
+  // 2. إعادة الاتصال التلقائي عند visibilitychange و pageshow
+  function checkResumeLive() {
+    try {
+      var tok = sessionStorage.getItem('arena_live_token');
+      var cod = sessionStorage.getItem('arena_live_code');
+      var rol = sessionStorage.getItem('arena_live_role');
+      if (tok && cod && rol && (!live.ws || live.ws.readyState > 1)) {
+        connectLiveWs(cod, tok, rol);
+      }
+    } catch (e) {}
+  }
+  window.addEventListener('visibilitychange', function() {
+    if (!document.hidden) checkResumeLive();
+  });
+  window.addEventListener('pageshow', checkResumeLive);
+
+  // 3. فتح الاتصال بمقبس WebSocket الحقيقي
+  function connectLiveWs(code, token, role) {
+    if (live.ws) {
+      try { live.ws.close(); } catch (e) {}
+      live.ws = null;
+    }
+    live.role = role;
+    live.code = code;
+    live.token = token;
+    try {
+      sessionStorage.setItem('arena_live_token', token);
+      sessionStorage.setItem('arena_live_code', code);
+      sessionStorage.setItem('arena_live_role', role);
+    } catch (e) {}
+
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = proto + '//' + location.host + '/api/arena/live/ws?code=' + encodeURIComponent(code) + '&token=' + encodeURIComponent(token);
+    var ws = new WebSocket(wsUrl);
+    live.ws = ws;
+
+    ws.onmessage = function(ev) {
+      try {
+        var msg = JSON.parse(ev.data);
+        if (msg.type === 'sync') {
+          handleLiveSync(msg.state);
+        } else if (msg.type === 'answer_ack') {
+          live.answered = true;
+          if (live.role === 'student') {
+            live.myResult = msg;
+            renderStudentQuestion();
+          }
+        } else if (msg.type === 'kicked') {
+          leaveLiveSession('تم استبعادك من الجلسة المباشرة بواسطة المعلم.');
+        } else if (msg.type === 'error') {
+          toast(msg.error || 'خطأ في الغرفة المباشرة');
+        }
+      } catch (e) {}
+    };
+
+    ws.onclose = function(ev) {
+      if (live.role && state.view.indexOf('live_') === 0 && ev.code !== 1000 && ev.code !== 4001) {
+        setTimeout(function() {
+          if (live.token && live.code) connectLiveWs(live.code, live.token, live.role);
+        }, 1200);
+      }
+    };
+  }
+
+  function leaveLiveSession(msg) {
+    if (msg) toast(msg);
+    if (live.timerId) { clearInterval(live.timerId); live.timerId = null; }
+    if (live.ws) {
+      try { live.ws.close(1000, 'leave'); } catch (e) {}
+      live.ws = null;
+    }
+    try {
+      sessionStorage.removeItem('arena_live_token');
+      sessionStorage.removeItem('arena_live_code');
+      sessionStorage.removeItem('arena_live_role');
+    } catch (e) {}
+    live.role = null;
+    live.code = null;
+    live.token = null;
+    live.state = null;
+    live.answered = false;
+    live.selectedChoice = null;
+    live.myResult = null;
+    renderSetup();
+  }
+
+  function handleLiveSync(newState) {
+    if (!newState) return;
+    var prevState = live.state ? live.state.state : null;
+    var prevQ = live.state ? live.state.currentQIndex : null;
+    live.state = newState;
+
+    if (newState.state === 'QUESTION') {
+      if (prevQ !== newState.currentQIndex || prevState !== 'QUESTION') {
+        live.answered = false;
+        live.selectedChoice = null;
+        live.myResult = null;
+      }
+    }
+
+    if (live.role === 'host') {
+      if (newState.state === 'LOBBY') renderHostLobby();
+      else if (newState.state === 'QUESTION' || newState.state === 'REVEAL' || newState.state === 'PAUSED' || newState.state === 'STARTING') renderHostGame();
+      else if (newState.state === 'PODIUM') renderHostPodium();
+    } else if (live.role === 'student') {
+      if (newState.state === 'LOBBY') renderStudentLobby();
+      else if (newState.state === 'QUESTION' || newState.state === 'PAUSED' || newState.state === 'STARTING') renderStudentQuestion();
+      else if (newState.state === 'REVEAL') renderStudentReveal();
+      else if (newState.state === 'PODIUM') renderStudentPodium();
+    }
+  }
+
+  // 4. واجهة المعلم: إعداد الغرفة المباشرة (Live Setup Modal)
+  function openLiveSetupModal() {
+    var old = $('arLiveSetupModal');
+    if (old) old.remove();
+
+    var curCourse = state.courses.find(function(c) { return c.key === state.selectedCourse; });
+    var courseLabel = curCourse ? (curCourse.subject + ' (' + curCourse.grade + ')') : 'مقرر عام';
+
+    var m = document.createElement('div');
+    m.id = 'arLiveSetupModal';
+    m.className = 'ar-modal-backdrop';
+    m.innerHTML = '<div class="ar-modal-box" style="max-width:540px">' +
+      '<h2><span>⚔️ إعداد اللعبة المباشرة</span><button type="button" class="btn ghost small" id="arCloseLiveModalBtn">✕</button></h2>' +
+      '<div class="ar-form-row">' +
+        '<label>المقرر الدراسي:</label>' +
+        '<div style="font-size:1.05rem;font-weight:700;color:var(--main-d);margin-bottom:6px">' + esc(courseLabel) + '</div>' +
+      '</div>' +
+      '<div class="ar-form-row">' +
+        '<label for="arLiveTimeSel">الوقت المخصص لكل سؤال:</label>' +
+        '<select id="arLiveTimeSel" class="ar-select">' +
+          '<option value="5">5 ثوانٍ (سريع للتجربة)</option>' +
+          '<option value="10">10 ثوانٍ (سريع جداً)</option>' +
+          '<option value="15" selected>15 ثانية (مثالي)</option>' +
+          '<option value="20">20 ثانية (مريح)</option>' +
+          '<option value="30">30 ثانية (تفكيري)</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="ar-form-row">' +
+        '<label for="arLiveCountSel">عدد الأسئلة:</label>' +
+        '<select id="arLiveCountSel" class="ar-select">' +
+          '<option value="1">سؤال واحد (سريع)</option>' +
+          '<option value="2">سؤالان</option>' +
+          '<option value="5">5 أسئلة</option>' +
+          '<option value="10" selected>10 أسئلة</option>' +
+          '<option value="15">15 سؤالاً</option>' +
+          '<option value="20">20 سؤالاً</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="ar-form-row">' +
+        '<label for="arLiveModeSel">نمط المسابقة:</label>' +
+        '<select id="arLiveModeSel" class="ar-select">' +
+          '<option value="gold_rush" selected>🏆 سباق الذهب والتتويج</option>' +
+          '<option value="speed">⚡ التحدي السريع (نقاط السرعة)</option>' +
+          '<option value="classic">🎯 كلاسيكي متوازن</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="ar-host-actions" style="margin-top:20px">' +
+        '<button type="button" class="btn primary" id="arSubmitLiveCreateBtn" style="min-height:46px;font-size:1.05rem">🚀 إنشاء الغرفة وبدء البهو</button>' +
+        '<button type="button" class="btn ghost" id="arCancelLiveModalBtn">إلغاء</button>' +
+      '</div>' +
+    '</div>';
+
+    document.body.appendChild(m);
+
+    function closeModal() { if (m) m.remove(); }
+    $('arCloseLiveModalBtn').onclick = closeModal;
+    $('arCancelLiveModalBtn').onclick = closeModal;
+
+    $('arSubmitLiveCreateBtn').onclick = function() {
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'جارٍ إنشاء الغرفة…';
+      var timeLimit = +$('arLiveTimeSel').value || 15;
+      var qCount = +$('arLiveCountSel').value || 10;
+      var mode = $('arLiveModeSel').value || 'gold_rush';
+
+      api('/api/arena/live/create', {
+        course_key: state.selectedCourse,
+        time_limit: timeLimit,
+        question_count: qCount,
+        mode: mode
+      }).then(function(res) {
+        closeModal();
+        if (res && res.code && res.hostToken) {
+          toast('تم إنشاء الغرفة المباشرة بنجاح!');
+          connectLiveWs(res.code, res.hostToken, 'host');
+        } else {
+          toast(res.error || 'تعذّر إنشاء الغرفة');
+        }
+      }).catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '🚀 إنشاء الغرفة وبدء البهو';
+        toast(err.message || 'تعذّر إنشاء الغرفة المباشرة');
+      });
+    };
+  }
+
+  // 5. واجهة المعلم: شاشة البهو وانتظار الطلاب (Host Lobby)
+  function renderHostLobby() {
+    state.view = 'live_host_lobby';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var players = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<span class="ar-av-badge">👑</span>' +
+        '<b>لوحة تحكم المعلم (المضيف)</b>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<button type="button" class="btn ghost small" id="arHostExitBtn">🚪 خروج من الغرفة</button>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="ar-live-code-card">' +
+      '<span style="font-size:1.1rem;color:var(--mute)">رمز الغرفة المباشرة للطلاب:</span>' +
+      '<div><span class="ar-room-code-badge" id="arRoomCodeVal">' + esc(live.state.code) + '</span></div>' +
+      '<p style="margin:8px 0;font-size:1rem;color:var(--ink)">رابط الدخول المباشر: <b>' + esc(location.origin + '/arena?code=' + live.state.code) + '</b></p>' +
+      '<button type="button" class="btn ghost small" id="arCopyCodeLink">📋 نسخ الرابط</button>' +
+    '</div>';
+
+    h += '<div class="card ar-players-panel">' +
+      '<div class="ar-players-title">' +
+        '<span>👥 الطلاب المنضمون في البهو:</span>' +
+        '<b id="arPlayerCount" style="color:var(--main);font-size:1.25rem">' + players.length + '</b>' +
+      '</div>' +
+      '<div class="ar-students-roster" id="arRosterBox">';
+
+    if (!players.length) {
+      h += '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--mute)">في انتظار انضمام الطلاب عبر الرمز أعلاه…</div>';
+    } else {
+      players.forEach(function(p) {
+        h += '<span class="ar-student-chip">' +
+          '<span>' + esc(p.avatar || '🦅') + '</span>' +
+          '<b>' + esc(p.name) + '</b>' +
+          '<button type="button" class="ar-kick-btn" data-kid="' + esc(p.id) + '" title="طرد الطالب">✕</button>' +
+        '</span>';
+      });
+    }
+
+    h += '</div>' +
+      '<div class="ar-host-actions">' +
+        '<button type="button" class="btn primary ar-start-btn" id="arHostStartBtn"' + (players.length === 0 ? ' disabled' : '') + '>🚀 بدء المنافسة الآن</button>' +
+        '<button type="button" class="btn secondary" id="arHostLockBtn">' + (live.state.locked ? '🔓 فتح الغرفة' : '🔒 قفل الغرفة') + '</button>' +
+      '</div>' +
+    '</div>';
+
+    main.innerHTML = h;
+
+    $('arHostExitBtn').onclick = function() {
+      if (confirm('هل تريد إغلاق الغرفة وإنهاء الجلسة للجميع؟')) leaveLiveSession();
+    };
+
+    $('arCopyCodeLink').onclick = function() {
+      var lnk = location.origin + '/arena?code=' + live.state.code;
+      navigator.clipboard ? navigator.clipboard.writeText(lnk).then(function() { toast('تم نسخ الرابط!'); }) : toast(lnk);
+    };
+
+    var sBtn = $('arHostStartBtn');
+    if (sBtn) {
+      sBtn.onclick = function() {
+        this.disabled = true;
+        this.textContent = 'جارٍ الانطلاق…';
+        if (live.ws && live.ws.readyState === 1) {
+          live.ws.send(JSON.stringify({ action: 'start' }));
+        }
+      };
+    }
+
+    var lBtn = $('arHostLockBtn');
+    if (lBtn) {
+      lBtn.onclick = function() {
+        if (live.ws && live.ws.readyState === 1) {
+          live.ws.send(JSON.stringify({ action: 'lock', locked: !live.state.locked }));
+        }
+      };
+    }
+
+    var kBtns = document.querySelectorAll('.ar-kick-btn');
+    Array.prototype.forEach.call(kBtns, function(b) {
+      b.onclick = function() {
+        var kid = this.getAttribute('data-kid');
+        if (kid && confirm('هل أنت متأكد من استبعاد هذا الطالب؟')) {
+          if (live.ws && live.ws.readyState === 1) {
+            live.ws.send(JSON.stringify({ action: 'kick', targetPlayerId: kid }));
+          }
+        }
+      };
+    });
+  }
+
+  // 6. واجهة المعلم: شاشة إدارة السؤال وكشف الإجابات (Host Game & Reveal)
+  function renderHostGame() {
+    state.view = 'live_host_game';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var q = live.state.question || { index: 0, total: 1, stem: 'السؤال', choices: [] };
+    var isReveal = live.state.state === 'REVEAL';
+    var isPaused = live.state.state === 'PAUSED';
+    var activePlayers = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<b>السؤال ' + (q.index + 1) + ' من ' + q.total + '</b>' +
+        '<span class="ar-tag active" style="margin-inline-start:8px">' + (isReveal ? 'كشف الإجابات' : (isPaused ? 'متوقف مؤقتاً' : 'نشط')) + '</span>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<button type="button" class="btn ghost small" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
+        '<button type="button" class="btn ghost small" id="arHostSkipBtn">⏭️ تخطي</button>' +
+        '<button type="button" class="btn ghost small" id="arHostEndBtn">🚪 إنهاء</button>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="card ar-live-q-box">' +
+      '<div class="ar-live-q-top">' +
+        '<span style="font-size:1rem;color:var(--mute)">كود الغرفة: <b>' + esc(live.state.code) + '</b></span>' +
+        '<div class="ar-live-timer' + (live.state.remainingSeconds <= 3 && !isReveal ? ' urgent' : '') + '">⏱️ ' + live.state.remainingSeconds + 'ث</div>' +
+      '</div>' +
+      '<div class="ar-live-q-stem">' + esc(q.stem) + '</div>';
+
+    if (isReveal) {
+      // إحصائيات توزيع إجابات الطلاب للمعلم
+      var dist = q.distribution || [0, 0, 0, 0];
+      var totalAnswers = dist.reduce(function(a, b) { return a + b; }, 0) || 1;
+      h += '<div class="ar-bars-dist">' +
+        '<h4>📊 إحصائيات إجابات الطلاب:</h4>';
+      q.choices.forEach(function(ch, idx) {
+        var isCorr = idx === q.correct;
+        var cnt = dist[idx] || 0;
+        var pct = Math.round((cnt / totalAnswers) * 100);
+        h += '<div class="ar-bar-row">' +
+          '<span class="ar-bar-label">' + (idx + 1) + '</span>' +
+          '<div class="ar-bar-track">' +
+            '<div class="ar-bar-fill opt-' + idx + '" style="width:' + pct + '%"></div>' +
+          '</div>' +
+          '<span class="ar-bar-cnt">' + cnt + ' (' + pct + '%)' + (isCorr ? ' ✓' : '') + '</span>' +
+          '<span style="flex:2;margin-inline-start:8px;font-size:.9rem' + (isCorr ? ';color:#10b981;font-weight:700' : '') + '">' + esc(ch) + '</span>' +
+        '</div>';
+      });
+      h += '</div>';
+    } else {
+      // عرض الخيارات مع إشارة للإجابة الصحيحة للمعلم فقط
+      h += '<div class="ar-live-grid">';
+      q.choices.forEach(function(ch, idx) {
+        var isHint = idx === q.hostHintCorrect;
+        h += '<div class="ar-live-btn opt-' + idx + '" style="cursor:default' + (isHint ? ';border:3px solid #fff;box-shadow:0 0 0 4px #10b981' : '') + '">' +
+          '<span class="ar-shape">' + (idx + 1) + '</span>' +
+          '<span>' + esc(ch) + (isHint ? ' <small style="background:rgba(0,0,0,.2);padding:2px 6px;border-radius:6px">✓ الصحيحة</small>' : '') + '</span>' +
+        '</div>';
+      });
+      h += '</div>';
+    }
+
+    h += '</div>';
+
+    // لوحة المتصدرين المصغرة
+    h += '<div class="card" style="padding:16px">' +
+      '<h4 style="margin:0 0 10px;font-size:1.05rem">🏆 لوحة المتصدرين الحالية:</h4>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+    (live.state.leaderboard || []).slice(0, 5).forEach(function(p, idx) {
+      h += '<div class="ar-student-chip">' +
+        '<span>' + (idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️'))) + '</span>' +
+        '<b>' + esc(p.name) + '</b>' +
+        '<span style="color:var(--accent);font-weight:700">' + p.score + 'ن</span>' +
+      '</div>';
+    });
+    h += '</div></div>';
+
+    main.innerHTML = h;
+
+    $('arHostPauseBtn').onclick = function() {
+      if (live.ws && live.ws.readyState === 1) {
+        live.ws.send(JSON.stringify({ action: isPaused ? 'resume' : 'pause' }));
+      }
+    };
+    $('arHostSkipBtn').onclick = function() {
+      if (live.ws && live.ws.readyState === 1 && confirm('هل تريد تخطي هذا السؤال؟')) {
+        live.ws.send(JSON.stringify({ action: 'skip' }));
+      }
+    };
+    $('arHostEndBtn').onclick = function() {
+      if (confirm('هل تريد إنهاء المسابقة المباشرة الآن؟')) leaveLiveSession();
+    };
+  }
+
+  // 7. واجهة المعلم: شاشة التتويج والمنصة (Host Podium)
+  function renderHostPodium() {
+    state.view = 'live_host_podium';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var list = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
+    var p1 = list[0] || null;
+    var p2 = list[1] || null;
+    var p3 = list[2] || null;
+
+    var h = '<div class="card ar-result-card">' +
+      '<div class="ar-res-trophy">🏆</div>' +
+      '<h2>منصة تتويج أبطال الساحة</h2>' +
+      '<p class="ar-res-lead">تهانينا لجميع الطلاب المتنافسين! تم حفظ النتائج بنجاح.</p>' +
+      '<div class="ar-podium-wrap">';
+
+    // المركز الثاني (فضة)
+    if (p2) {
+      h += '<div class="ar-podium-col rank-2">' +
+        '<span style="font-size:1.8rem">' + esc(p2.avatar || '🥈') + '</span>' +
+        '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">2</div>' +
+      '</div>';
+    }
+
+    // المركز الأول (ذهب)
+    if (p1) {
+      h += '<div class="ar-podium-col rank-1">' +
+        '<span style="font-size:2.4rem">👑</span>' +
+        '<span style="font-size:2rem">' + esc(p1.avatar || '🦅') + '</span>' +
+        '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
+        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">1</div>' +
+      '</div>';
+    }
+
+    // المركز الثالث (برونز)
+    if (p3) {
+      h += '<div class="ar-podium-col rank-3">' +
+        '<span style="font-size:1.8rem">' + esc(p3.avatar || '🥉') + '</span>' +
+        '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">3</div>' +
+      '</div>';
+    }
+
+    h += '</div>';
+
+    // جدول الترتيب الكامل
+    h += '<table class="ar-leaderboard-tbl">' +
+      '<thead><tr><th>المركز</th><th>اسم الطالب</th><th>النقاط</th><th>الإجابات الصحيحة</th></tr></thead><tbody>';
+    list.forEach(function(p, idx) {
+      h += '<tr>' +
+        '<td><b>' + (idx + 1) + '</b></td>' +
+        '<td>' + esc(p.name) + '</td>' +
+        '<td style="color:var(--accent);font-weight:700">' + p.score + '</td>' +
+        '<td>' + (p.correctCount || 0) + '</td>' +
+      '</tr>';
+    });
+    h += '</tbody></table>';
+
+    h += '<div class="ar-res-actions">' +
+      '<button type="button" class="btn primary" id="arHostDoneBtn">العودة للرئيسية 🏠</button>' +
+      '<button type="button" class="btn secondary" id="arHostRepBtn">عرض تقارير الطلاب 📊</button>' +
+    '</div></div>';
+
+    main.innerHTML = h;
+
+    $('arHostDoneBtn').onclick = function() { leaveLiveSession(); };
+    $('arHostRepBtn').onclick = function() {
+      leaveLiveSession();
+      renderTeacherReports();
+    };
+  }
+
+  // 8. واجهة الطالب: نموذج الانضمام (Student Join Screen)
+  function renderStudentJoinForm(initialCode) {
+    state.view = 'live_join';
+    var main = $('arenaMain');
+    if (!main) return;
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<span class="ar-av-badge">🎯</span>' +
+        '<b>انضمام لمسابقة مباشرة</b>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<button type="button" class="btn ghost small" id="arCancelJoinBtn">رجوع للساحة</button>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="card ar-setup-card" style="max-width:520px;margin:24px auto;padding:24px;text-align:center">' +
+      '<h2 style="margin:0 0 16px;font-size:1.3rem;color:var(--main-d)">ادخل بياناتك للانضمام</h2>' +
+      '<div class="ar-form-row" style="text-align:right">' +
+        '<label for="arLiveCodeInput">رمز الغرفة (6 أحرف):</label>' +
+        '<input type="text" id="arLiveCodeInput" maxlength="6" value="' + esc(initialCode || '') + '" placeholder="ABCDEF" style="text-transform:uppercase;font-family:monospace;font-size:1.6rem;letter-spacing:4px;text-align:center" required>' +
+      '</div>' +
+      '<div class="ar-form-row" style="text-align:right">' +
+        '<label for="arLiveNameInput">اسمك (للظهور في المسابقة):</label>' +
+        '<input type="text" id="arLiveNameInput" maxlength="30" placeholder="مثال: أحمد العماني" required>' +
+      '</div>' +
+      '<div class="ar-form-row" style="text-align:right">' +
+        '<label for="arLiveClassInput">كود الفصل (اختياري لحفظ رصيد الجوائز):</label>' +
+        '<input type="text" id="arLiveClassInput" placeholder="مثال: 6K52W2">' +
+      '</div>' +
+      '<div class="ar-host-actions" style="margin-top:20px">' +
+        '<button type="button" class="btn primary ar-start-btn" id="arSubmitJoinBtn" style="width:100%;min-height:48px;font-size:1.1rem">دخول الساحة المباشرة ←</button>' +
+      '</div>' +
+    '</div>';
+
+    main.innerHTML = h;
+
+    $('arCancelJoinBtn').onclick = function() { renderSetup(); };
+
+    $('arSubmitJoinBtn').onclick = function() {
+      var btn = this;
+      var code = ($('arLiveCodeInput').value || '').trim().toUpperCase();
+      var name = ($('arLiveNameInput').value || '').trim();
+      var classId = ($('arLiveClassInput').value || '').trim();
+
+      if (!code || code.length !== 6) { toast('أدخل رمز الغرفة المكون من 6 أحرف!'); return; }
+      if (!name) { toast('اكتب اسمك للمشاركة!'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'جارٍ الانضمام…';
+
+      api('/api/arena/live/join', {
+        code: code,
+        name: name,
+        class_id: classId,
+        avatar: state.activeAvatar
+      }).then(function(res) {
+        if (res && res.playerToken) {
+          toast('أهلاً بك يا ' + res.name + '!');
+          connectLiveWs(res.code, res.playerToken, 'student');
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'دخول الساحة المباشرة ←';
+          toast(res.error || 'تعذّر الانضمام');
+        }
+      }).catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'دخول الساحة المباشرة ←';
+        toast(err.message || 'تعذّر الانضمام للغرفة المباشرة');
+      });
+    };
+  }
+
+  // 9. واجهة الطالب: شاشة الانتظار في البهو (Student Lobby)
+  function renderStudentLobby() {
+    state.view = 'live_student_lobby';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<span class="ar-av-badge">' + esc(state.activeAvatar || '🦅') + '</span>' +
+        '<b>الساحة المباشرة</b>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<button type="button" class="btn ghost small" id="arStudentLeaveLobby">🚪 مغادرة</button>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="card ar-setup-card" style="max-width:520px;margin:30px auto;padding:32px 20px;text-align:center">' +
+      '<div style="font-size:3.5rem;margin-bottom:12px">⏳</div>' +
+      '<h2 style="font-size:1.4rem;color:var(--main-d);margin-bottom:8px">أنت الآن في البهو!</h2>' +
+      '<p style="font-size:1.1rem;color:var(--ink);margin-bottom:16px">رمز الغرفة: <b style="font-family:monospace;letter-spacing:2px">' + esc(live.state.code) + '</b></p>' +
+      '<div class="ar-notice-strip" style="justify-content:center">' +
+        '<span>المعلم يجهز المنافسة، سيبدأ السؤال الأول على هاتفك تلقائياً فور الانطلاق… استعد!</span>' +
+      '</div>' +
+    '</div>';
+
+    main.innerHTML = h;
+
+    $('arStudentLeaveLobby').onclick = function() {
+      if (confirm('هل تريد مغادرة الغرفة؟')) leaveLiveSession();
+    };
+  }
+
+  // 10. واجهة الطالب: شاشة الإجابة بأزرار كبيرة ولمسية (Student Question Screen)
+  function renderStudentQuestion() {
+    state.view = 'live_student_question';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var q = live.state.question || { index: 0, total: 1, stem: '', choices: [] };
+    var answered = live.answered;
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<b>السؤال ' + (q.index + 1) + ' من ' + q.total + '</b>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<div class="ar-live-timer' + (live.state.remainingSeconds <= 3 ? ' urgent' : '') + '">⏱️ ' + live.state.remainingSeconds + 'ث</div>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="card ar-live-q-box">' +
+      '<div class="ar-live-q-stem">' + esc(q.stem) + '</div>';
+
+    if (answered) {
+      h += '<div class="ar-notice-strip" style="justify-content:center;margin:16px 0;background:#e1f3ec;color:#0b3b33">' +
+        '<span>✓ تم تسجيل إجابتك بنجاح! في انتظار انتهاء وقت السؤال لكشف النتيجة…</span>' +
+      '</div>';
+    }
+
+    var shapes = ['▲', '◆', '●', '◼'];
+    h += '<div class="ar-live-grid">';
+    q.choices.forEach(function(ch, idx) {
+      var isSel = live.selectedChoice === idx;
+      h += '<button type="button" class="ar-live-btn opt-' + idx + (isSel ? ' selected' : '') + '" data-cidx="' + idx + '"' + (answered ? ' disabled' : '') + '>' +
+        '<span class="ar-shape">' + shapes[idx] + '</span>' +
+        '<span>' + esc(ch) + '</span>' +
+      '</button>';
+    });
+    h += '</div></div>';
+
+    main.innerHTML = h;
+
+    if (!answered) {
+      var btns = document.querySelectorAll('.ar-live-btn');
+      Array.prototype.forEach.call(btns, function(b) {
+        b.onclick = function() {
+          var cidx = +this.getAttribute('data-cidx');
+          live.selectedChoice = cidx;
+          live.answered = true;
+          playSfx('coin');
+          if (live.ws && live.ws.readyState === 1) {
+            live.ws.send(JSON.stringify({ action: 'answer', choiceIndex: cidx }));
+          }
+          renderStudentQuestion();
+        };
+      });
+    }
+  }
+
+  // 11. واجهة الطالب: كشف النتيجة والنقاط (Student Reveal Screen)
+  function renderStudentReveal() {
+    state.view = 'live_student_reveal';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var q = live.state.question || { choices: [], correct: 0 };
+    var res = live.myResult;
+    var isCorrect = res && res.isCorrect;
+
+    var h = '<div class="ar-top-bar">' +
+      '<div class="ar-user-info">' +
+        '<b>كشف الإجابات 🎯</b>' +
+      '</div>' +
+      '<div class="ar-top-actions">' +
+        '<span>السؤال القادم قريباً…</span>' +
+      '</div>' +
+    '</div>';
+
+    h += '<div class="card ar-reveal-card">';
+    if (isCorrect) {
+      h += '<div class="ar-reveal-status ok">🎉 إجابة صحيحة وممتازة!</div>' +
+        '<div class="ar-reveal-pts">+' + (res.pointsAwarded || 500) + ' نقطة</div>';
+      playSfx('correct');
+    } else if (live.answered) {
+      h += '<div class="ar-reveal-status fail">❌ إجابة خاطئة! حظاً أوفر</div>' +
+        '<div style="color:var(--mute);margin-bottom:12px">لم تكتسب نقاطاً في هذا السؤال</div>';
+      playSfx('wrong');
+    } else {
+      h += '<div class="ar-reveal-status fail">⏳ انتهى الوقت دون إجابة!</div>';
+    }
+
+    h += '<div class="ar-notice-strip" style="justify-content:center;margin:16px 0">' +
+      '<span>الإجابة الصحيحة هي: <b>' + esc(q.answer || q.choices[q.correct] || '') + '</b></span>' +
+    '</div>';
+
+    // الترتيب الحالي للطالب
+    var me = (live.state.leaderboard || []).find(function(p) { return p.id === (live.state.playerId || (live.myResult && live.myResult.playerId)); });
+    if (me) {
+      h += '<div style="margin-top:16px;font-size:1.1rem;color:var(--ink)">' +
+        'مركزك الحالي: <b style="color:var(--main);font-size:1.3rem">#' + me.rank + '</b> (مجموعك: <b>' + me.score + '</b> نقطة)' +
+      '</div>';
+    }
+
+    h += '</div>';
+
+    main.innerHTML = h;
+  }
+
+  // 12. واجهة الطالب: منصة التتويج النهائية (Student Podium Screen)
+  function renderStudentPodium() {
+    state.view = 'live_student_podium';
+    var main = $('arenaMain');
+    if (!main || !live.state) return;
+
+    var list = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
+    var p1 = list[0] || null;
+    var p2 = list[1] || null;
+    var p3 = list[2] || null;
+
+    var me = list.find(function(p) { return p.id === live.state.playerId; }) || list[0];
+
+    var h = '<div class="card ar-result-card">' +
+      '<div class="ar-res-trophy">🏆</div>' +
+      '<h2>انتهت المسابقة المباشرة!</h2>' +
+      '<p class="ar-res-lead">أحسنت المشاركة والمنافسة اليوم!</p>';
+
+    if (me) {
+      h += '<div style="background:var(--main-l);border:2px solid var(--main);border-radius:14px;padding:14px;margin:16px 0">' +
+        '<span style="font-size:1.15rem;color:var(--main-d)">نتيجتك النهائية: </span>' +
+        '<b style="font-size:1.4rem;color:var(--main-d)">المركز #' + (me.rank || 1) + ' بمجموع ' + (me.score || 0) + ' نقطة</b>' +
+      '</div>';
+    }
+
+    h += '<div class="ar-podium-wrap">';
+    if (p2) {
+      h += '<div class="ar-podium-col rank-2">' +
+        '<span style="font-size:1.8rem">' + esc(p2.avatar || '🥈') + '</span>' +
+        '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">2</div>' +
+      '</div>';
+    }
+    if (p1) {
+      h += '<div class="ar-podium-col rank-1">' +
+        '<span style="font-size:2.2rem">👑</span>' +
+        '<span style="font-size:2rem">' + esc(p1.avatar || '🦅') + '</span>' +
+        '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
+        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">1</div>' +
+      '</div>';
+    }
+    if (p3) {
+      h += '<div class="ar-podium-col rank-3">' +
+        '<span style="font-size:1.8rem">' + esc(p3.avatar || '🥉') + '</span>' +
+        '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + 'ن</span>' +
+        '<div class="ar-podium-pedestal">3</div>' +
+      '</div>';
+    }
+    h += '</div>';
+
+    h += '<div class="ar-res-actions">' +
+      '<button type="button" class="btn primary" id="arStudentDoneBtn">العودة للساحة الرئيسية 🏠</button>' +
+    '</div></div>';
+
+    main.innerHTML = h;
+
+    $('arStudentDoneBtn').onclick = function() {
+      leaveLiveSession();
+    };
+  }
+
+  // ==========================================
   // الانطلاق والتحميل الأولي
   // ==========================================
   function init() {
+    // 0. فحص رابط الانضمام المباشر أو استئناف الجلسة الحية
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var codeParam = urlParams.get('code');
+      var joinParam = urlParams.get('join');
+      if (codeParam || joinParam) {
+        renderStudentJoinForm(codeParam || '');
+        return;
+      }
+      var savedTok = sessionStorage.getItem('arena_live_token');
+      var savedCod = sessionStorage.getItem('arena_live_code');
+      var savedRol = sessionStorage.getItem('arena_live_role');
+      if (savedTok && savedCod && savedRol) {
+        connectLiveWs(savedCod, savedTok, savedRol);
+        return;
+      }
+    } catch (e) {}
+
     // 1. مزامنة بيانات المستخدم لتفعيل أدوات المعلم (بدون تحويل قسري عند عدم تسجيل الدخول)
     try {
       var h = {};
@@ -1199,6 +2005,7 @@
 
     api('/api/arena/courses').then(function(res) {
       state.courses = res.courses || [];
+      state.liveEnabled = !!res.live_enabled;
       // تحديد أول مقرر متاح فيه أسئلة
       var firstOk = state.courses.find(function(c) { return c.has_arena; });
       if (firstOk) {

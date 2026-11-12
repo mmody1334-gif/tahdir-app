@@ -1790,6 +1790,56 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
 .ar-form-row{margin-bottom:12px}
 .ar-form-row label{display:block;font-weight:700;font-size:.88rem;margin-bottom:4px}
 .ar-form-row input,.ar-form-row textarea,.ar-form-row select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
+/* ---------- اللعب المباشر (Live Multiplayer) ---------- */
+.ar-live-code-card{text-align:center;padding:24px 18px;background:var(--paper);border:2px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-bottom:18px}
+.ar-room-code-badge{display:inline-block;font-size:3rem;font-weight:900;letter-spacing:5px;color:var(--main-d);background:var(--main-l);border:2px dashed var(--main);border-radius:18px;padding:8px 24px;margin:12px 0;font-family:monospace;direction:ltr}
+.ar-players-panel{margin:18px 0;text-align:right}
+.ar-players-title{font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.ar-students-roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:240px;overflow-y:auto;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.ar-student-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;font-size:.88rem}
+.ar-kick-btn{margin-inline-start:auto;background:none;border:none;color:var(--danger,#b23a2b);cursor:pointer;padding:2px 4px;font-size:.85rem}
+.ar-host-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.ar-live-q-box{padding:22px;border-radius:18px;margin-bottom:16px}
+.ar-live-q-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.ar-live-timer{font-size:1.5rem;font-weight:800;color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.ar-live-timer.urgent{color:var(--danger,#b23a2b)}
+.ar-live-q-stem{font-size:1.3rem;font-weight:700;line-height:1.5;margin-bottom:20px;color:var(--ink);text-align:right}
+.ar-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.ar-live-grid{grid-template-columns:1fr}}
+.ar-live-btn{display:flex;align-items:center;gap:12px;min-height:72px;padding:14px 18px;border-radius:16px;border:none;color:#fff;font-family:inherit;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .1s,box-shadow .15s;text-align:right;box-shadow:0 3px 10px rgba(0,0,0,.15);touch-action:manipulation}
+.ar-live-btn:active{transform:scale(.97)}
+.ar-live-btn:disabled{opacity:.65;cursor:not-allowed}
+.ar-live-btn.opt-0{background:#d9383a}
+.ar-live-btn.opt-1{background:#1e88e5}
+.ar-live-btn.opt-2{background:#d97706}
+.ar-live-btn.opt-3{background:#10b981}
+.ar-live-btn .ar-shape{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);font-size:1rem;flex-shrink:0}
+.ar-live-btn.selected{outline:4px solid #fff;box-shadow:0 0 0 6px var(--main)}
+.ar-live-btn.correct-choice{outline:5px solid #fff;box-shadow:0 0 0 7px #10b981}
+.ar-reveal-card{text-align:center;padding:24px 18px;background:var(--paper);border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px}
+.ar-reveal-status{font-size:1.6rem;font-weight:800;margin-bottom:10px}
+.ar-reveal-status.ok{color:#10b981}
+.ar-reveal-status.fail{color:#d9383a}
+.ar-reveal-pts{font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:14px}
+.ar-bars-dist{margin:16px 0;text-align:right}
+.ar-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.88rem}
+.ar-bar-label{width:24px;font-weight:700}
+.ar-bar-track{flex:1;height:22px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.ar-bar-fill{height:100%;transition:width .3s ease}
+.ar-bar-fill.opt-0{background:#d9383a}
+.ar-bar-fill.opt-1{background:#1e88e5}
+.ar-bar-fill.opt-2{background:#d97706}
+.ar-bar-fill.opt-3{background:#10b981}
+.ar-bar-cnt{font-size:.82rem;width:40px;text-align:left}
+.ar-podium-wrap{margin:24px 0;display:flex;align-items:flex-end;justify-content:center;gap:12px;min-height:220px}
+.ar-podium-col{display:flex;flex-direction:column;align-items:center;width:105px;text-align:center}
+.ar-podium-pedestal{width:100%;border-radius:12px 12px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800}
+.ar-podium-col.rank-1 .ar-podium-pedestal{height:140px;background:linear-gradient(180deg,#f59e0b,#d97706);font-size:1.8rem}
+.ar-podium-col.rank-2 .ar-podium-pedestal{height:100px;background:linear-gradient(180deg,#94a3b8,#64748b);font-size:1.5rem}
+.ar-podium-col.rank-3 .ar-podium-pedestal{height:75px;background:linear-gradient(180deg,#d97706,#b45309);font-size:1.3rem}
+.ar-leaderboard-tbl{width:100%;border-collapse:collapse;margin:18px 0;font-size:.92rem}
+.ar-leaderboard-tbl th,.ar-leaderboard-tbl td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right}
+.ar-leaderboard-tbl th{background:var(--bg);font-weight:700}
 @media(prefers-reduced-motion:reduce){.ar-progress-fill,.ar-rep-fill,.ar-tower-hp-fill,.ar-choice-btn,.ar-chest-box{transition:none !important;animation:none !important}}
 '''
 CSS = base_css + extra_css

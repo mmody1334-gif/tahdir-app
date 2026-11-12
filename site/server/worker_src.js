@@ -1154,7 +1154,10 @@ async function arenaApi(req, env, me, p, m, url) {
         mCourses.set(k, c);
       }
     });
-    return json({ courses: Array.from(mCourses.values()) });
+    return json({
+      courses: Array.from(mCourses.values()),
+      live_enabled: String(env.ARENA_LIVE_ENABLED || '').toLowerCase() === 'true' || env.ARENA_LIVE_ENABLED === true
+    });
   }
 
   // 2. استرجاع بيانات دروس ووحدات المقرر
@@ -1346,7 +1349,8 @@ async function arenaApi(req, env, me, p, m, url) {
     if (itemId === 'falcon') return json({ error: 'هذه الشخصية مفتوحة لديك بالفعل.' }, 400);
 
     const c = cookies(req);
-    const did = String(c.did || req.headers.get('X-Tahdir-Did') || (b && b.device_id) || '').trim();
+    // did في اللعب الحي: خذه من الكوكي did أو الترويسة الموثوقة (وليس من جسم الطلب) لمنع تزوير رصيد الأجهزة
+    const did = String(c.did || req.headers.get('X-Tahdir-Did') || '').trim() || null;
     const classId = b && b.class_id ? String(b.class_id).trim() : '';
 
     const rowId = 'item_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
@@ -1405,7 +1409,8 @@ async function arenaApi(req, env, me, p, m, url) {
     }
 
     const c = cookies(req);
-    const did = String(c.did || req.headers.get('X-Tahdir-Did') || (b && b.device_id) || '').trim();
+    // did في اللعب الحي: خذه من الكوكي did أو الترويسة الموثوقة (وليس من جسم الطلب) لمنع تزوير رصيد الأجهزة
+    const did = String(c.did || req.headers.get('X-Tahdir-Did') || '').trim() || null;
     const classId = b && b.class_id ? String(b.class_id).trim() : '';
     if (classId && did) {
       const studentKey = classId + ':' + did;
@@ -1685,7 +1690,8 @@ async function arenaLiveApi(req, env, me, p, m, url) {
     }
 
     const c = cookies(req);
-    const did = String(c.did || req.headers.get('X-Tahdir-Did') || (b && b.device_id) || '').trim();
+    // did في اللعب الحي: خذه من الكوكي did أو الترويسة الموثوقة (وليس من جسم الطلب) لمنع تزوير رصيد الأجهزة
+    const did = String(c.did || req.headers.get('X-Tahdir-Did') || '').trim() || null;
 
     const playerId = 'p_' + rand(10);
     const playerToken = 'pt_' + rand(24);

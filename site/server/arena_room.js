@@ -24,6 +24,23 @@ class ArenaRoom {
 
     if (savedState) {
       this.engine = ArenaEngine.deserialize(savedState);
+
+      // دمج إجابات السؤال الحالي من مرفقات مقابس الطلاب (WebSocket Hibernation attachments)
+      // لحماية النقاط من الضياع عند سبات الـ DO قبل انتهاء وقت السؤال (Zero storage writes)
+      if (this.engine && this.engine.state === ENGINE_STATES.QUESTION && this.ctx && typeof this.ctx.getWebSockets === 'function') {
+        try {
+          const sockets = this.ctx.getWebSockets();
+          for (const s of sockets) {
+            const att = s.deserializeAttachment ? s.deserializeAttachment() : null;
+            if (att && att.role === 'student' && att.playerId && att.answers) {
+              const ans = att.answers[this.engine.currentQIndex];
+              if (ans && ans.choice !== undefined && !this.engine.roundAnswers.has(att.playerId)) {
+                this.engine.submitAnswer(att.playerId, ans.choice, ans.atMs || Date.now());
+              }
+            }
+          }
+        } catch (e) {}
+      }
     }
     if (savedHostToken) {
       this.hostToken = savedHostToken;
@@ -218,6 +235,22 @@ class ArenaRoom {
           // حساب سرعة الإجابة بوقت الخادم فقط (nowMs)
           const res = engine.submitAnswer(playerId, data.choiceIndex, nowMs);
           if (res.ok) {
+            // حفظ الإجابة في مرفق المقبس (WebSocket Hibernation attachment)
+            // لحمايتها من الضياع عند سبات الـ DO (Zero storage cost)
+            try {
+              const att = ws.deserializeAttachment ? ws.deserializeAttachment() : null;
+              if (att) {
+                att.answers = att.answers || {};
+                att.answers[engine.currentQIndex] = {
+                  choice: data.choiceIndex,
+                  atMs: nowMs
+                };
+                if (typeof ws.serializeAttachment === 'function') {
+                  ws.serializeAttachment(att);
+                }
+              }
+            } catch (e) {}
+
             ws.send(JSON.stringify({
               type: 'answer_ack',
               choiceIndex: data.choiceIndex,
