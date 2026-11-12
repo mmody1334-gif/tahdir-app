@@ -5,5 +5,7 @@ local.properties
 # إعداد OCR مولَّد تلقائيًا
 site/tools/rapidocr_arabic.yaml
 site/tests/cards_print.pdf
+site/.wrangler/
+site/node_modules/
 
 grindmate27/scripts/node_modules/

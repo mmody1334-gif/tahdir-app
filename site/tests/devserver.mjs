@@ -27,7 +27,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 const ASSETS = { fetch: async rq => { const p = decodeURIComponent(new URL(rq.url).pathname); const f = join(dir, '../dist/assets', p); const ct = f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/json'; return existsSync(f) ? new Response(readFileSync(f), { headers: { 'content-type': ct } }) : new Response('nf', { status: 404 }); } };
 // بيئة العامل: نمرّر أيضًا إعدادات قابلة للضبط من متغيّرات البيئة حتى نستطيع اختبارها محليًا
 // (مثل STALE_SECONDS: مدة إهمال الجهاز). في الإنتاج تُضبط من إعدادات الـWorker.
-const ENV = { DB, ASSETS, ...(process.env.AI_KEY ? { AI_KEY: process.env.AI_KEY, AI_URL: process.env.AI_URL } : {}) };
+const ENV = { DB, ASSETS, ARENA_LIVE_ENABLED: process.env.ARENA_LIVE_ENABLED === 'true', ...(process.env.AI_KEY ? { AI_KEY: process.env.AI_KEY, AI_URL: process.env.AI_URL } : {}) };
 if (process.env.STALE_SECONDS) ENV.STALE_SECONDS = process.env.STALE_SECONDS;
 
 http.createServer(async (req, res) => {
@@ -50,12 +50,15 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
     res.end(readFileSync(f)); return;
   }
-  // أصل ساحة التحدي: يُخدَم كما في الإنتاج (/arena.js → dist/assets/arena.js)
-  if (req.url === '/arena.js' || req.url.startsWith('/arena.js?')) {
-    const f = join(dir, '../dist/assets/arena.js');
-    if (!existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
+  // أصل ساحة التحدي: يُخدَم كما في الإنتاج (/arena.js أو /arena.<hash>.js → dist/assets/...)
+  if (req.url.startsWith('/arena') && req.url.split('?')[0].endsWith('.js')) {
+    const raw = req.url.split('?')[0].slice(1);
+    const f = join(dir, '../dist/assets', raw);
+    const fallback = join(dir, '../dist/assets/arena.js');
+    const target = existsSync(f) ? f : (existsSync(fallback) ? fallback : null);
+    if (!target || statSync(target).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
-    res.end(readFileSync(f)); return;
+    res.end(readFileSync(target)); return;
   }
   // فيديو الإعلانات: يُخدَم كما في الإنتاج (/promo/… → dist/assets/promo/…) مع دعم Range لتشغيل الفيديو
   if (req.url.startsWith('/promo/')) {

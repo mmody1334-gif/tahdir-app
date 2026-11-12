@@ -2239,7 +2239,7 @@ PAGES = {
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
-  'arena': page_asset('ساحة التحدي · الكبسولة', ARENA_PAGE, '/arena.js'),
+  'arena': page_asset('ساحة التحدي · الكبسولة', ARENA_PAGE, '__ARENA_JS__'),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
   'homework': page('الواجبات المنزلية · الكبسولة', HOMEWORK, "window.PAGE_MODE='hw';" + chr(10) + rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@FX@@', rd('client_fx.js')).replace('// @@TUG@@', rd('client_tug.js') + chr(10) + rd('client_arcade.js') + chr(10) + rd('client_runner.js'))),
@@ -2357,7 +2357,12 @@ if os.path.isdir(os.path.join(DIST, 'assets', 'd')):
         if _o != _PH: _sh.rmtree(os.path.join(DIST, 'assets', 'd', _o), ignore_errors=True)
 _PD = os.path.join(DIST, 'assets', 'd', _PH); os.makedirs(_PD, exist_ok=True)
 for k, b in _PB.items(): open(os.path.join(_PD, k + '.json'), 'wb').write(b)
-open(os.path.join(DIST, 'assets', 'arena.js'), 'w', encoding='utf-8').write(common + chr(10) + rd('client_arena.js'))
+arena_raw = common + chr(10) + rd('client_arena.js')
+_arena_hash = _hl.sha256(arena_raw.encode('utf-8')).hexdigest()[:12]
+_arena_name = f'arena.{_arena_hash}.js'
+open(os.path.join(DIST, 'assets', _arena_name), 'w', encoding='utf-8').write(arena_raw)
+open(os.path.join(DIST, 'assets', 'arena.js'), 'w', encoding='utf-8').write(arena_raw)
+src = src.replace('__ARENA_JS__', f'/{_arena_name}')
 src = src.replace('__PACKDIR__', json.dumps('/d/' + _PH + '/'))
 src = src.replace('__QBANK__', json.dumps(qbank, ensure_ascii=False, separators=(',', ':')))
 src = src.replace('__BUILD__', json.dumps(BUILD))
@@ -2373,6 +2378,18 @@ src = src.replace('__EXTZIP__', json.dumps(_b64.b64encode(open(_ext_zip, 'rb').r
 src = src.replace('__APK__', json.dumps(_b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
 _tq_apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'teqany.apk')
 src = src.replace('__APK_TQ__', json.dumps(_b64.b64encode(open(_tq_apk_path, 'rb').read()).decode() if os.path.exists(_tq_apk_path) else _b64.b64encode(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'tahdir.apk'),'rb').read()).decode()))
+
+# دمج المحرك النقي وغلاف Durable Object وتصدير ArenaRoom لدعم السبات والمزامنة السحابية
+def _bundle_arena_room():
+    engine_code = rd('arena_engine.js')
+    room_code = rd('arena_room.js')
+    engine_code = re.sub(r'if\s*\(\s*typeof module\s*!==\s*[\'"]undefined[\'"].*?\n\}', '', engine_code, flags=re.DOTALL)
+    room_code = re.sub(r'const\s*\{\s*ArenaEngine,\s*ENGINE_STATES\s*\}\s*=\s*require\(.*?\);?', '', room_code)
+    room_code = re.sub(r'if\s*\(\s*typeof module\s*!==\s*[\'"]undefined[\'"].*?\n\}', '', room_code, flags=re.DOTALL)
+    room_code = re.sub(r'\bclass ArenaRoom\b', 'export class ArenaRoom', room_code, count=1)
+    return chr(10) + '// ===== Arena Live Engine & Durable Object =====' + chr(10) + engine_code + chr(10) + room_code
+
+src = src + _bundle_arena_room()
 out = os.path.join(DIST, 'worker.js')
 open(out, 'w', encoding='utf-8').write(src)
 print('worker.js', round(len(src.encode('utf-8')) / 1024), 'KB')

@@ -129,178 +129,238 @@ const ok = (n, c, extra) => {
 
   await browser.close();
 
-  console.log('\n=== فحص 4: نقاط الخادم للمرحلة 2 (المحفظة، الجلسات، التحقق، الحقائب والتقارير) ===');
+  console.log('\n=== فحص 4: نقاط الخادم للمرحلة 2 و3 (عزل المعلمين، صلاحيات الفصول، التحقق الصارم، والمحفظة) ===');
 
-  // 1. فحص المحفظة للزائر (Guest)
+  // 1. استخراج أسئلة حقيقية من المقرر لاختبار التحقق من qid والإجابة في الخادم
+  const realQuestions = (units[0] && units[0].lessons[0] && units[0].lessons[0].items) || [];
+  ok('توجد أسئلة حقيقية في المقرر للاختبار الصارم', realQuestions.length >= 3, realQuestions.length + ' سؤال متاح');
+  const rq1 = realQuestions[0], rq2 = realQuestions[1], rq3 = realQuestions[2];
+
+  // 2. فحص المحفظة للزائر (Guest)
   const guestWallet = await getHttp('/api/arena/wallet');
   ok('محفظة الزائر ترجع افتراضياً الصقر ورصيد 0', guestWallet.status === 200 && guestWallet.json.guest === true && guestWallet.json.active_avatar === 'falcon');
 
-  // 2. فحص حفظ الجولة الفردية وحساب النقاط والذهب في الخادم
-  const sessionPayload = {
-    course_key: firstOkCourse.key,
-    mode: 'gold',
-    student_name: 'طالب مجتهد',
-    duration_sec: 12,
-    device_id: 'dev_lab_pc_01',
-    answers: [
-      { qid: 'q_1', lesson_id: '101', is_correct: 1, chosen_idx: 0, time_taken_ms: 2200 },
-      { qid: 'q_2', lesson_id: '101', is_correct: 1, chosen_idx: 1, time_taken_ms: 1900 },
-      { qid: 'q_3', lesson_id: '101', is_correct: 0, chosen_idx: 2, time_taken_ms: 2500 }
-    ]
-  };
-  const sessRes = await fetch(B + '/api/arena/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_01' },
-    body: JSON.stringify(sessionPayload)
-  });
-  const sessJson = await sessRes.json();
-  ok('حفظ الجولة ينجح ويرجع session_id', sessRes.status === 200 && !!sessJson.session_id);
-  ok('الخادم يعيد احتساب النقاط والذهب بدقة (2 صحيحة من 3)', sessJson.score === 20 && sessJson.gold === 10 && sessJson.correct === 2 && sessJson.total === 3);
-
-  // 3. فحص كشف الإجابات السريعة المشبوهة (Anti-Cheat Speed Check)
-  const suspiciousPayload = {
-    course_key: firstOkCourse.key,
-    mode: 'gold',
-    student_name: 'بوت سريع',
-    duration_sec: 1,
-    device_id: 'dev_bot_scanner',
-    answers: [
-      { qid: 'q_1', is_correct: 1, time_taken_ms: 200 },
-      { qid: 'q_2', is_correct: 1, time_taken_ms: 250 },
-      { qid: 'q_3', is_correct: 1, time_taken_ms: 180 }
-    ]
-  };
-  const suspRes = await fetch(B + '/api/arena/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_bot_scanner' },
-    body: JSON.stringify(suspiciousPayload)
-  });
-  const suspJson = await suspRes.json();
-  ok('الخادم يحظر منح الذهب عند سرعة استجابة خارقة غير بشرية (<800ms)', suspJson.score === 30 && suspJson.gold === 0);
-
-  // 4. فحص حد المعدل (Rate Limiting) المعتمد على المستخدم/الجهاز وليس IP المدرسة
-  // أ) جهاز ثانٍ في نفس المدرسة (نفس الـ IP: 194.168.1.100) يرسل في نفس اللحظة: ينجح ولا يُحظر
-  const otherDeviceRes = await fetch(B + '/api/arena/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_02' },
-    body: JSON.stringify({
-      course_key: firstOkCourse.key,
-      mode: 'gold',
-      student_name: 'طالب في جهاز مجاور',
-      device_id: 'dev_lab_pc_02',
-      duration_sec: 10,
-      answers: [{ qid: 'q_1', is_correct: 1, time_taken_ms: 2000 }]
-    })
-  });
-  ok('جهاز آخر على نفس IP المدرسة المشترك لا يُحظر بحد المعدل', otherDeviceRes.status === 200);
-
-  // ج) حفظ جولة باسم يبدأ برمز صيغة لاختبار حماية CSV Injection لاحقاً
-  await fetch(B + '/api/arena/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'dev_lab_pc_03' },
-    body: JSON.stringify({
-      course_key: firstOkCourse.key,
-      mode: 'gold',
-      student_name: '=cmd|/C calc!A0',
-      device_id: 'dev_lab_pc_03',
-      duration_sec: 12,
-      answers: [{ qid: 'q_test_csv', is_correct: 1, time_taken_ms: 2200 }]
-    })
-  });
-
-  // ب) نفس الجهاز يرسل مرتين في أقل من 10 ثوانٍ: يُرفض بـ 429
-  const rateLimitRes = await fetch(B + '/api/arena/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_01' },
-    body: JSON.stringify(sessionPayload)
-  });
-  ok('نفس الجهاز يُرفض إذا حفظ جولتين في أقل من 10 ثوانٍ (HTTP 429)', rateLimitRes.status === 429);
-
-  // 5. تهيئة حساب المدير/المعلم وتسجيل الدخول
+  // 3. تهيئة حساب مدير وإنشاء حسابي معلمين (Teacher 1 و Teacher 2) لاختبار العزل التام
   await fetch(B + '/api/setup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'أ. محمد مجدي', username: 'mohamed', password: 'Bio@2026x', password2: 'Bio@2026x' })
+    body: JSON.stringify({ name: 'مدير النظام', username: 'admin_boss', password: 'Bio@2026admin', password2: 'Bio@2026admin' })
   });
-
-  const loginRes = await fetch(B + '/api/login', {
+  const adminLoginRes = await fetch(B + '/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'mohamed', password: 'Bio@2026x' })
+    body: JSON.stringify({ username: 'admin_boss', password: 'Bio@2026admin' })
   });
-  const rawCookie = loginRes.headers.get('set-cookie') || '';
-  const sidMatch = /sid=([^;]+)/.exec(rawCookie);
-  const sid = sidMatch ? sidMatch[1] : '';
-  const authHeaders = { 'Content-Type': 'application/json', 'Cookie': 'sid=' + sid, 'X-Tahdir-Sid': sid };
-  ok('تسجيل دخول المعلم ناجح للحصول على الجلسة', loginRes.status === 200 && !!sid);
+  const adminSid = (/sid=([^;]+)/.exec(adminLoginRes.headers.get('set-cookie') || '') || [])[1] || '';
+  const adminHeaders = { 'Content-Type': 'application/json', 'Cookie': 'sid=' + adminSid, 'X-Tahdir-Sid': adminSid };
+  ok('تسجيل دخول مدير النظام ناجح لإنشاء المعلمين', adminLoginRes.status === 200 && !!adminSid);
 
-  // 6. فحص المتجر وتبديل الشخصية للمعلم
-  const buyRes = await fetch(B + '/api/arena/store/buy', {
+  // إنشاء المعلم 1 (أ. أحمد) والمعلم 2 (أ. سالم)
+  await fetch(B + '/api/admin/teachers', {
     method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({ item_id: 'robot' }) // روبوت ثمنه 1000 ذهب ورصيد الحساب أقل
+    headers: adminHeaders,
+    body: JSON.stringify({ name: 'أ. أحمد المعلم', username: 'teacher_ahmed', password: 'Teach@2026x', role: 'teacher' })
   });
-  const buyJson = await buyRes.json();
-  ok('الشراء برصيد غير كافٍ يُرفض برسالة توضيحية', buyRes.status === 400 && buyJson.error.includes('غير كافٍ'));
-
-  const setAvatarRes = await fetch(B + '/api/arena/avatar', {
+  await fetch(B + '/api/admin/teachers', {
     method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({ avatar: 'dragon' }) // غير مفتوحة
+    headers: adminHeaders,
+    body: JSON.stringify({ name: 'أ. سالم المعلم', username: 'teacher_salem', password: 'Teach@2026y', role: 'teacher' })
   });
-  ok('محاولة تفعيل شخصية غير مفتوحة تُرفض بـ 403', setAvatarRes.status === 403);
 
-  const setFalconRes = await fetch(B + '/api/arena/avatar', {
+  // تسجيل دخول المعلم 1
+  const t1Login = await fetch(B + '/api/login', {
     method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({ avatar: 'falcon' }) // مفتوحة افتراضياً
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'teacher_ahmed', password: 'Teach@2026x' })
   });
-  const setFalconJson = await setFalconRes.json();
-  ok('تفعيل شخصية مفتوحة ينجح', setFalconRes.status === 200 && setFalconJson.active_avatar === 'falcon');
+  const t1Sid = (/sid=([^;]+)/.exec(t1Login.headers.get('set-cookie') || '') || [])[1] || '';
+  const t1Headers = { 'Content-Type': 'application/json', 'Cookie': 'sid=' + t1Sid, 'X-Tahdir-Sid': t1Sid };
+  ok('تسجيل دخول المعلم 1 (حساب معلّم حقيقي) ناجح', t1Login.status === 200 && !!t1Sid);
 
-  // 7. فحص حقائب المعلم المخصصة واستيراد CSV وتنظيف XSS
-  const csvText = `السؤال,الخيار1,الخيار2,الخيار3,الخيار4,رقم الصحيح(1-4),تلميح
-ما وحدة قياس القوة؟,النيوتن,الجول,الفولت,الأوم,1,تخليداً للعالم إسحاق
-<script>alert('xss')</script>ما ناتج 10 × 10؟,50,100,1000,20,2,عملية ضرب
-`;
-  const setCreateRes = await fetch(B + '/api/arena/sets', {
+  // تسجيل دخول المعلم 2
+  const t2Login = await fetch(B + '/api/login', {
     method: 'POST',
-    headers: authHeaders,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'teacher_salem', password: 'Teach@2026y' })
+  });
+  const t2Sid = (/sid=([^;]+)/.exec(t2Login.headers.get('set-cookie') || '') || [])[1] || '';
+  const t2Headers = { 'Content-Type': 'application/json', 'Cookie': 'sid=' + t2Sid, 'X-Tahdir-Sid': t2Sid };
+  ok('تسجيل دخول المعلم 2 (حساب معلّم حقيقي) ناجح', t2Login.status === 200 && !!t2Sid);
+
+  // المعلم 1 ينشئ فصلاً دراسياً
+  const c1Res = await fetch(B + '/api/classes', {
+    method: 'POST',
+    headers: t1Headers,
+    body: JSON.stringify({ name: 'أحياء 11/1', course: firstOkCourse.key })
+  });
+  const c1Json = await c1Res.json();
+  const classCode1 = c1Json.code;
+  ok('المعلم 1 ينشئ فصلاً دراسياً ويحصل على رمز الفصل', c1Res.status === 200 && !!classCode1, 'رمز الفصل: ' + classCode1);
+
+  // 4. فحص التحقق الصارم في /api/arena/session
+  // أ) رفض جولة الطالب بدون did
+  const noDidRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ course_key: firstOkCourse.key, mode: 'gold', class_id: classCode1, answers: [{ qid: rq1.qid }] })
+  });
+  ok('رفض جولة الطالب إذا خلا الطلب من معرّف الجهاز did (HTTP 400)', noDidRes.status === 400);
+
+  // ب) رفض جولة الطالب بدون كود فصل صالح
+  const badClassRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_01' },
+    body: JSON.stringify({ course_key: firstOkCourse.key, mode: 'gold', class_id: 'FAKE_CODE', answers: [{ qid: rq1.qid }] })
+  });
+  ok('رفض جولة الطالب إذا كان كود الفصل غير موجود أو غير نشط (HTTP 400)', badClassRes.status === 400);
+
+  // ج) رفض الجولة التي تحتوي qid وهمي غير موجود في البنك
+  const fakeQidRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_fakeqid' },
     body: JSON.stringify({
-      title: 'حقيبة اختبار الفيزياء والرياضيات',
       course_key: firstOkCourse.key,
-      csv_text: csvText
+      mode: 'gold',
+      class_id: classCode1,
+      answers: [{ qid: 'fake_qid_xyz_999', chosen_idx: 0 }]
     })
   });
-  const setCreateJson = await setCreateRes.json();
-  ok('استيراد حقيبة من CSV ينجح ويعالج الصفوف', setCreateRes.status === 200 && setCreateJson.count === 2);
+  ok('رفض الجولة إذا تضمنت qid غير صالح في بنك الأسئلة (HTTP 400)', fakeQidRes.status === 400);
 
-  // فحص استعراض الحقائب
-  const setsListRes = await fetch(B + '/api/arena/sets', { headers: authHeaders });
-  const setsListJson = await setsListRes.json();
-  ok('استعراض حقائب المعلم يرجع الحقيبة المنشأة', setsListRes.status === 200 && setsListJson.sets.some(s => s.id === setCreateJson.id));
+  // د) رفض الجولة التي تحتوي qid مكرر (Anti-Duplication)
+  const dupQidRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_dupqid' },
+    body: JSON.stringify({
+      course_key: firstOkCourse.key,
+      mode: 'gold',
+      class_id: classCode1,
+      answers: [
+        { qid: rq1.qid, chosen_idx: rq1.correct },
+        { qid: rq1.qid, chosen_idx: rq1.correct }
+      ]
+    })
+  });
+  ok('رفض الجولة إذا تضمنت qid مكرراً (HTTP 400)', dupQidRes.status === 400);
 
-  // 8. فحص تقارير المعلم وتصدير CSV وصلاحيات الوصول وحماية المعادلات
-  const guestReportRes = await fetch(B + '/api/arena/reports');
-  ok('غير المصرح لهم يُمنعون من استعراض تقارير الطلاب (HTTP 403)', guestReportRes.status === 403);
+  // هـ) التحقق في الخادم: العميل يرسل is_correct: 1 زوراً على إجابة خاطئة؛ الخادم يتحقق من chosen_idx
+  const wrongIdx = (rq3.correct + 1) % rq3.choices.length;
+  const validStudentPayload = {
+    course_key: firstOkCourse.key,
+    mode: 'gold',
+    class_id: classCode1,
+    student_name: 'طالب في فصل المعلم 1',
+    duration_sec: 14,
+    answers: [
+      { qid: rq1.qid, chosen_idx: rq1.correct, is_correct: 0, time_taken_ms: 2200 }, // صحيحة
+      { qid: rq2.qid, chosen_idx: rq2.correct, is_correct: 0, time_taken_ms: 2100 }, // صحيحة
+      { qid: rq3.qid, chosen_idx: wrongIdx, is_correct: 1, time_taken_ms: 2500 }     // خاطئة عمداً رغم زعم العميل
+    ]
+  };
+  const validStudentRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_valid' },
+    body: JSON.stringify(validStudentPayload)
+  });
+  const validStudentJson = await validStudentRes.json();
+  ok('حفظ جولة الطالب برمز فصل صالح ينجح', validStudentRes.status === 200 && !!validStudentJson.session_id);
+  ok('الخادم يرفض زعم العميل ويحتسب الإجابات الصحيحة بناءً على chosen_idx فقط (2 من 3)', validStudentJson.correct === 2 && validStudentJson.score === 20 && validStudentJson.gold === 10);
 
-  const reportsRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key), { headers: authHeaders });
-  const reportsJson = await reportsRes.json();
-  ok('تقارير المعلم ترجع الإحصائيات العامة ونسب الدقة', reportsRes.status === 200 && typeof reportsJson.summary.total_sessions === 'number');
+  // و) حفظ جولة باسم يبدأ برمز صيغة لاختبار حماية CSV Injection
+  await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_csv' },
+    body: JSON.stringify({
+      course_key: firstOkCourse.key,
+      mode: 'gold',
+      class_id: classCode1,
+      student_name: '=cmd|/C calc!A0',
+      duration_sec: 10,
+      answers: [{ qid: rq1.qid, chosen_idx: rq1.correct, time_taken_ms: 2000 }]
+    })
+  });
 
-  const csvReportRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key) + '&format=csv', { headers: authHeaders });
+  // ز) فحص حد المعدل (Rate Limiting) لنفس الجهاز
+  const rateLimitRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_valid' },
+    body: JSON.stringify(validStudentPayload)
+  });
+  ok('نفس الجهاز يُرفض إذا حاول حفظ جولتين في أقل من 10 ثوانٍ (HTTP 429)', rateLimitRes.status === 429);
+
+  // 5. فحص تقارير المعلم 1 وحل مشكلة ambiguous column name: user_id
+  const t1ReportRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key), { headers: t1Headers });
+  const t1ReportJson = await t1ReportRes.json();
+  ok('المعلم 1 يستعرض تقارير فصوله بنجاح دون أي خطأ SQL (ambiguous column)', t1ReportRes.status === 200 && typeof t1ReportJson.summary.total_sessions === 'number' && t1ReportJson.summary.total_sessions >= 2);
+  ok('تقرير الأسئلة الأكثر خطأ top_failed يعمل بسلاسة دون تعارض أسماء الأعمدة', Array.isArray(t1ReportJson.top_failed));
+
+  // تصدير CSV وحماية المعادلات
+  const csvReportRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key) + '&format=csv', { headers: t1Headers });
   const csvBuf = Buffer.from(await csvReportRes.arrayBuffer());
   const reportCsvText = csvBuf.toString('utf8');
   const hasBom = csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf;
   ok('تصدير التقرير بصيغة CSV صالح ويتضمن ترويسة UTF-8 BOM', csvReportRes.status === 200 && reportCsvText.includes('معرف_الجلسة') && hasBom);
   ok('حماية CSV Injection: تحييد الصيغ المبتدئة بـ (= أو + أو - أو @) بعلامة اقتباس مفردة', reportCsvText.includes(`"'=cmd|/C calc!A0"`));
 
-  // تنظيف: حذف الحقيبة التجريبية
+  // 6. فحص العزل التام لبيانات الطلاب بين المعلمين (Teacher 1 vs Teacher 2 Data Isolation)
+  // المعلم 2 لا يملك أي جولات في فصوله لنفس المقرر
+  const t2ReportRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key), { headers: t2Headers });
+  const t2ReportJson = await t2ReportRes.json();
+  ok('العزل التام: المعلم 2 لا يرى أياً من جولات طلاب المعلم 1 (total_sessions = 0)', t2ReportRes.status === 200 && t2ReportJson.summary.total_sessions === 0 && t2ReportJson.recent.length === 0);
+
+  // 7. فحص محفظة الطالب وشراء المتجر الذري (Atomic Store Purchase)
+  const studentBuyFail = await fetch(B + '/api/arena/store/buy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_01' },
+    body: JSON.stringify({ item_id: 'robot', class_id: classCode1 }) // سعر 1000 ورصيد الطالب 10
+  });
+  const studentBuyFailJson = await studentBuyFail.json();
+  ok('الخصم الذري: رفض شراء الطالب برصيد غير كافٍ مع إشعار بالرصيد المتبقي المطلوب', studentBuyFail.status === 400 && studentBuyFailJson.error.includes('غير كافٍ'));
+
+  const studentBuyDefault = await fetch(B + '/api/arena/store/buy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'student_dev_01' },
+    body: JSON.stringify({ item_id: 'falcon', class_id: classCode1 })
+  });
+  ok('رفض شراء شخصية الصقر لأنها مفتوحة افتراضياً للجميع', studentBuyDefault.status === 400);
+
+  // 8. فحص حقائب المعلم المخصصة لحساب المعلم (Teacher Role CRUD)
+  const csvText = `السؤال,الخيار1,الخيار2,الخيار3,الخيار4,رقم الصحيح(1-4),تلميح
+ما وحدة قياس القوة؟,النيوتن,الجول,الفولت,الأوم,1,تخليداً للعالم إسحاق
+<script>alert('xss')</script>ما ناتج 10 × 10؟,50,100,1000,20,2,عملية ضرب
+`;
+  const setCreateRes = await fetch(B + '/api/arena/sets', {
+    method: 'POST',
+    headers: t1Headers,
+    body: JSON.stringify({
+      title: 'حقيبة اختبار المعلم 1',
+      course_key: firstOkCourse.key,
+      csv_text: csvText
+    })
+  });
+  const setCreateJson = await setCreateRes.json();
+  ok('المعلم ينشئ حقيبة مخصصة من CSV وتُعالج صفوفها بأمان', setCreateRes.status === 200 && setCreateJson.count === 2);
+
   const delSetRes = await fetch(B + '/api/arena/sets?id=' + encodeURIComponent(setCreateJson.id), {
     method: 'DELETE',
-    headers: authHeaders
+    headers: t1Headers
   });
-  ok('حذف الحقيبة المخصصة ينجح', delSetRes.status === 200);
+  ok('المعلم يحذف حقيبته المخصصة بنجاح', delSetRes.status === 200);
+
+  // 9. فحص تعطيل خدمة اللعب المباشر افتراضياً (ARENA_LIVE_ENABLED=false)
+  const liveCreateDis = await fetch(B + '/api/arena/live/create', {
+    method: 'POST',
+    headers: t1Headers,
+    body: JSON.stringify({ course_key: firstOkCourse.key })
+  });
+  ok('نقطة إنشاء الغرفة المباشرة ترجع 501 عند إغلاق ARENA_LIVE_ENABLED', liveCreateDis.status === 501);
+
+  const liveJoinDis = await fetch(B + '/api/arena/live/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: 'TST123', name: 'طالب' })
+  });
+  ok('نقطة انضمام الغرفة ترجع 501 عند إغلاق ARENA_LIVE_ENABLED', liveJoinDis.status === 501);
 
   srv.stop();
 

@@ -9,22 +9,39 @@ class ArenaRoom {
     this.ctx = ctx;
     this.env = env;
     this.engine = null; // يُحمّل من التخزين (ctx.storage) عند الحاجة
+    this.hostToken = null;
+    this.playerTokens = new Map(); // token -> { playerId, name, avatar, classId, registeredAt }
   }
 
-  // تحميل أو استعادة المحرك من التخزين الدائم
+  // تحميل أو استعادة المحرك والرموز من التخزين الدائم
   async getEngine() {
     if (this.engine) return this.engine;
-    const saved = await this.ctx.storage.get('engine_state');
-    if (saved) {
-      this.engine = ArenaEngine.deserialize(saved);
+    const [savedState, savedHostToken, savedPlayerTokens] = await Promise.all([
+      this.ctx.storage.get('engine_state'),
+      this.ctx.storage.get('host_token'),
+      this.ctx.storage.get('player_tokens')
+    ]);
+
+    if (savedState) {
+      this.engine = ArenaEngine.deserialize(savedState);
+    }
+    if (savedHostToken) {
+      this.hostToken = savedHostToken;
+    }
+    if (savedPlayerTokens && Array.isArray(savedPlayerTokens)) {
+      this.playerTokens = new Map(savedPlayerTokens);
     }
     return this.engine;
   }
 
-  // حفظ المحرك إلى التخزين الدائم وضبط المنبه (Alarm)
+  // حفظ المحرك والرموز إلى التخزين الدائم وضبط المنبه (Alarm)
   async saveEngine() {
     if (!this.engine) return;
-    await this.ctx.storage.put('engine_state', this.engine.serialize());
+    await Promise.all([
+      this.ctx.storage.put('engine_state', this.engine.serialize()),
+      this.hostToken ? this.ctx.storage.put('host_token', this.hostToken) : Promise.resolve(),
+      this.ctx.storage.put('player_tokens', Array.from(this.playerTokens.entries()))
+    ]);
     if (this.engine.deadlineAt && this.engine.deadlineAt > Date.now()) {
       await this.ctx.storage.setAlarm(this.engine.deadlineAt);
     }
@@ -35,17 +52,45 @@ class ArenaRoom {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // 1) نقطة إنشاء/تهيئة الغرفة عبر HTTP
+    // 1) نقطة إنشاء/تهيئة الغرفة عبر HTTP (تصدر رمز المضيف السري)
     if (pathname === '/init' && request.method === 'POST') {
       const config = await request.json();
       this.engine = new ArenaEngine(config);
+      this.hostToken = String(config.hostToken || '');
+      this.playerTokens = new Map();
       await this.saveEngine();
       return new Response(JSON.stringify({ ok: true, code: this.engine.code }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    // 2) نقطة الاستعلام عن حالة الغرفة عبر HTTP
+    // 2) نقطة تسجيل لاعب وإصدار رمز موقّع للـ WebSocket
+    if (pathname === '/register-player' && request.method === 'POST') {
+      const engine = await this.getEngine();
+      if (!engine) return new Response(JSON.stringify({ error: 'الغرفة غير موجودة' }), { status: 404 });
+      if (engine.state !== ENGINE_STATES.LOBBY) return new Response(JSON.stringify({ error: 'اللعبة بدأت بالفعل' }), { status: 400 });
+      if (engine.locked) return new Response(JSON.stringify({ error: 'الغرفة مغلقة' }), { status: 400 });
+
+      const { playerId, playerToken, name, avatar, classId } = await request.json();
+      if (!playerId || !playerToken) return new Response(JSON.stringify({ error: 'بيانات ناقصة' }), { status: 400 });
+
+      // تنظيف الاسم وحد أقصى 30 حرفاً
+      const cleanName = String(name || '').replace(/<[^>]*>/g, '').trim().slice(0, 30);
+      if (!cleanName) return new Response(JSON.stringify({ error: 'الاسم مطلوب' }), { status: 400 });
+
+      this.playerTokens.set(playerToken, {
+        playerId,
+        name: cleanName,
+        avatar: String(avatar || '🦅').slice(0, 10),
+        classId: classId ? String(classId).trim() : null,
+        registeredAt: Date.now()
+      });
+
+      await this.saveEngine();
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // 3) نقطة الاستعلام عن حالة الغرفة عبر HTTP
     if (pathname === '/info' && request.method === 'GET') {
       const engine = await this.getEngine();
       if (!engine) return new Response(JSON.stringify({ error: 'الغرفة غير موجودة' }), { status: 404 });
@@ -53,22 +98,40 @@ class ArenaRoom {
         ok: true,
         code: engine.code,
         state: engine.state,
-        playersCount: engine.players.size,
+        playersCount: [...engine.players.values()].filter(p => !p.isHost).length,
         locked: engine.locked
       }), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // 3) ترقية الاتصال إلى WebSocket مع تفعيل السبات (Hibernation)
+    // 4) ترقية الاتصال إلى WebSocket مع التحقق الصارم من الرموز (حظر أخذ role أو playerId من query string)
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const engine = await this.getEngine();
       if (!engine) {
         return new Response('الغرفة غير مهيأة', { status: 404 });
       }
 
-      const playerId = url.searchParams.get('playerId') || `p_${Math.random().toString(36).slice(2, 9)}`;
-      const role = url.searchParams.get('role') === 'host' ? 'host' : 'student';
-      const name = url.searchParams.get('name') || (role === 'host' ? engine.hostName : 'طالب');
-      const avatar = url.searchParams.get('avatar') || (role === 'host' ? '👑' : '🦅');
+      const token = url.searchParams.get('token');
+      if (!token) {
+        return new Response('رمز المصادقة مطلوب للاتصال بالساحة المباشرة', { status: 401 });
+      }
+
+      let role = null, playerId = null, name = null, avatar = null;
+      if (this.hostToken && token === this.hostToken) {
+        // مصادقة المضيف (المعلم)
+        role = 'host';
+        playerId = engine.hostId;
+        name = engine.hostName;
+        avatar = '👑';
+      } else if (this.playerTokens.has(token)) {
+        // مصادقة الطالب عبر رمزه الموقّع
+        const reg = this.playerTokens.get(token);
+        role = 'student';
+        playerId = reg.playerId;
+        name = reg.name;
+        avatar = reg.avatar;
+      } else {
+        return new Response('رمز المصادقة غير صالح أو منتهي الصلاحية', { status: 401 });
+      }
 
       const pair = new WebSocketPair();
       const [client, server] = [pair[0], pair[1]];
@@ -82,7 +145,7 @@ class ArenaRoom {
 
       // تسجيل انضمام اللاعب في المحرك
       const joinRes = engine.join(playerId, { name, avatar });
-      if (!joinRes.ok) {
+      if (!joinRes.ok && !joinRes.reconnected) {
         server.send(JSON.stringify({ type: 'error', error: joinRes.error }));
         server.close(4003, joinRes.error);
         return new Response(null, { status: 101, webSocket: client });
@@ -122,7 +185,7 @@ class ArenaRoom {
     }
 
     const { playerId, role } = attachment;
-    const isHost = role === 'host' || playerId === engine.hostId;
+    const isHost = role === 'host';
     const nowMs = Date.now();
     let stateChanged = false;
 
@@ -141,6 +204,7 @@ class ArenaRoom {
 
       case 'answer':
         if (!isHost) {
+          // حساب سرعة الإجابة بوقت الخادم فقط (nowMs)
           const res = engine.submitAnswer(playerId, data.choiceIndex, nowMs);
           if (res.ok) {
             ws.send(JSON.stringify({
@@ -227,7 +291,6 @@ class ArenaRoom {
   }
 
   async webSocketError(ws, error) {
-    // معالجة الخطأ مثل الانقطاع
     await this.webSocketClose(ws, 1006, 'error', false);
   }
 
@@ -257,7 +320,7 @@ class ArenaRoom {
       try {
         const attachment = ws.deserializeAttachment();
         const pId = attachment ? attachment.playerId : 'guest';
-        //getStateFor ينقح السؤال تلقائياً ويخفي الإجابة الصحيحة أثناء طور السؤال
+        // getStateFor ينقح السؤال تلقائياً ويخفي الإجابة الصحيحة أثناء طور السؤال
         const state = engine.getStateFor(pId, nowMs);
         ws.send(JSON.stringify({ type: 'sync', state }));
       } catch (err) {
