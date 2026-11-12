@@ -193,7 +193,20 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS init_chunks(file_id INTEGER NOT NULL, seq INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(file_id, seq))`,
   `CREATE INDEX IF NOT EXISTS ev_user ON events(user_id, type)`,
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
-  `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`
+  `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`,
+  // ساحة التحدي: الجلسات والإجابات والمحفظة والمتجر وحقائب المعلم
+  `CREATE TABLE IF NOT EXISTS arena_sessions (id TEXT PRIMARY KEY, user_id INTEGER, student_name TEXT, class_id TEXT, course_key TEXT NOT NULL, mode TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, gold INTEGER NOT NULL DEFAULT 0, total_q INTEGER NOT NULL DEFAULT 0, correct_q INTEGER NOT NULL DEFAULT 0, duration_sec INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS arena_answers (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id INTEGER, qid TEXT NOT NULL, lesson_id TEXT, is_correct INTEGER NOT NULL, chosen_idx INTEGER, time_taken_ms INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS arena_wallet (user_id INTEGER PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0, total_earned INTEGER NOT NULL DEFAULT 0, active_avatar TEXT NOT NULL DEFAULT 'falcon', updated_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS arena_items (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, item_id TEXT NOT NULL, item_type TEXT NOT NULL DEFAULT 'avatar', purchased_at INTEGER NOT NULL, UNIQUE(user_id, item_id))`,
+  `CREATE TABLE IF NOT EXISTS arena_sets (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT NOT NULL, course_key TEXT, questions_json TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_sessions_user ON arena_sessions(user_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_sessions_course ON arena_sessions(course_key, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_answers_session ON arena_answers(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_answers_lesson ON arena_answers(lesson_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_answers_user ON arena_answers(user_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_items_user ON arena_items(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_arena_sets_user ON arena_sets(user_id, updated_at)`
 ];
 let schemaReady = false;
 async function ensureSchema(db) {
@@ -1049,6 +1062,327 @@ async function liveApi(req, env, me, p, m, url) {
   }
   return json({ error: 'not found' }, 404);
 }
+
+// ========================================================================
+// ساحة التحدي (Challenge Arena API) — إدارة الجلسات والمحفظة والحقائب والتقارير
+// ========================================================================
+const AVATAR_PRICES = { falcon: 0, owl: 100, fox: 150, lion: 250, dragon: 500, phoenix: 750, robot: 1000 };
+const ARENA_RATE = new Map();
+
+function parseArenaCsv(text) {
+  const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length <= 1) return { error: 'ملف CSV فارغ أو لا يحتوي أسئلة.' };
+  const startIdx = /سؤال|question|stem/i.test(lines[0]) ? 1 : 0;
+  const questions = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const row = parseCsvLine(lines[i]);
+    if (!row || row.length < 6) continue;
+    const stem = sanitizeHtml(row[0]);
+    const c1 = sanitizeHtml(row[1]);
+    const c2 = sanitizeHtml(row[2]);
+    const c3 = sanitizeHtml(row[3]);
+    const c4 = sanitizeHtml(row[4]);
+    const correctRaw = parseInt(String(row[5]).trim(), 10);
+    const hint = row[6] ? sanitizeHtml(row[6]) : '';
+    if (!stem || !c1 || !c2 || !c3 || !c4) continue;
+    if (isNaN(correctRaw) || correctRaw < 1 || correctRaw > 4) continue;
+    questions.push({
+      qid: 'cq_' + (i + 1),
+      stem,
+      choices: [c1, c2, c3, c4],
+      correct: correctRaw - 1,
+      hint
+    });
+    if (questions.length >= 200) break;
+  }
+  if (!questions.length) return { error: 'لم يتم العثور على أي أسئلة صالحة. تأكد من الصيغة: السؤال,الخيار1,الخيار2,الخيار3,الخيار4,رقم الصحيح(1-4),تلميح' };
+  return { questions };
+}
+
+function parseCsvLine(line) {
+  const res = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      res.push(cur.trim()); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+function sanitizeHtml(s) {
+  return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').slice(0, 1000);
+}
+
+async function arenaApi(req, env, me, p, m, url) {
+  const DB = env.DB;
+
+  // 1. استرجاع بيانات المقررات
+  if (p === '/api/arena/courses') {
+    await loadPacks(env, url);
+    const all = await allLessons(env);
+    const sc = me ? scopeOf(me) : null;
+    const mCourses = new Map();
+    all.forEach(l => {
+      const k = courseKey(l);
+      if (!sc || sc.has(k)) {
+        const c = mCourses.get(k) || { key: k, subject: l.subject, grade: l.grade, total_mcq: 0, has_arena: false };
+        const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
+        c.total_mcq += qList.length;
+        if (c.total_mcq > 0) c.has_arena = true;
+        mCourses.set(k, c);
+      }
+    });
+    return json({ courses: Array.from(mCourses.values()) });
+  }
+
+  // 2. استرجاع بيانات دروس ووحدات المقرر
+  if (p === '/api/arena/data') {
+    await loadPacks(env, url);
+    const key = url.searchParams.get('key') || '';
+    const sc = me ? scopeOf(me) : null;
+    if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
+    const all = await allLessons(env);
+    const ls = all.filter(l => courseKey(l) === key);
+    const unitsMap = new Map();
+    ls.forEach(l => {
+      const uNum = String(l.unit || '1');
+      const uName = l.unit_name || ('الوحدة ' + uNum);
+      if (!unitsMap.has(uNum)) unitsMap.set(uNum, { unit: uNum, unit_name: uName, lessons: [] });
+      const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
+      unitsMap.get(uNum).lessons.push({
+        id: l.id,
+        title: l.title,
+        unit: l.unit,
+        mcq_count: qList.length,
+        items: qList
+      });
+    });
+    return json({ course: key, units: Array.from(unitsMap.values()) });
+  }
+
+  // 3. المحفظة (الرصيد والشخصيات المفتوحة)
+  if (p === '/api/arena/wallet') {
+    if (!me) return json({ guest: true, balance: 0, total_earned: 0, active_avatar: 'falcon', items: ['falcon'] });
+    let w = await DB.prepare('SELECT balance, total_earned, active_avatar FROM arena_wallet WHERE user_id=?').bind(me.id).first();
+    if (!w) w = { balance: 0, total_earned: 0, active_avatar: 'falcon' };
+    const items = (await DB.prepare('SELECT item_id FROM arena_items WHERE user_id=?').bind(me.id).all()).results || [];
+    const owned = new Set(['falcon', ...items.map(r => r.item_id)]);
+    return json({ guest: false, balance: w.balance, total_earned: w.total_earned, active_avatar: w.active_avatar, items: Array.from(owned) });
+  }
+
+  // 4. حفظ الجولة (Session Persistence & Validation)
+  if (p === '/api/arena/session' && m === 'POST') {
+    const rateKey = (me ? ('u_' + me.id) : ('ip_' + ipOf(req))) + ':asess';
+    const curTime = now();
+    if (ARENA_RATE.has(rateKey) && curTime - ARENA_RATE.get(rateKey) < 10000) {
+      return json({ error: 'يرجى الانتظار قليلاً قبل حفظ جولة أخرى.' }, 429);
+    }
+    ARENA_RATE.set(rateKey, curTime);
+
+    const b = await body(req);
+    const course_key = String(b.course_key || '').trim();
+    if (!course_key) return json({ error: 'المقرر مطلوب.' }, 400);
+
+    const mode = ['gold', 'cafe', 'tower', 'review'].includes(b.mode) ? b.mode : 'gold';
+    const answers = Array.isArray(b.answers) ? b.answers.slice(0, 100) : [];
+    if (!answers.length) return json({ error: 'لا توجد إجابات لحفظها.' }, 400);
+
+    const durSec = Math.max(0, +b.duration_sec || 0);
+    const totalTimeMs = answers.reduce((acc, a) => acc + Math.max(0, +a.time_taken_ms || 0), 0);
+    const avgMs = totalTimeMs / answers.length;
+    const suspicious = answers.length >= 3 && (avgMs < 800 || (durSec > 0 && durSec < answers.length * 0.8));
+
+    let correctCount = 0;
+    answers.forEach(a => { if (a.is_correct === 1 || a.is_correct === true) correctCount++; });
+
+    let rawScore = 0, rawGold = 0;
+    if (mode === 'gold') { rawScore = correctCount * 10; rawGold = correctCount * 5; }
+    else if (mode === 'cafe') { rawScore = correctCount * 10; rawGold = correctCount * 4; }
+    else if (mode === 'tower') { rawScore = correctCount * 15; rawGold = correctCount * 6; }
+    else { rawScore = correctCount * 5; rawGold = 0; }
+
+    if (suspicious) rawGold = 0;
+    const score = Math.min(1000, rawScore);
+    const gold = Math.min(200, rawGold);
+
+    const sid = 'as_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    const timeSec = Math.floor(curTime / 1000);
+    const sName = String(b.student_name || (me ? me.name : 'طالب')).trim().slice(0, 50);
+    const classId = b.class_id ? String(b.class_id).trim().slice(0, 50) : null;
+
+    await DB.prepare('INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(sid, me ? me.id : null, sName, classId, course_key, mode, score, gold, answers.length, correctCount, durSec, timeSec).run();
+
+    const ansBatch = answers.slice(0, 80).map((a, i) =>
+      DB.prepare('INSERT INTO arena_answers (id, session_id, user_id, qid, lesson_id, is_correct, chosen_idx, time_taken_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
+        sid + '_' + i,
+        sid,
+        me ? me.id : null,
+        String(a.qid || '').slice(0, 50),
+        a.lesson_id ? String(a.lesson_id).slice(0, 30) : null,
+        (a.is_correct === 1 || a.is_correct === true) ? 1 : 0,
+        a.chosen_idx !== undefined ? +a.chosen_idx : null,
+        Math.max(0, +a.time_taken_ms || 0),
+        timeSec
+      )
+    );
+    if (ansBatch.length) await DB.batch(ansBatch);
+
+    if (me && gold > 0) {
+      await DB.prepare("INSERT INTO arena_wallet (user_id, balance, total_earned, active_avatar, updated_at) VALUES (?, ?, ?, 'falcon', ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?").bind(me.id, gold, gold, timeSec, gold, gold, timeSec).run();
+    }
+
+    return json({ ok: true, session_id: sid, score, gold, correct: correctCount, total: answers.length });
+  }
+
+  // 5. شراء شخصية من المتجر
+  if (p === '/api/arena/store/buy' && m === 'POST') {
+    if (!me) return json({ error: 'سجّل الدخول أولاً لتتمكن من الشراء والاحتفاظ بشخصياتك.' }, 401);
+    const b = await body(req);
+    const itemId = String(b.item_id || '').trim();
+    const price = AVATAR_PRICES[itemId];
+    if (price === undefined) return json({ error: 'عنصر غير موجود في المتجر.' }, 400);
+    if (itemId === 'falcon') return json({ error: 'هذه الشخصية مفتوحة لديك بالفعل.' }, 400);
+
+    const existing = await DB.prepare('SELECT id FROM arena_items WHERE user_id=? AND item_id=?').bind(me.id, itemId).first();
+    if (existing) return json({ error: 'تمتلك هذا العنصر بالفعل.' }, 400);
+
+    const w = await DB.prepare('SELECT balance FROM arena_wallet WHERE user_id=?').bind(me.id).first();
+    const bal = w ? w.balance : 0;
+    if (bal < price) return json({ error: 'رصيد الذهب غير كافٍ. العب جولات أكثر واجمع ' + (price - bal) + ' ذهباً إضافياً.' }, 400);
+
+    const rowId = 'item_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    const nowSec = Math.floor(now() / 1000);
+    await DB.batch([
+      DB.prepare('UPDATE arena_wallet SET balance = balance - ?, updated_at = ? WHERE user_id = ?').bind(price, nowSec, me.id),
+      DB.prepare('INSERT INTO arena_items (id, user_id, item_id, item_type, purchased_at) VALUES (?, ?, ?, ?, ?)').bind(rowId, me.id, itemId, 'avatar', nowSec)
+    ]);
+    return json({ ok: true, item_id: itemId, new_balance: bal - price });
+  }
+
+  // 6. تحديد الشخصية النشطة
+  if (p === '/api/arena/avatar' && m === 'POST') {
+    if (!me) return json({ error: 'سجّل الدخول لتحديد الشخصية.' }, 401);
+    const b = await body(req);
+    const avatar = String(b.avatar || '').trim();
+    if (avatar !== 'falcon') {
+      const own = await DB.prepare('SELECT id FROM arena_items WHERE user_id=? AND item_id=?').bind(me.id, avatar).first();
+      if (!own) return json({ error: 'يجب فتح هذه الشخصية أولاً من المتجر.' }, 403);
+    }
+    const nowSec = Math.floor(now() / 1000);
+    await DB.prepare("INSERT INTO arena_wallet (user_id, balance, total_earned, active_avatar, updated_at) VALUES (?, 0, 0, ?, ?) ON CONFLICT(user_id) DO UPDATE SET active_avatar = ?, updated_at = ?").bind(me.id, avatar, nowSec, avatar, nowSec).run();
+    return json({ ok: true, active_avatar: avatar });
+  }
+
+  // 7. حقائب المعلم المخصصة (CRUD)
+  if (p === '/api/arena/sets') {
+    if (!me || (me.role !== 'teacher' && me.role !== 'admin')) return json({ error: 'خاص بالمعلمين.' }, 403);
+    if (m === 'GET') {
+      const rows = (await DB.prepare('SELECT id, title, course_key, questions_json, created_at, updated_at FROM arena_sets WHERE user_id=? ORDER BY updated_at DESC').bind(me.id).all()).results || [];
+      const sets = rows.map(r => {
+        let qCount = 0;
+        try { qCount = JSON.parse(r.questions_json).length; } catch (e) {}
+        return { id: r.id, title: r.title, course_key: r.course_key, count: qCount, created_at: r.created_at, updated_at: r.updated_at };
+      });
+      return json({ sets });
+    }
+    if (m === 'POST') {
+      const b = await body(req);
+      const title = sanitizeHtml(b.title || 'حقيبة أسئلة جديدة').slice(0, 100);
+      const course_key = String(b.course_key || '').trim().slice(0, 100);
+      let questions = [];
+      if (b.csv_text) {
+        const parsed = parseArenaCsv(b.csv_text);
+        if (parsed.error) return json({ error: parsed.error }, 400);
+        questions = parsed.questions;
+      } else if (Array.isArray(b.questions)) {
+        questions = b.questions.slice(0, 200).map((q, i) => ({
+          qid: 'cq_' + (i + 1),
+          stem: sanitizeHtml(q.stem),
+          choices: (Array.isArray(q.choices) ? q.choices.slice(0, 4) : []).map(sanitizeHtml),
+          correct: Math.max(0, Math.min(3, +q.correct || 0)),
+          hint: sanitizeHtml(q.hint || '')
+        })).filter(q => q.stem && q.choices.length === 4);
+      }
+      if (!questions.length) return json({ error: 'يجب إدخال سؤال واحد على الأقل بصيغة صحيحة.' }, 400);
+
+      const setId = 'set_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      const nowSec = Math.floor(now() / 1000);
+      await DB.prepare('INSERT INTO arena_sets (id, user_id, title, course_key, questions_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(
+        setId, me.id, title, course_key, JSON.stringify(questions), nowSec, nowSec
+      ).run();
+      return json({ ok: true, id: setId, title, count: questions.length });
+    }
+    if (m === 'DELETE') {
+      const id = url.searchParams.get('id') || '';
+      if (!id) return json({ error: 'معرّف الحقيبة مطلوب.' }, 400);
+      await DB.prepare('DELETE FROM arena_sets WHERE id=? AND user_id=?').bind(id, me.id).run();
+      return json({ ok: true });
+    }
+  }
+
+  // 8. تقارير المعلم (Teacher Reports & CSV Export)
+  if (p === '/api/arena/reports') {
+    if (!me || (me.role !== 'teacher' && me.role !== 'admin')) return json({ error: 'خاص بالمعلمين.' }, 403);
+    const course = url.searchParams.get('course') || '';
+    const classId = url.searchParams.get('class_id') || '';
+
+    let whereClause = '1=1', params = [];
+    if (course) { whereClause += ' AND course_key = ?'; params.push(course); }
+    if (classId) { whereClause += ' AND class_id = ?'; params.push(classId); }
+
+    const summary = await DB.prepare(`SELECT COUNT(*) as total_sessions, COUNT(DISTINCT student_name) as total_students, IFNULL(AVG(score), 0) as avg_score, IFNULL(SUM(correct_q), 0) as total_correct, IFNULL(SUM(total_q), 0) as total_questions FROM arena_sessions WHERE ${whereClause}`).bind(...params).first();
+
+    const topFailed = (await DB.prepare(`SELECT a.qid, a.lesson_id, COUNT(*) as attempts, SUM(CASE WHEN a.is_correct = 0 THEN 1 ELSE 0 END) as fail_count FROM arena_answers a JOIN arena_sessions s ON a.session_id = s.id WHERE ${whereClause.replace(/course_key/g, 's.course_key').replace(/class_id/g, 's.class_id')} GROUP BY a.qid ORDER BY fail_count DESC LIMIT 10`).bind(...params).all()).results || [];
+
+    const recentSessions = (await DB.prepare(`SELECT id, student_name, course_key, mode, score, gold, correct_q, total_q, duration_sec, created_at FROM arena_sessions WHERE ${whereClause} ORDER BY created_at DESC LIMIT 30`).bind(...params).all()).results || [];
+
+    if (url.searchParams.get('format') === 'csv') {
+      const csvRows = ['معرف_الجلسة,اسم_الطالب,المقرر,النمط,النقاط,الذهب,الإجابات_الصحيحة,إجمالي_الأسئلة,الوقت_ثواني,التاريخ'];
+      recentSessions.forEach(s => {
+        csvRows.push([
+          s.id,
+          `"${(s.student_name || '').replace(/"/g, '""')}"`,
+          `"${(s.course_key || '').replace(/"/g, '""')}"`,
+          s.mode,
+          s.score,
+          s.gold,
+          s.correct_q,
+          s.total_q,
+          s.duration_sec,
+          new Date(s.created_at * 1000).toISOString()
+        ].join(','));
+      });
+      return new Response('\uFEFF' + csvRows.join('\r\n'), {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="arena_report.csv"'
+        }
+      });
+    }
+
+    return json({
+      summary: {
+        total_sessions: summary.total_sessions || 0,
+        total_students: summary.total_students || 0,
+        avg_score: Math.round(summary.avg_score || 0),
+        accuracy_rate: summary.total_questions > 0 ? Math.round((summary.total_correct * 100) / summary.total_questions) : 0
+      },
+      top_failed: topFailed,
+      recent: recentSessions
+    });
+  }
+
+  return null;
+}
+
 async function gamesData(env, me, key) {
   const sc = scopeOf(me); if (sc && !sc.has(key)) return { error: 'غير مسموح.' };
   const ls = (await allLessons(env)).filter(l => courseKey(l) === key);
@@ -1497,50 +1831,10 @@ export default {
       if (p === '/play') return html('play');
       if (p === '/arena') return html('arena');
       if (p === '/teqany/arena') return htmlTq('arena');
-      if (p === '/api/arena/courses') {
-        await loadPacks(env, url);
-        const all = await allLessons(env);
+      if (p.startsWith('/api/arena/')) {
         const meUser = await currentUser(req, env);
-        const sc = meUser ? scopeOf(meUser) : null;
-        const mCourses = new Map();
-        all.forEach(l => {
-          const k = courseKey(l);
-          if (!sc || sc.has(k)) {
-            const c = mCourses.get(k) || { key: k, subject: l.subject, grade: l.grade, total_mcq: 0, has_arena: false };
-            const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
-            c.total_mcq += qList.length;
-            if (c.total_mcq > 0) c.has_arena = true;
-            mCourses.set(k, c);
-          }
-        });
-        return json({ courses: Array.from(mCourses.values()) });
-      }
-      if (p === '/api/arena/data') {
-        await loadPacks(env, url);
-        const key = url.searchParams.get('key') || '';
-        const meUser = await currentUser(req, env);
-        const sc = meUser ? scopeOf(meUser) : null;
-        if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
-        const all = await allLessons(env);
-        const ls = all.filter(l => courseKey(l) === key);
-        const unitsMap = new Map();
-        ls.forEach(l => {
-          const uNum = String(l.unit || '1');
-          const uName = l.unit_name || ('الوحدة ' + uNum);
-          if (!unitsMap.has(uNum)) unitsMap.set(uNum, { unit: uNum, unit_name: uName, lessons: [] });
-          const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
-          unitsMap.get(uNum).lessons.push({
-            id: l.id,
-            title: l.title,
-            unit: l.unit,
-            mcq_count: qList.length,
-            items: qList
-          });
-        });
-        return json({
-          course: key,
-          units: Array.from(unitsMap.values())
-        });
+        const r = await arenaApi(req, env, meUser, p, m, url);
+        if (r) return r;
       }
       if (/^\/s\/[A-Za-z0-9]{6}\/?$/.test(p) || p === '/s' || p === '/s/') return html('student');
       if (p.startsWith('/api/s/')) { const r = await studentApi(req, env, p, m, url); if (r) return r; }

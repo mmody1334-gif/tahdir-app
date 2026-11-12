@@ -498,6 +498,8 @@
     state.gold = 0;
     state.combo = 0;
     state.wrongAnswers = [];
+    state.gameStartTime = Date.now();
+    state.recordedAnswers = [];
 
     // إعدادات حسب النمط
     if (state.mode === 'cafe') {
@@ -525,6 +527,7 @@
     }
 
     var q = state.activeQuestions[state.currentQIndex];
+    state.qStartTime = Date.now();
     var totalQ = state.activeQuestions.length;
     var progressPct = Math.round((state.currentQIndex / totalQ) * 100);
 
@@ -613,6 +616,15 @@
       Array.prototype.forEach.call(buttons, function(b) { b.disabled = true; });
 
       var isCorrect = (chosenIdx === q.correct);
+      var timeTaken = Date.now() - (state.qStartTime || Date.now());
+      state.recordedAnswers = state.recordedAnswers || [];
+      state.recordedAnswers.push({
+        qid: String(q.qid || ('q_' + state.currentQIndex)),
+        lesson_id: String(q.lesson_id || ''),
+        is_correct: isCorrect ? 1 : 0,
+        chosen_idx: chosenIdx,
+        time_taken_ms: timeTaken
+      });
       var chosenBtn = document.querySelector('.ar-choice-btn[data-cidx="' + chosenIdx + '"]');
       var correctBtn = document.querySelector('.ar-choice-btn[data-cidx="' + q.correct + '"]');
 
@@ -807,6 +819,28 @@
     '</div></div>';
 
     main.innerHTML = h;
+
+    // حفظ نتائج الجولة في الخادم D1
+    try {
+      var dur = Math.round((Date.now() - (state.gameStartTime || Date.now())) / 1000);
+      api('/api/arena/session', {
+        course_key: state.selectedCourse,
+        mode: state.mode,
+        duration_sec: dur,
+        answers: state.recordedAnswers || []
+      }).then(function(res) {
+        if (res && res.gold !== undefined) {
+          api('/api/arena/wallet').then(function(w) {
+            if (w && typeof w.balance === 'number' && !w.guest) {
+              state.wallet = w.balance;
+              saveWallet();
+              var wv = $('arWalletVal');
+              if (wv) wv.textContent = state.wallet;
+            }
+          }).catch(function() {});
+        }
+      }).catch(function() {});
+    } catch (e) {}
 
     bindCommonHeaderEvents();
     var agBtn = $('arPlayAgainBtn');

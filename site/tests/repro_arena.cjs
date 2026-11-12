@@ -128,6 +128,144 @@ const ok = (n, c, extra) => {
   ok('لا توجد أخطاء JavaScript في المتصفح', jsErrors.length === 0, jsErrors.join(', '));
 
   await browser.close();
+
+  console.log('\n=== فحص 4: نقاط الخادم للمرحلة 2 (المحفظة، الجلسات، التحقق، الحقائب والتقارير) ===');
+
+  // 1. فحص المحفظة للزائر (Guest)
+  const guestWallet = await getHttp('/api/arena/wallet');
+  ok('محفظة الزائر ترجع افتراضياً الصقر ورصيد 0', guestWallet.status === 200 && guestWallet.json.guest === true && guestWallet.json.active_avatar === 'falcon');
+
+  // 2. فحص حفظ الجولة الفردية وحساب النقاط والذهب في الخادم
+  const sessionPayload = {
+    course_key: firstOkCourse.key,
+    mode: 'gold',
+    student_name: 'طالب مجتهد',
+    duration_sec: 12,
+    answers: [
+      { qid: 'q_1', lesson_id: '101', is_correct: 1, chosen_idx: 0, time_taken_ms: 2200 },
+      { qid: 'q_2', lesson_id: '101', is_correct: 1, chosen_idx: 1, time_taken_ms: 1900 },
+      { qid: 'q_3', lesson_id: '101', is_correct: 0, chosen_idx: 2, time_taken_ms: 2500 }
+    ]
+  };
+  const sessRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.1' },
+    body: JSON.stringify(sessionPayload)
+  });
+  const sessJson = await sessRes.json();
+  ok('حفظ الجولة ينجح ويرجع session_id', sessRes.status === 200 && !!sessJson.session_id);
+  ok('الخادم يعيد احتساب النقاط والذهب بدقة (2 صحيحة من 3)', sessJson.score === 20 && sessJson.gold === 10 && sessJson.correct === 2 && sessJson.total === 3);
+
+  // 3. فحص كشف الإجابات السريعة المشبوهة (Anti-Cheat Speed Check)
+  const suspiciousPayload = {
+    course_key: firstOkCourse.key,
+    mode: 'gold',
+    student_name: 'بوت سريع',
+    duration_sec: 1,
+    answers: [
+      { qid: 'q_1', is_correct: 1, time_taken_ms: 200 },
+      { qid: 'q_2', is_correct: 1, time_taken_ms: 250 },
+      { qid: 'q_3', is_correct: 1, time_taken_ms: 180 }
+    ]
+  };
+  const suspRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.2' },
+    body: JSON.stringify(suspiciousPayload)
+  });
+  const suspJson = await suspRes.json();
+  ok('الخادم يحظر منح الذهب عند سرعة استجابة خارقة غير بشرية (<800ms)', suspJson.score === 30 && suspJson.gold === 0);
+
+  // 4. فحص حد المعدل (Rate Limiting)
+  const rateLimitRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.1' },
+    body: JSON.stringify(sessionPayload)
+  });
+  ok('حد المعدل يرفض حفظ جولتين في أقل من 10 ثوانٍ لنفس المصدر (HTTP 429)', rateLimitRes.status === 429);
+
+  // 5. تهيئة حساب المدير/المعلم وتسجيل الدخول
+  await fetch(B + '/api/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'أ. محمد مجدي', username: 'mohamed', password: 'Bio@2026x', password2: 'Bio@2026x' })
+  });
+
+  const loginRes = await fetch(B + '/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'mohamed', password: 'Bio@2026x' })
+  });
+  const rawCookie = loginRes.headers.get('set-cookie') || '';
+  const sidMatch = /sid=([^;]+)/.exec(rawCookie);
+  const sid = sidMatch ? sidMatch[1] : '';
+  const authHeaders = { 'Content-Type': 'application/json', 'Cookie': 'sid=' + sid, 'X-Tahdir-Sid': sid };
+  ok('تسجيل دخول المعلم ناجح للحصول على الجلسة', loginRes.status === 200 && !!sid);
+
+  // 6. فحص المتجر وتبديل الشخصية للمعلم
+  const buyRes = await fetch(B + '/api/arena/store/buy', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ item_id: 'robot' }) // روبوت ثمنه 1000 ذهب ورصيد الحساب أقل
+  });
+  const buyJson = await buyRes.json();
+  ok('الشراء برصيد غير كافٍ يُرفض برسالة توضيحية', buyRes.status === 400 && buyJson.error.includes('غير كافٍ'));
+
+  const setAvatarRes = await fetch(B + '/api/arena/avatar', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ avatar: 'dragon' }) // غير مفتوحة
+  });
+  ok('محاولة تفعيل شخصية غير مفتوحة تُرفض بـ 403', setAvatarRes.status === 403);
+
+  const setFalconRes = await fetch(B + '/api/arena/avatar', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ avatar: 'falcon' }) // مفتوحة افتراضياً
+  });
+  const setFalconJson = await setFalconRes.json();
+  ok('تفعيل شخصية مفتوحة ينجح', setFalconRes.status === 200 && setFalconJson.active_avatar === 'falcon');
+
+  // 7. فحص حقائب المعلم المخصصة واستيراد CSV وتنظيف XSS
+  const csvText = `السؤال,الخيار1,الخيار2,الخيار3,الخيار4,رقم الصحيح(1-4),تلميح
+ما وحدة قياس القوة؟,النيوتن,الجول,الفولت,الأوم,1,تخليداً للعالم إسحاق
+<script>alert('xss')</script>ما ناتج 10 × 10؟,50,100,1000,20,2,عملية ضرب
+`;
+  const setCreateRes = await fetch(B + '/api/arena/sets', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      title: 'حقيبة اختبار الفيزياء والرياضيات',
+      course_key: firstOkCourse.key,
+      csv_text: csvText
+    })
+  });
+  const setCreateJson = await setCreateRes.json();
+  ok('استيراد حقيبة من CSV ينجح ويعالج الصفوف', setCreateRes.status === 200 && setCreateJson.count === 2);
+
+  // فحص استعراض الحقائب
+  const setsListRes = await fetch(B + '/api/arena/sets', { headers: authHeaders });
+  const setsListJson = await setsListRes.json();
+  ok('استعراض حقائب المعلم يرجع الحقيبة المنشأة', setsListRes.status === 200 && setsListJson.sets.some(s => s.id === setCreateJson.id));
+
+  // 8. فحص تقارير المعلم وتصدير CSV
+  const reportsRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key), { headers: authHeaders });
+  const reportsJson = await reportsRes.json();
+  ok('تقارير المعلم ترجع الإحصائيات العامة ونسب الدقة', reportsRes.status === 200 && typeof reportsJson.summary.total_sessions === 'number');
+
+  const csvReportRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key) + '&format=csv', { headers: authHeaders });
+  const csvBuf = Buffer.from(await csvReportRes.arrayBuffer());
+  const reportCsvText = csvBuf.toString('utf8');
+  const hasBom = csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf;
+  ok('تصدير التقرير بصيغة CSV صالح ويتضمن ترويسة UTF-8 BOM', csvReportRes.status === 200 && reportCsvText.includes('معرف_الجلسة') && hasBom);
+
+  // تنظيف: حذف الحقيبة التجريبية
+  const delSetRes = await fetch(B + '/api/arena/sets?id=' + encodeURIComponent(setCreateJson.id), {
+    method: 'DELETE',
+    headers: authHeaders
+  });
+  ok('حذف الحقيبة المخصصة ينجح', delSetRes.status === 200);
+
   srv.stop();
 
   console.log('\n=== النتيجة: ' + pass + ' ناجح، ' + fail + ' فاشل ===');
