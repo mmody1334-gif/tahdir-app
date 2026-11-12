@@ -195,8 +195,9 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ev_at ON events(at)`,
   `CREATE INDEX IF NOT EXISTS at_user ON attempts(username, at)`,
   // ساحة التحدي: الجلسات والإجابات والمحفظة والمتجر وحقائب المعلم
-  `CREATE TABLE IF NOT EXISTS arena_sessions (id TEXT PRIMARY KEY, user_id INTEGER, student_name TEXT, class_id TEXT, course_key TEXT NOT NULL, mode TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, gold INTEGER NOT NULL DEFAULT 0, total_q INTEGER NOT NULL DEFAULT 0, correct_q INTEGER NOT NULL DEFAULT 0, duration_sec INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS arena_sessions (id TEXT PRIMARY KEY, user_id INTEGER, student_name TEXT, class_id TEXT, course_key TEXT NOT NULL, mode TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, gold INTEGER NOT NULL DEFAULT 0, total_q INTEGER NOT NULL DEFAULT 0, correct_q INTEGER NOT NULL DEFAULT 0, duration_sec INTEGER NOT NULL DEFAULT 0, answers_json TEXT, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS arena_answers (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id INTEGER, qid TEXT NOT NULL, lesson_id TEXT, is_correct INTEGER NOT NULL, chosen_idx INTEGER, time_taken_ms INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS arena_daily_usage (day_key TEXT PRIMARY KEY, session_count INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS arena_wallet (user_id INTEGER PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0, total_earned INTEGER NOT NULL DEFAULT 0, active_avatar TEXT NOT NULL DEFAULT 'falcon', updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS arena_items (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, item_id TEXT NOT NULL, item_type TEXT NOT NULL DEFAULT 'avatar', purchased_at INTEGER NOT NULL, UNIQUE(user_id, item_id))`,
   `CREATE TABLE IF NOT EXISTS arena_student_wallet (student_key TEXT PRIMARY KEY, class_id TEXT NOT NULL, did TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, total_earned INTEGER NOT NULL DEFAULT 0, active_avatar TEXT NOT NULL DEFAULT 'falcon', updated_at INTEGER NOT NULL)`,
@@ -216,6 +217,7 @@ let schemaReady = false;
 async function ensureSchema(db) {
   if (schemaReady) return;
   await db.batch(SCHEMA.map(s => db.prepare(s)));
+  try { await db.prepare('ALTER TABLE arena_sessions ADD COLUMN answers_json TEXT').run(); } catch (e) { /* already there */ }
   try { await db.prepare('ALTER TABLE users ADD COLUMN scope TEXT').run(); } catch (e) { /* already there */ }
   // «الشاملة»: معلمون نُقلوا إلى لوحة التحكم المخفية (/elkabsula) فلا يظهرون في اللوحة الأساسية
   try { await db.prepare('ALTER TABLE users ADD COLUMN vault INTEGER NOT NULL DEFAULT 0').run(); } catch (e) { /* already there */ }
@@ -313,6 +315,7 @@ function jsonETag(req, data) {
   return new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-cache', ETag: etag, ...SEC_HEADERS } });
 }
 const PAGES_TQ = __PAGES_TQ__;
+let _reqHost = '';
 // عرض صفحة بهوية «تقني حذيفة» (نسخة جاهزة من البناء) — نفس المحتوى والشعار مختلف
 function htmlTq(name, extra = {}) {
   if (name === 'cards') extra = { 'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()', ...extra };
@@ -320,7 +323,8 @@ function htmlTq(name, extra = {}) {
   const nonce = rand(16);
   const src = PAGES_TQ[name].replace(/%CSS%/, () => PAGES.css);
   const body = src.replace(/%NONCE%/g, nonce);
-  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  const connHost = _reqHost ? ` wss://${_reqHost}` : '';
+  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'${connHost}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
   return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp, ...SEC_HEADERS, ...extra } });
 }
 function html(name, extra = {}) {
@@ -329,7 +333,8 @@ function html(name, extra = {}) {
   const body = PAGES[name].replace(/%NONCE%/g, nonce).replace('%CSS%', () => PAGES.css);
   // worker-src 'self' ضروري لـpdf.js: إن لم يُذكر يرث script-src (وهو nonce فقط)
   // فيُحجب عامل القراءة. والقصر على 'self' يمنع أي عامل خارجي.
-  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  const connHost = _reqHost ? ` wss://${_reqHost}` : '';
+  const csp = `default-src 'self'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'${connHost}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
   return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp, ...SEC_HEADERS, ...extra } });
 }
 function redirect(to, extra = {}) { return new Response(null, { status: 302, headers: { Location: to, ...SEC_HEADERS, ...extra } }); }
@@ -1217,8 +1222,10 @@ async function arenaApi(req, env, me, p, m, url) {
       if (!classCode) return json({ error: 'كود الفصل مطلوب لحفظ جولة الطالب.' }, 400);
       const classRow = await DB.prepare('SELECT id, code, active FROM classes WHERE code = ? AND active = 1').bind(classCode).first();
       if (!classRow) return json({ error: 'كود الفصل غير صالح أو غير نشط.' }, 400);
-    } else if (b && b.class_id) {
-      classCode = String(b.class_id).trim();
+    } else if (me && b && b.class_id) {
+      const cid = String(b.class_id).trim();
+      const myClass = await DB.prepare('SELECT code FROM classes WHERE code = ? AND user_id = ?').bind(cid, me.id).first();
+      classCode = myClass ? myClass.code : null;
     }
 
     const rateKey = me ? ('u_' + me.id) : (did ? ('d_' + did) : null);
@@ -1288,26 +1295,37 @@ async function arenaApi(req, env, me, p, m, url) {
     const score = Math.min(1000, rawScore);
     const gold = Math.min(200, rawGold);
 
+    // حد الطوارئ اليومي (20,000 جلسة كحد أقصى لحماية خطة Cloudflare D1 المجانية)
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const usageRow = await DB.prepare('SELECT session_count FROM arena_daily_usage WHERE day_key = ?').bind(dayKey).first();
+    const currentSessions = usageRow ? (usageRow.session_count || 0) : 0;
+    if (currentSessions >= 20000) {
+      return json({
+        ok: true,
+        saved: false,
+        message: 'تم الوصول إلى الحد اليومي الأقصى لحفظ الجلسات (20,000). يستمر اللعب كالمعتاد دون تسجيل النتائج في السجل العام اليوم.',
+        score,
+        gold: 0,
+        correct: correctCount,
+        total: answers.length
+      });
+    }
+
     const sid = 'as_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
     const timeSec = Math.floor(curTime / 1000);
     const sName = String(b.student_name || (me ? me.name : 'طالب')).trim().slice(0, 50);
 
-    await DB.prepare('INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(sid, me ? me.id : null, sName, classCode, course_key, mode, score, gold, answers.length, correctCount, durSec, timeSec).run();
+    const answersJson = JSON.stringify(answers.map(a => ({
+      qid: String(a.qid || '').trim(),
+      chosen: a.chosen_idx !== undefined ? +a.chosen_idx : -1,
+      ok: a.is_correct ? 1 : 0
+    })));
 
-    const ansBatch = answers.slice(0, 80).map((a, i) =>
-      DB.prepare('INSERT INTO arena_answers (id, session_id, user_id, qid, lesson_id, is_correct, chosen_idx, time_taken_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
-        sid + '_' + i,
-        sid,
-        me ? me.id : null,
-        String(a.qid || '').slice(0, 50),
-        a.lesson_id ? String(a.lesson_id).slice(0, 30) : null,
-        a.is_correct ? 1 : 0,
-        a.chosen_idx !== undefined ? +a.chosen_idx : null,
-        Math.max(0, +a.time_taken_ms || 0),
-        timeSec
-      )
-    );
-    if (ansBatch.length) await DB.batch(ansBatch);
+    // حفظ الجولة في صف واحد يتضمن answers_json (إيقاف الإدراج في arena_answers لحفظ حد الـ100 ألف صف يومياً)
+    await DB.prepare('INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, answers_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(sid, me ? me.id : null, sName, classCode, course_key, mode, score, gold, answers.length, correctCount, durSec, answersJson, timeSec).run();
+
+    // تحديث عداد الجلسات اليومية
+    await DB.prepare('INSERT INTO arena_daily_usage (day_key, session_count, updated_at) VALUES (?, 1, ?) ON CONFLICT(day_key) DO UPDATE SET session_count = session_count + 1, updated_at = ?').bind(dayKey, timeSec, timeSec).run();
 
     if (me && gold > 0) {
       await DB.prepare("INSERT INTO arena_wallet (user_id, balance, total_earned, active_avatar, updated_at) VALUES (?, ?, ?, 'falcon', ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?").bind(me.id, gold, gold, timeSec, gold, gold, timeSec).run();
@@ -1469,7 +1487,31 @@ async function arenaApi(req, env, me, p, m, url) {
 
     const summary = await DB.prepare(`SELECT COUNT(*) as total_sessions, COUNT(DISTINCT s.student_name) as total_students, IFNULL(AVG(s.score), 0) as avg_score, IFNULL(SUM(s.correct_q), 0) as total_correct, IFNULL(SUM(s.total_q), 0) as total_questions FROM arena_sessions s WHERE ${whereClause}`).bind(...params).first();
 
-    const topFailed = (await DB.prepare(`SELECT a.qid, a.lesson_id, COUNT(*) as attempts, SUM(CASE WHEN a.is_correct = 0 THEN 1 ELSE 0 END) as fail_count FROM arena_answers a JOIN arena_sessions s ON a.session_id = s.id WHERE ${whereClause} GROUP BY a.qid ORDER BY fail_count DESC LIMIT 10`).bind(...params).all()).results || [];
+    // حساب top_failed في الذاكرة من عمود answers_json لحفظ عمليات الكتابة والقراءة على D1
+    const failedRows = (await DB.prepare(`SELECT s.answers_json FROM arena_sessions s WHERE ${whereClause} AND s.answers_json IS NOT NULL ORDER BY s.created_at DESC LIMIT 200`).bind(...params).all()).results || [];
+    const qidStats = new Map();
+    for (const row of failedRows) {
+      try {
+        const arr = JSON.parse(row.answers_json || '[]');
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const qid = String(item.qid || '').trim();
+            if (!qid) continue;
+            let stat = qidStats.get(qid);
+            if (!stat) {
+              stat = { qid, attempts: 0, fail_count: 0 };
+              qidStats.set(qid, stat);
+            }
+            stat.attempts++;
+            if (!item.ok) stat.fail_count++;
+          }
+        }
+      } catch (e) {}
+    }
+    const topFailed = Array.from(qidStats.values())
+      .filter(s => s.fail_count > 0)
+      .sort((a, b) => b.fail_count - a.fail_count || b.attempts - a.attempts)
+      .slice(0, 10);
 
     const recentSessions = (await DB.prepare(`SELECT s.id, s.student_name, s.course_key, s.mode, s.score, s.gold, s.correct_q, s.total_q, s.duration_sec, s.created_at FROM arena_sessions s WHERE ${whereClause} ORDER BY s.created_at DESC LIMIT 30`).bind(...params).all()).results || [];
 
@@ -1520,6 +1562,15 @@ async function arenaApi(req, env, me, p, m, url) {
   return null;
 }
 
+const ARENA_ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newArenaCode() {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  let code = '';
+  for (let i = 0; i < 6; i++) code += ARENA_ROOM_CHARS[bytes[i] % ARENA_ROOM_CHARS.length];
+  return code;
+}
+
 async function arenaLiveApi(req, env, me, p, m, url) {
   const liveEnabled = String(env.ARENA_LIVE_ENABLED || '').toLowerCase() === 'true' || env.ARENA_LIVE_ENABLED === true;
   if (!liveEnabled) {
@@ -1567,27 +1618,51 @@ async function arenaLiveApi(req, env, me, p, m, url) {
     const limit = Math.max(1, Math.min(50, +(b.question_count || 10)));
     questions = questions.sort(() => Math.random() - 0.5).slice(0, limit);
 
-    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
     const hostToken = 'ht_' + rand(24);
-    const doId = env.ARENA_ROOM.idFromName(code);
-    const room = env.ARENA_ROOM.get(doId);
+    let code = '';
+    let initRes = null;
+    let attempts = 0;
 
-    const initRes = await room.fetch(new Request('http://arena/init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code,
-        hostId: 'u_' + me.id,
-        hostName: me.name,
-        hostToken,
-        mode: b.mode || 'gold_rush',
-        timePerQuestion: b.time_limit || 20,
-        revealDuration: b.reveal_duration || 6,
-        questions
-      })
-    }));
+    while (attempts < 5) {
+      attempts++;
+      code = newArenaCode();
+      const doId = env.ARENA_ROOM.idFromName(code);
+      const room = env.ARENA_ROOM.get(doId);
 
-    if (!initRes.ok) {
+      try {
+        initRes = await room.fetch(new Request('http://arena/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            hostId: 'u_' + me.id,
+            hostName: me.name,
+            hostToken,
+            mode: b.mode || 'gold_rush',
+            courseKey: b.course_key || '',
+            timePerQuestion: b.time_limit || 20,
+            revealDuration: b.reveal_duration || 6,
+            questions
+          })
+        }));
+
+        if (initRes.status === 409) {
+          continue; // conflict: active room with same code, retry
+        }
+        break;
+      } catch (err) {
+        const msg = String(err && (err.message || err.toString()) || '');
+        if (/quota|limit|exceeded|over quota/i.test(msg)) {
+          return json({ error: 'اللعب المباشر متوقف مؤقتًا حتى الغد.' }, 503);
+        }
+        throw err;
+      }
+    }
+
+    if (!initRes || !initRes.ok) {
+      if (initRes && initRes.status === 503) {
+        return json({ error: 'اللعب المباشر متوقف مؤقتًا حتى الغد.' }, 503);
+      }
       return json({ error: 'تعذر تهيئة غرفة التحدي المباشر.' }, 500);
     }
     return json({ ok: true, code, hostToken, questions_count: questions.length });
@@ -1609,6 +1684,9 @@ async function arenaLiveApi(req, env, me, p, m, url) {
       if (cRow) classId = cRow.code;
     }
 
+    const c = cookies(req);
+    const did = String(c.did || req.headers.get('X-Tahdir-Did') || (b && b.device_id) || '').trim();
+
     const playerId = 'p_' + rand(10);
     const playerToken = 'pt_' + rand(24);
     const avatar = String(b.avatar || '🦅').slice(0, 10);
@@ -1619,7 +1697,7 @@ async function arenaLiveApi(req, env, me, p, m, url) {
     const regRes = await room.fetch(new Request('http://arena/register-player', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, playerToken, name: cleanName, avatar, classId })
+      body: JSON.stringify({ playerId, playerToken, name: cleanName, avatar, classId, did })
     }));
 
     if (!regRes.ok) {
@@ -2026,6 +2104,7 @@ export default {
       // لنجح الدخول ثم عاد المعلم لصفحة الدخول، وسُجّل جهاز جديد في كل محاولة
       // حتى يُقفل حسابه بحدّ الأجهزة. فنحوّل أي طلب غير آمن إلى https قبل أي شيء.
       const u0 = new URL(req.url);
+      _reqHost = u0.host;
       const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(u0.host);
       if (u0.protocol === 'http:' && !isLocal) {
         u0.protocol = 'https:';

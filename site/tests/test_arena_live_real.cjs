@@ -247,6 +247,15 @@ const tempPersist = fs.mkdtempSync(path.join(os.tmpdir(), 'wrangler-arena-test-'
     ok('اكتمال منافسة الغرفة المباشرة والوصول لمنصة التتويج (PODIUM)', !!podiumState);
     ok('لوحة التتويج تتضمن ترتيب المراكز والنقاط لجميع الطلاب', podiumState && Array.isArray(podiumState.leaderboard) && podiumState.leaderboard.length >= 5);
 
+    // 10. فحص المرحلة 3هـ: التحقق من حفظ نتائج اللعبة الحية تلقائياً في D1
+    console.log('\n=== فحص المرحلة 3هـ: حفظ نتائج اللعبة الحية تلقائياً في D1 ===');
+    await new Promise(r => setTimeout(r, 1200));
+    const liveReportRes = await fetch(`${BASE}/api/arena/reports`, { headers: teacherH });
+    const liveReportJson = await liveReportRes.json();
+    const liveSessions = (liveReportJson.recent || []).filter(s => s.mode === 'live');
+    ok('حفظ جولات اللعبة الحية تلقائياً في D1 من الخادم (بدون طلبات من العميل)', liveSessions.length >= 5);
+    ok('جولات اللعبة الحية في التقارير تحمل أسماء الطلاب ونقاطهم الحقيقية', liveSessions.some(s => s.student_name === 'طالب 1'));
+
     // إغلاق جميع المقابس
     hostWs.close();
     studentSockets.forEach(s => { try { s.close(); } catch(e){} });

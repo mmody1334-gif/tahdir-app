@@ -48,11 +48,16 @@ const ok = (n, c, extra) => {
     return { status: r.status, text: await r.text() };
   }
 
-  // فحص صفحة ساحة التحدي بهوية الكبسولة
-  const arenaPage = await getHttp('/arena');
-  ok('صفحة /arena تعمل وترجع HTTP 200', arenaPage.status === 200);
-  ok('صفحة /arena تتضمن عنوان «ساحة التحدي»', arenaPage.text.includes('ساحة التحدي'));
-  ok('صفحة /arena تتضمن معرّف الحاوية arenaMain', arenaPage.text.includes('id="arenaMain"'));
+  // فحص صفحة ساحة التحدي بهوية الكبسولة وقيود CSP الصارمة
+  const arenaRawRes = await fetch(B + '/arena');
+  const arenaPageText = await arenaRawRes.text();
+  const arenaCsp = arenaRawRes.headers.get('content-security-policy') || '';
+  ok('صفحة /arena تعمل وترجع HTTP 200', arenaRawRes.status === 200);
+  ok('صفحة /arena تتضمن عنوان «ساحة التحدي»', arenaPageText.includes('ساحة التحدي'));
+  ok('صفحة /arena تتضمن معرّف الحاوية arenaMain', arenaPageText.includes('id="arenaMain"'));
+  ok('فحص CSP: لا يتضمن ws: إطلاقاً في connect-src', !arenaCsp.includes('ws:'));
+  ok('فحص CSP: لا يتضمن wss: عامة غير محددة النطاق', !/\bconnect-src[^;]*\bwss:(?!\/\/)/.test(arenaCsp));
+  ok('فحص CSP: يسمح بـ wss للمضيف نفسه بدقة', arenaCsp.includes(`connect-src 'self' wss://${new URL(B).host};`));
 
   // فحص صفحة ساحة التحدي بهوية تقني حذيفة
   const tqArenaPage = await getHttp('/teqany/arena');
@@ -308,6 +313,23 @@ const ok = (n, c, extra) => {
   const t2ReportJson = await t2ReportRes.json();
   ok('العزل التام: المعلم 2 لا يرى أياً من جولات طلاب المعلم 1 (total_sessions = 0)', t2ReportRes.status === 200 && t2ReportJson.summary.total_sessions === 0 && t2ReportJson.recent.length === 0);
 
+  // فحص تحقق المعلم من ملكية الفصل في /api/arena/session
+  // المعلم 2 يحاول إرسال كود فصل المعلم 1 (classCode1)
+  const t2ClassCheckRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { ...t2Headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      course_key: firstOkCourse.key,
+      class_id: classCode1,
+      duration_sec: 10,
+      answers: [{ qid: rq1.qid, chosen_idx: rq1.correct, time_taken_ms: 2000 }]
+    })
+  });
+  ok('المعلم يستطيع حفظ جلسته حتى لو أرسل فصلاً لا يملكه (يُتجاهل الفصل دون تعطيل الجلسة)', t2ClassCheckRes.status === 200);
+  const t2ClassReportRes = await fetch(B + '/api/arena/reports?class_id=' + encodeURIComponent(classCode1), { headers: t2Headers });
+  const t2ClassReportJson = await t2ClassReportRes.json();
+  ok('تحقق ملكية الفصل: المعلم 2 لا تُنسب جلسته لفصل المعلم 1 (تجاهل class_id غير المملوك)', t2ClassReportJson.summary.total_sessions === 0);
+
   // 7. فحص محفظة الطالب وشراء المتجر الذري (Atomic Store Purchase)
   const studentBuyFail = await fetch(B + '/api/arena/store/buy', {
     method: 'POST',
@@ -427,6 +449,109 @@ const ok = (n, c, extra) => {
   simTime += 5000;
   simEngine.tick(simTime); // منصة التتويج
   ok('اكتمال تدفق اللعبة والوصول لمنصة التتويج (PODIUM)', simEngine.state === ENGINE_STATES.PODIUM);
+
+  console.log('\n=== فحص 6: حماية الخطة المجانية، أكواد الغرف، ومنع التكرار (Free Plan Protection) ===');
+  // 1. فحص أبجدية أكواد الغرف (طول 6 وحروف غير ملتبسة)
+  const roomChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  ok('أبجدية أكواد الغرف خالية من الحروف الملتبسة (لا تتضمن 0 أو O أو 1 أو I)', !roomChars.includes('0') && !roomChars.includes('O') && !roomChars.includes('1') && !roomChars.includes('I'));
+
+  // 2. فحص غلاف Durable Object لمنع تكرار الغرف النشطة (409 Conflict)
+  const { ArenaRoom } = require('../server/arena_room.js');
+  let storagePuts = 0;
+  let storageDeletes = 0;
+  const mockStorage = {
+    map: new Map(),
+    async get(k) { return this.map.get(k); },
+    async put(k, v) { storagePuts++; this.map.set(k, v); },
+    async deleteAll() { storageDeletes++; this.map.clear(); },
+    async setAlarm(ts) { this.alarm = ts; }
+  };
+  const mockCtx = {
+    storage: mockStorage,
+    acceptWebSocket() {},
+    getWebSockets() { return []; }
+  };
+
+  const d1Inserts = [];
+  const mockDb = {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              if (sql.includes('arena_daily_usage')) return { session_count: 0 };
+              return null;
+            },
+            async run() {
+              d1Inserts.push({ sql, args });
+              return {};
+            }
+          };
+        }
+      };
+    },
+    async batch(list) {
+      for (const item of list) await item.run();
+    }
+  };
+
+  const roomInstance = new ArenaRoom(mockCtx, { DB: mockDb });
+
+  // تهيئة الغرفة أول مرة (تنجح 200)
+  const initReq1 = new Request('http://arena/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: 'SAFE49',
+      hostId: 'u_10',
+      hostName: 'المعلم',
+      hostToken: 'ht_secret',
+      courseKey: 'bio_9',
+      questions: [{ qid: 'q1', stem: 'س', choices: ['أ', 'ب'], correct: 0 }]
+    })
+  });
+  const initRes1 = await roomInstance.fetch(initReq1);
+  ok('تهيئة الغرفة المباشرة لأول مرة تنجح (HTTP 200)', initRes1.status === 200);
+
+  // محاولة تهيئة نفس الغرفة وهي لا تزال نشطة (تُرفض 409 Conflict)
+  const initReq2 = new Request('http://arena/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: 'SAFE49', hostId: 'u_10' })
+  });
+  const initRes2 = await roomInstance.fetch(initReq2);
+  ok('منع تكرار الغرف النشطة: رفض إعادة تهيئة غرفة نشطة بـ HTTP 409 Conflict', initRes2.status === 409);
+
+  // 3. فحص حماية DO: عدم استهلاك Storage Puts عند إجابة فردية طالما لم يجب الجميع
+  const mockWs = {
+    deserializeAttachment() {
+      return { playerId: 'student_free1', role: 'student', name: 'طالب مجاني 1' };
+    },
+    send() {}
+  };
+  // تسجيل طالبين لضمان عدم اكتمال الإجابات عند إجابة الأول فقط
+  roomInstance.engine.join('student_free1', { name: 'طالب مجاني 1', classId: 'CLS_99', did: 'dev_did_free1' });
+  roomInstance.engine.join('student_free2', { name: 'طالب مجاني 2', classId: 'CLS_99', did: 'dev_did_free2' });
+  roomInstance.engine.state = ENGINE_STATES.QUESTION;
+  roomInstance.engine.currentQIndex = 0;
+  roomInstance.engine.stateStartedAt = Date.now();
+  roomInstance.engine.deadlineAt = Date.now() + 20000;
+
+  const putsBefore = storagePuts;
+  // إرسال إجابة الطالب الأول فقط (لم يجب الطالب الثاني بعد)
+  await roomInstance.webSocketMessage(mockWs, JSON.stringify({ action: 'answer', choiceIndex: 0 }));
+  ok('حماية DO: الإجابة الفردية لا تستدعي ctx.storage.put (صفر عمليات كتابة إضافية)', storagePuts === putsBefore);
+
+  // 4. فحص الحفظ التلقائي في D1 عند PODIUM (المرحلة 3هـ)
+  roomInstance.engine.state = ENGINE_STATES.PODIUM;
+  await roomInstance.persistLiveResultsToD1();
+  const sessionInsert = d1Inserts.find(ins => ins.sql.includes('INSERT INTO arena_sessions'));
+  ok('المرحلة 3هـ: الخادم يكتب نتائج الطلاب تلقائياً في arena_sessions عند PODIUM', !!sessionInsert);
+  ok('المرحلة 3هـ: ربط جولة الطالب بـ class_id و answers_json في D1', sessionInsert && sessionInsert.args[3] === 'CLS_99' && sessionInsert.args[11].includes('q1'));
+
+  // 5. فحص حذف التخزين بـ deleteAll بعد ساعة من التتويج
+  await roomInstance.alarm();
+  ok('حماية DO: حذف بيانات التخزين بـ deleteAll بعد انتهاء اللعبة', storageDeletes >= 1);
 
   console.log('\n=== النتيجة: ' + pass + ' ناجح، ' + fail + ' فاشل ===');
   process.exit(fail ? 1 : 0);

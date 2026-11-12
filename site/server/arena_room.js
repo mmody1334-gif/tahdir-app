@@ -52,12 +52,20 @@ class ArenaRoom {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // 1) نقطة إنشاء/تهيئة الغرفة عبر HTTP (تصدر رمز المضيف السري)
+    // 1) نقطة إنشاء/تهيئة الغرفة عبر HTTP (تصدر رمز المضيف السري وتمنع تكرار الغرف النشطة)
     if (pathname === '/init' && request.method === 'POST') {
+      const existingEngine = await this.getEngine();
+      if (existingEngine && existingEngine.state !== ENGINE_STATES.PODIUM) {
+        return new Response(JSON.stringify({ error: 'الغرفة نشطة بالفعل' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
       const config = await request.json();
       this.engine = new ArenaEngine(config);
       this.hostToken = String(config.hostToken || '');
       this.playerTokens = new Map();
+      this._persistedToD1 = false;
       await this.saveEngine();
       return new Response(JSON.stringify({ ok: true, code: this.engine.code }), {
         headers: { 'Content-Type': 'application/json' }
@@ -71,7 +79,7 @@ class ArenaRoom {
       if (engine.state !== ENGINE_STATES.LOBBY) return new Response(JSON.stringify({ error: 'اللعبة بدأت بالفعل' }), { status: 400 });
       if (engine.locked) return new Response(JSON.stringify({ error: 'الغرفة مغلقة' }), { status: 400 });
 
-      const { playerId, playerToken, name, avatar, classId } = await request.json();
+      const { playerId, playerToken, name, avatar, classId, did } = await request.json();
       if (!playerId || !playerToken) return new Response(JSON.stringify({ error: 'بيانات ناقصة' }), { status: 400 });
 
       // تنظيف الاسم وحد أقصى 30 حرفاً
@@ -83,6 +91,7 @@ class ArenaRoom {
         name: cleanName,
         avatar: String(avatar || '🦅').slice(0, 10),
         classId: classId ? String(classId).trim() : null,
+        did: did ? String(did).trim() : null,
         registeredAt: Date.now()
       });
 
@@ -115,7 +124,7 @@ class ArenaRoom {
         return new Response('رمز المصادقة مطلوب للاتصال بالساحة المباشرة', { status: 401 });
       }
 
-      let role = null, playerId = null, name = null, avatar = null;
+      let role = null, playerId = null, name = null, avatar = null, classId = null, did = null;
       if (this.hostToken && token === this.hostToken) {
         // مصادقة المضيف (المعلم)
         role = 'host';
@@ -129,6 +138,8 @@ class ArenaRoom {
         playerId = reg.playerId;
         name = reg.name;
         avatar = reg.avatar;
+        classId = reg.classId || null;
+        did = reg.did || null;
       } else {
         return new Response('رمز المصادقة غير صالح أو منتهي الصلاحية', { status: 401 });
       }
@@ -137,14 +148,14 @@ class ArenaRoom {
       const [client, server] = [pair[0], pair[1]];
 
       // حفظ بيانات اللاعب داخل المرفق المتسلسل للـ WebSocket (يصمد أثناء السبات ولا يُحفظ في الذاكرة العشوائية للكلاس)
-      const attachment = { playerId, role, name, avatar, joinedAt: Date.now() };
+      const attachment = { playerId, role, name, avatar, classId, did, joinedAt: Date.now() };
       server.serializeAttachment(attachment);
 
       // قبول المقبس في نظام السبات
       this.ctx.acceptWebSocket(server, [role, `player:${playerId}`]);
 
       // تسجيل انضمام اللاعب في المحرك
-      const joinRes = engine.join(playerId, { name, avatar });
+      const joinRes = engine.join(playerId, { name, avatar, classId, did });
       if (!joinRes.ok && !joinRes.reconnected) {
         server.send(JSON.stringify({ type: 'error', error: joinRes.error }));
         server.close(4003, joinRes.error);
@@ -213,10 +224,14 @@ class ArenaRoom {
               isCorrect: res.isCorrect,
               pointsAwarded: res.pointsAwarded
             }));
-            stateChanged = true;
-            // إذا أجاب الجميع فوراً ننتقل للنتيجة دون انتظار المؤقت
+            // حماية DO: لا نحفظ في storage عند كل إجابة فردية (تبقى في الذاكرة ومرفق المقبس)
+            // إذا أجاب الجميع ننتقل لطور REVEAL فوراً (وهذا انتقال حالة يستوجب الحفظ)
             if (res.allAnswered) {
               engine.revealQuestion(nowMs);
+              stateChanged = true;
+            } else {
+              // بث التحديث للمتصلين دون كتابة إلى SQLite
+              await this.broadcastState();
             }
           } else {
             ws.send(JSON.stringify({ type: 'error', error: res.error }));
@@ -272,6 +287,13 @@ class ArenaRoom {
     }
 
     if (stateChanged) {
+      if (engine.state === ENGINE_STATES.PODIUM) {
+        await this.persistLiveResultsToD1();
+        await this.saveEngine();
+        await this.broadcastState();
+        await this.ctx.storage.setAlarm(Date.now() + 3600000); // تنظيف التخزين بعد ساعة
+        return;
+      }
       await this.saveEngine();
       await this.broadcastState();
     }
@@ -299,12 +321,99 @@ class ArenaRoom {
     const engine = await this.getEngine();
     if (!engine) return;
 
+    if (engine.state === ENGINE_STATES.PODIUM) {
+      // حذف بيانات التخزين بالكامل بعد انتهاء اللعبة بساعة واحدة
+      await this.ctx.storage.deleteAll();
+      this.engine = null;
+      this.hostToken = null;
+      this.playerTokens.clear();
+      return;
+    }
+
     const res = engine.tick(Date.now());
     if (res.transitioned) {
+      if (engine.state === ENGINE_STATES.PODIUM) {
+        await this.persistLiveResultsToD1();
+        await this.saveEngine();
+        await this.broadcastState();
+        await this.ctx.storage.setAlarm(Date.now() + 3600000); // تنظيف التخزين بعد ساعة
+        return;
+      }
       await this.saveEngine();
       await this.broadcastState();
     } else if (res.nextAlarmAt && res.nextAlarmAt > Date.now()) {
       await this.ctx.storage.setAlarm(res.nextAlarmAt);
+    }
+  }
+
+  // 3هـ: حفظ نتائج اللعبة الحية في D1 من الخادم مباشرة وتحديث محفظة الطلاب مع مراعاة حد الطوارئ
+  async persistLiveResultsToD1() {
+    if (!this.env || !this.env.DB || !this.engine) return;
+    if (this._persistedToD1) return;
+    this._persistedToD1 = true;
+
+    try {
+      const DB = this.env.DB;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const dayKey = new Date().toISOString().slice(0, 10);
+
+      // فحص حد الطوارئ اليومي (20,000 جلسة كحد أقصى)
+      const usageRow = await DB.prepare('SELECT session_count FROM arena_daily_usage WHERE day_key = ?').bind(dayKey).first();
+      const currentCount = usageRow ? (usageRow.session_count || 0) : 0;
+      if (currentCount >= 20000) return;
+
+      const nonHostStudents = [...this.engine.players.values()].filter(p => !p.isHost);
+      if (!nonHostStudents.length) return;
+
+      const sessionsToInsert = [];
+      const walletUpdates = [];
+      let savedCount = 0;
+
+      for (const st of nonHostStudents) {
+        if (currentCount + savedCount >= 20000) break;
+        const sid = 'as_live_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        const answersList = (st.rounds || []).map(r => ({
+          qid: String(r.qid || '').trim(),
+          chosen: r.choiceIndex !== undefined ? +r.choiceIndex : -1,
+          ok: r.isCorrect ? 1 : 0
+        }));
+        const answersJson = JSON.stringify(answersList);
+        const totalQ = this.engine.questions.length;
+        const correctQ = st.correctCount || 0;
+        const durSec = Math.max(0, Math.floor((Date.now() - (st.joinedAt || Date.now())) / 1000));
+        const courseKey = this.engine.courseKey || 'arena_live';
+        const classCode = st.classId || null;
+        const did = st.did || null;
+        const score = Math.min(1000, st.score || 0);
+        const gold = Math.min(200, Math.floor(score / 10));
+
+        const hostUserId = parseInt(String(this.engine.hostId || '').replace(/^u_/, ''), 10) || null;
+        sessionsToInsert.push(
+          DB.prepare(
+            'INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, answers_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(sid, hostUserId, st.name, classCode, courseKey, 'live', score, gold, totalQ, correctQ, durSec, answersJson, nowSec)
+        );
+
+        if (classCode && did && gold > 0) {
+          const studentKey = classCode + ':' + did;
+          walletUpdates.push(
+            DB.prepare(
+              "INSERT INTO arena_student_wallet (student_key, class_id, did, balance, total_earned, active_avatar, updated_at) VALUES (?, ?, ?, ?, ?, 'falcon', ?) ON CONFLICT(student_key) DO UPDATE SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?"
+            ).bind(studentKey, classCode, did, gold, gold, nowSec, gold, gold, nowSec)
+          );
+        }
+        savedCount++;
+      }
+
+      if (sessionsToInsert.length) {
+        const incUsage = DB.prepare(
+          'INSERT INTO arena_daily_usage (day_key, session_count, updated_at) VALUES (?, ?, ?) ON CONFLICT(day_key) DO UPDATE SET session_count = session_count + ?, updated_at = ?'
+        ).bind(dayKey, savedCount, nowSec, savedCount, nowSec);
+
+        await DB.batch([...sessionsToInsert, ...walletUpdates, incUsage]);
+      }
+    } catch (e) {
+      // لا نوقف عمل الغرفة أو المقابس في حال تعثرت كتابة D1
     }
   }
 

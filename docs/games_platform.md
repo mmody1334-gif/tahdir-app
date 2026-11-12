@@ -175,3 +175,21 @@
     - توثيق اشتراطات iOS Safari: تشفير `wss:` حصرياً عبر HTTPS، إعادة الاتصال التلقائي عند تبديل التطبيقات عبر أحداث `visibilitychange` و`pageshow`، وضرورة تفعيل أصوات WebAudio عبر إيماءة لمس أولية للمستخدم.
 12. **Decision (Default Feature Flag)**:
     - ضبط `ARENA_LIVE_ENABLED=false` افتراضياً في `site/wrangler.toml` لترجع كافة نقاط البث الحي رمز 501 حتى موعد الإطلاق الفعلي.
+13. **Decision (Free Plan D1 Protection & Single-Row `answers_json`)**:
+    - حماية حصة Cloudflare D1 المجانية (100 ألف صف كتابة يومياً للموقع بأكمله): إيقاف إدراج صفوف فردية في `arena_answers` من كود التطبيق، والاعتماد على تخزين الجولة كاملة في صف واحد بجدول `arena_sessions` يتضمن عمود `answers_json` بصيغة مضغوطة (`[{qid, chosen, ok}]`).
+    - إعادة احتساب تقرير الأسئلة الأكثر خطأ `top_failed` في الذاكرة من عمود `answers_json` للجولات المشمولة فقط دون استعلامات ربط ثقيلة.
+    - إضافة حد طوارئ يومي (20,000 جلسة) عبر جدول `arena_daily_usage`. عند تجاوز هذا الحد، يستمر الطلاب في اللعب دون تسجيل الجلسة في D1 مع إرجاع رسالة عربية توضيحية لطيفة.
+14. **Decision (Durable Object SQLite Storage & Lifecycle Optimization)**:
+    - حماية حصة Durable Objects في الخطة المجانية (100 ألف وحدة كتابة و13 ألف GB-s): الامتناع عن استدعاء `ctx.storage.put` عند تسليم كل إجابة فردية، وإبقاء الإجابات في ذاكرة المحرك ومرفق المقبس المتسلسل (`serializeAttachment`).
+    - حصر الكتابة في `ctx.storage` عند تحولات الحالات الأساسية فقط (`QUESTION`, `REVEAL`, `PODIUM`, `PAUSED`, `RESUMED` أو اكتمال إجابة جميع الطلاب المتصلين).
+    - ضبط منبه تنظيف دقيق `ctx.storage.setAlarm` عند الوصول للمنصة `PODIUM` لتنفيذ `ctx.storage.deleteAll()` تلقائياً بعد ساعة واحدة من عدم النشاط لتحرير مساحة التخزين.
+    - التقاط أخطاء تجاوز الحصة (Quota Exceeded) من الـ DO وإرجاع استجابة HTTP 503 للمعلّم برسالة ودية: «اللعب المباشر متوقف مؤقتًا حتى الغد».
+15. **Decision (Stage 3e Server-Side Live Persistence)**:
+    - حفظ نتائج اللعبة المباشرة تلقائياً من خادم DO إلى قاعدة بيانات D1 فور الانتقال إلى طور التتويج `PODIUM` دون انتظار أي طلبات من متصفحات الطلاب.
+    - إدراج صف واحد لكل طالب في `arena_sessions` بنمط `live` متضمناً `answers_json` ومربوطاً بـ `class_id` ومعرّف المعلم المضيف `user_id`.
+    - تحديث محفظة الطالب `arena_student_wallet` بالذهب المستحق وفق معاملة ذرية متوافقة مع حد الطوارئ اليومي.
+16. **Decision (Strict CSP & Non-Ambiguous Codes)**:
+    - إزالة `ws:` و `wss:` العامة من سياسة CSP واستبدالها بالقيد الصارم `connect-src 'self' wss://${url.host};`.
+    - توليد رموز الغرف المباشرة عبر `crypto.getRandomValues` من أبجدية نقية خالية من الالتباس (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`) وبطول 6 خانات دائماً.
+    - رفض تهيئة أي غرفة نشطة في الـ DO برمز HTTP 409 Conflict، مع إعادة المحاولة تلقائياً برمز جديد حتى 5 مرات.
+    - التحقق في `/api/arena/session` من ملكية المعلم المسجل للفصل المرسل (`classes.user_id = me.id`) وتجاهله في حال عدم الملكية لمنع التلاعب.

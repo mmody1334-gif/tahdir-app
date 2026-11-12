@@ -16,6 +16,7 @@ class ArenaEngine {
     this.code = String(config.code || '').toUpperCase();
     this.hostId = String(config.hostId || 'host');
     this.hostName = String(config.hostName || 'المعلم');
+    this.courseKey = String(config.courseKey || '').trim();
     this.mode = config.mode || 'gold_rush'; // gold_rush | cafe | tower
     this.timePerQuestion = Math.max(5, Math.min(120, +(config.timePerQuestion || 20))); // ثوانٍ
     this.revealDuration = Math.max(3, Math.min(30, +(config.revealDuration || 6))); // ثوانٍ
@@ -73,6 +74,8 @@ class ArenaEngine {
       id: playerId,
       name: String(profile.name || (isHost ? this.hostName : `طالب ${nonHostCount + 1}`)).trim().slice(0, 30),
       avatar: String(profile.avatar || (isHost ? '👑' : '🦅')).slice(0, 10),
+      classId: profile.classId ? String(profile.classId).trim() : null,
+      did: profile.did ? String(profile.did).trim() : null,
       isHost,
       score: 0,
       gold: 0,
@@ -82,7 +85,8 @@ class ArenaEngine {
       wrongCount: 0,
       connected: true,
       joinedAt: Date.now(),
-      lastSeen: Date.now()
+      lastSeen: Date.now(),
+      rounds: []
     };
 
     this.players.set(playerId, player);
@@ -169,13 +173,18 @@ class ArenaEngine {
       if (!this.roundAnswers.has(id)) {
         player.streak = 0;
         player.wrongCount++;
-        this.roundAnswers.set(id, {
+        const timeoutRecord = {
+          qIndex: this.currentQIndex,
+          qid: currentQ ? currentQ.qid : '',
           choiceIndex: -1,
           answeredAt: nowMs,
           durationMs: this.timePerQuestion * 1000,
           isCorrect: false,
           pointsAwarded: 0
-        });
+        };
+        this.roundAnswers.set(id, timeoutRecord);
+        if (!player.rounds) player.rounds = [];
+        player.rounds.push(timeoutRecord);
       }
     }
 
@@ -222,13 +231,18 @@ class ArenaEngine {
       player.wrongCount++;
     }
 
-    this.roundAnswers.set(playerId, {
+    const ansRecord = {
+      qIndex: this.currentQIndex,
+      qid: currentQ.qid,
       choiceIndex,
       answeredAt: nowMs,
       durationMs,
       isCorrect,
       pointsAwarded
-    });
+    };
+    this.roundAnswers.set(playerId, ansRecord);
+    if (!player.rounds) player.rounds = [];
+    player.rounds.push(ansRecord);
 
     // تحقق هل أجاب جميع الطلاب المتصلين؟
     const activeStudents = [...this.players.values()].filter(p => !p.isHost && p.connected);
@@ -416,6 +430,7 @@ class ArenaEngine {
       code: this.code,
       hostId: this.hostId,
       hostName: this.hostName,
+      courseKey: this.courseKey,
       mode: this.mode,
       timePerQuestion: this.timePerQuestion,
       revealDuration: this.revealDuration,
@@ -442,6 +457,7 @@ class ArenaEngine {
       code: data.code,
       hostId: data.hostId,
       hostName: data.hostName,
+      courseKey: data.courseKey,
       mode: data.mode,
       timePerQuestion: data.timePerQuestion,
       revealDuration: data.revealDuration,
