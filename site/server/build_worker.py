@@ -1679,6 +1679,105 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
 }
 @keyframes abSheet{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes abIn{from{opacity:0}to{opacity:1}}
+/* ---------- ساحة التحدي (arena) ---------- */
+.ar-wrap{max-width:1040px;margin:18px auto;padding:0 16px}
+.ar-top-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:8px 14px;box-shadow:var(--shadow)}
+.ar-user-info{display:flex;align-items:center;gap:10px}
+.ar-av-badge{font-size:1.6rem;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.ar-wallet-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-l,#fbf0db);border:1px solid #e8cd9b;color:#7a4f07;border-radius:20px;padding:4px 12px;font-size:.92rem}
+.ar-top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ar-notice-strip{background:var(--main-l);border:1px solid #b7dfd2;color:var(--main-d);border-radius:12px;padding:8px 14px;margin-bottom:16px;font-size:.88rem;display:flex;align-items:center;gap:8px}
+.ar-setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:800px){.ar-setup-grid{grid-template-columns:1fr}}
+.ar-setup-card{padding:18px}
+.ar-step-h{font-size:1.15rem;margin:0 0 14px;display:flex;align-items:center;gap:8px;color:var(--main-d)}
+.ar-step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--main);color:#fff;font-size:.85rem;font-weight:700}
+.ar-field{margin-bottom:14px}
+.ar-field label{display:block;margin-bottom:6px;font-size:.9rem}
+.ar-select{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-family:inherit;font-size:.95rem}
+.ar-units-box{max-height:380px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg)}
+.ar-unit-block{margin-bottom:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ar-unit-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.ar-lessons-list{display:grid;gap:6px}
+.ar-lesson-item{display:flex;align-items:center;gap:8px;font-size:.88rem;padding:6px 8px;border-radius:6px;cursor:pointer;min-height:36px}
+.ar-lesson-item:hover{background:var(--main-l)}
+.ar-lesson-item.disabled{opacity:.5;cursor:not-allowed}
+.ar-q-tag{margin-inline-start:auto;font-size:.78rem;background:var(--main-l);color:var(--main-d);padding:2px 6px;border-radius:6px}
+.ar-q-tag.muted{background:var(--line);color:var(--mute)}
+.ar-modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:500px){.ar-modes-grid{grid-template-columns:1fr}}
+.ar-mode-opt{display:flex;flex-direction:column;gap:4px;padding:12px;border:2px solid var(--line);border-radius:12px;cursor:pointer;background:var(--paper);transition:border-color .15s,box-shadow .15s;position:relative}
+.ar-mode-opt input{position:absolute;opacity:0;pointer-events:none}
+.ar-mode-opt.active{border-color:var(--main);background:var(--main-l);box-shadow:0 0 0 2px rgba(31,138,112,.2)}
+.ar-mode-ic{font-size:1.8rem}
+.ar-mode-opt b{font-size:1rem;color:var(--ink)}
+.ar-mode-opt small{font-size:.8rem;color:var(--mute);line-height:1.3}
+.ar-settings-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:500px){.ar-settings-row{grid-template-columns:1fr}}
+.ar-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ar-launch-box{margin-top:16px;text-align:center}
+.ar-avail-hint{font-size:.88rem;color:var(--mute);margin-bottom:10px}
+.ar-start-btn{min-height:48px;font-size:1.05rem;font-weight:700}
+.ar-game-bar{margin-bottom:14px}
+.ar-progress-wrap{width:100%;height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.ar-progress-fill{height:100%;background:linear-gradient(90deg,var(--main),var(--leaf));transition:width .2s ease}
+.ar-game-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.9rem}
+.ar-lesson-badge{background:var(--main-l);color:var(--main-d);padding:4px 10px;border-radius:12px;font-size:.82rem}
+.ar-score-badge{color:var(--accent);font-weight:700}
+.ar-mode-bar{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.9rem}
+.ar-rep-wrap,.ar-tower-hp-bar{display:inline-flex;align-items:center;gap:6px}
+.ar-rep-bar,.ar-tower-hp-bar{width:120px;height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.ar-rep-fill,.ar-tower-hp-fill{height:100%;transition:width .25s ease}
+.ar-question-card{padding:22px;margin-bottom:16px}
+.ar-stem{font-size:1.25rem;font-weight:700;line-height:1.5;margin-bottom:20px;color:var(--ink)}
+.ar-choices-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.ar-choices-grid{grid-template-columns:1fr}}
+.ar-choice-btn{display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:1.05rem;text-align:right;cursor:pointer;transition:transform .1s,border-color .15s,background .15s}
+.ar-choice-btn:hover:not(:disabled){border-color:var(--main);background:var(--main-l);transform:translateY(-1px)}
+.ar-choice-btn:focus-visible{outline:3px solid var(--main);outline-offset:2px}
+.ar-choice-btn .ar-opt-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--line);font-weight:700;font-size:.9rem;flex-shrink:0}
+.ar-choice-btn.correct{border-color:#1f8a70;background:#e1f3ec;color:#0b3b33}
+.ar-choice-btn.correct .ar-opt-num{background:#1f8a70;color:#fff}
+.ar-choice-btn.wrong{border-color:#b23a2b;background:#fde8e8;color:#7a1d1d}
+.ar-choice-btn.wrong .ar-opt-num{background:#b23a2b;color:#fff}
+.ar-stage-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
+.ar-feedback-card{background:var(--paper);border-radius:18px;padding:26px;max-width:440px;width:100%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.ar-fb-ic{font-size:3.2rem;margin-bottom:10px}
+.ar-feedback-card p{font-size:1.1rem;margin-bottom:18px;line-height:1.4}
+.ar-chests-modal{background:var(--paper);border-radius:20px;padding:26px;max-width:500px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.ar-chests-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}
+.ar-chest-box{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:90px;border:2px dashed var(--accent);border-radius:14px;background:var(--accent-l,#fbf0db);font-size:1.8rem;cursor:pointer;transition:transform .15s}
+.ar-chest-box:hover:not(:disabled){transform:scale(1.05);background:#fae5bf}
+.ar-chest-box.opened{background:#e3f1eb;border-color:var(--main);border-style:solid}
+.ar-chest-res{margin-top:14px}
+.ar-prize-alert{font-size:1.15rem;font-weight:700;color:var(--main-d);margin-bottom:14px}
+.ar-result-card{text-align:center;padding:32px 20px;max-width:700px;margin:0 auto}
+.ar-res-trophy{font-size:4rem;margin-bottom:10px}
+.ar-res-lead{color:var(--mute);font-size:1.1rem;margin-bottom:24px}
+.ar-stats-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:26px}
+.ar-stat-box{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.ar-stat-box b{font-size:1.6rem;color:var(--ink)}
+.ar-stat-box b.gold{color:var(--accent)}
+.ar-stat-box span{font-size:.85rem;color:var(--mute)}
+.ar-mistakes-section{text-align:right;margin:24px 0;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px}
+.ar-mistakes-section h3{font-size:1.05rem;margin:0 0 12px;color:var(--danger)}
+.ar-mistake-item{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.ar-mistake-item b{display:block;margin-bottom:4px;font-size:.95rem}
+.ar-ans-correct{color:var(--main-d);font-size:.9rem}
+.ar-res-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.ar-store-card{padding:24px;max-width:820px;margin:0 auto}
+.ar-store-head{text-align:center;margin-bottom:24px}
+.ar-avatars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:24px}
+.ar-av-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);transition:border-color .15s}
+.ar-av-card.active-av{border-color:var(--main);background:var(--main-l)}
+.ar-av-icon{font-size:2.8rem;margin-bottom:4px}
+.ar-av-card b{font-size:1.05rem}
+.ar-av-card small{font-size:.82rem;color:var(--mute);line-height:1.3;flex:1}
+.ar-av-action{margin-top:10px;width:100%}
+.ar-av-action .btn{width:100%;min-height:38px}
+.ar-tag.active{display:inline-block;padding:4px 8px;border-radius:8px;background:var(--main);color:#fff;font-size:.82rem;font-weight:700}
+.ar-store-foot{text-align:center;padding-top:10px;border-top:1px solid var(--line)}
+@media(prefers-reduced-motion:reduce){.ar-progress-fill,.ar-rep-fill,.ar-tower-hp-fill,.ar-choice-btn,.ar-chest-box{transition:none !important;animation:none !important}}
 '''
 CSS = base_css + extra_css
 
@@ -1792,7 +1891,7 @@ TOP = lambda extra: f'''<header class="top">{BANNER}<div class="wrap top-in">
   <p class="by">إعداد أستاذ <b>محمد مجدي</b>، معلم الأحياء</p>{extra}</div></div>
   <div class="actions whobar">%BTNS%</div></div></header>'''
 
-MENU_ITEMS = [('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('homework', '/homework', '📒', 'الواجبات المنزلية'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
+MENU_ITEMS = [('arena', '/arena', '⚔️', 'ساحة التحدي'), ('quiz', '/quiz', '📝', 'التقويم والاختبارات'), ('homework', '/homework', '📒', 'الواجبات المنزلية'), ('diag', '/diag', '🧪', 'الاختبار التشخيصي'), ('games', '/games', '🎲', 'الألعاب التعليمية'),
               ('slides', '/slides', '📽️', 'العروض التقديمية'),
               ('remedial', '/remedial', '🩹', 'الخطط العلاجية والأنشطة الصفية'), ('summaries', '/summaries', '📚', 'ملخصات الدروس والوحدات'), ('cando', '/cando', '☑️', 'أستطيع أن ✓'), ('cards', '/cards', '🪪', 'كروت الأسئلة (بليكرز)'), ('analysis', '/analysis', '📊', 'تحليل نتائج الاختبارات'), ('ld', '/ld', '🧩', 'سجل صعوبات التعلم'), ('forms', '/forms', '🗂', 'النماذج الإدارية'), ('space', '/space', '🎒', 'مساحة الطالب'), ('research', '/research', '🔬', 'البحوث الإجرائية'), ('finals', '/finals', '🗂', 'الاختبارات النهائية السابقة')]
 # «تصحيح الواجبات تلقائيًا» (/grading و /teqany/grading) مخفي من كل القوائم والبطاقات: يُفتح بالرابط المباشر فقط.
@@ -1819,6 +1918,7 @@ def NAV(active, extra=''):
 
 # ===== صفحة البداية بعد تسجيل الدخول: عقد أقسام مرتبة بنفس روح «تقني حذيفة» (تُقدّم كل الأدوات بضغطة) =====
 _KB_DESC = {
+  '/arena': 'مسابقات وألعاب تعليمية تفاعلية بأسئلة المنهج الحقيقية.',
   '/app': 'دروس كل المواد جاهزة — عدّلها واطبعها وأرسلها إلى نور.',
   '/quiz': 'اختبارات قصيرة ومراجعات وفق الوثيقة، بالترويسة الرسمية.',
   '/homework': 'ورقة واجب منزلي بالدرجات وأنواع الأسئلة حسب وثيقة التقويم، بترويسة رسمية.',
@@ -1969,6 +2069,10 @@ CANDO_PAGE = TOP('<div class="stats"><span class="stat">أستطيع أن ✓</s
 <main class="panel" id="panel"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main></div>
 <div id="printArea"></div>'''
 
+ARENA_PAGE = TOP('<div class="stats"><span class="stat">ساحة التحدي</span><span class="stat">مسابقات وألعاب تفاعلية بأسئلة المنهج</span></div>').replace('%BTNS%', NAV('arena')) + '''
+<main class="wrap ar-wrap" id="arenaMain"><div class="welcome"><h2>جارٍ التحميل…</h2></div></main>
+<div id="printArea"></div>'''
+
 ADMIN = TOP('<div class="stats"><span class="stat">لوحة التحكم</span></div>').replace('%BTNS%',
   NAV('admin', '<button type="button" role="menuitem" id="refreshBtn"><span class="mi">↻</span>تحديث البيانات</button>')) + '''
 <main class="wrap dash" id="dash"><div class="empty-state">جارٍ تحميل البيانات…</div></main>'''
@@ -2074,7 +2178,7 @@ TQ_SECTIONS = [('/teqany/tahdir', '📝', 'التحضير', 'دروس جاهزة
 # أي قسم جديد يُضاف إلى قائمة المنصة (MENU_ITEMS) يظهر تلقائيًا في «تقني حذيفة» أيضًا.
 # الروابط الخارجية (مثل باحث المدرسة) لا تُبنى ببادئة /teqany ولا تُستبعد:
 # شرط h.startswith('/') القديم كان يحذفها، فغابت من كروت الواجهة رغم وجودها في «المزيد».
-_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال', '/homework': 'ورقة واجب بدرجات وأنواع وفق الوثيقة'}
+_TQ_DESC = {'/cards': 'بطاقة لكل طالب وامسح الصف بالجوال', '/homework': 'ورقة واجب بدرجات وأنواع وفق الوثيقة', '/arena': 'مسابقات وألعاب تفاعلية بأسئلة المنهج'}
 TQ_SECTIONS += [(h if h.startswith('http') else '/teqany' + h, ic, t, _TQ_DESC.get(h, '')) for _k, h, ic, t in MENU_ITEMS
                 if _k != 'grading' and (h if h.startswith('http') else '/teqany' + h) not in {x[0] for x in TQ_SECTIONS}]
 # باحث المدرسة خاص بـ «تقني حذيفة» فقط: غير موجود في MENU_ITEMS (أُخفي من الكبسولة)،
@@ -2110,6 +2214,7 @@ PAGES = {
   'setup': page('إعداد الكبسولة', SETUP, rd('client_login.js')),
   'app': page('الكبسولة', APP, rd('client_app.js')),
   'admin': page('لوحة التحكم · الكبسولة', ADMIN, rd('client_admin.js')),
+  'arena': page('ساحة التحدي · الكبسولة', ARENA_PAGE, rd('client_arena.js')),
   'quiz': page('التقويم · الكبسولة', QUIZ, rd('client_quiz.js') + chr(10) + rd('client_checker.js')),
   'homework': page('الواجبات المنزلية · الكبسولة', HOMEWORK, "window.PAGE_MODE='hw';" + chr(10) + rd('client_quiz.js')),
   'games': page('الألعاب التعليمية · الكبسولة', GAMES, rd('vendor/qr.js') + chr(10) + rd('client_games.js').replace('// @@FX@@', rd('client_fx.js')).replace('// @@TUG@@', rd('client_tug.js') + chr(10) + rd('client_arcade.js') + chr(10) + rd('client_runner.js'))),

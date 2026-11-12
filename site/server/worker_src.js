@@ -1474,7 +1474,7 @@ export default {
       // ===== مساحة «تقني حذيفة»: نفس المنصة بهوية مختلفة تحت /teqany =====
       // تجهيز الحالة قبل التحقق من الدخول حتى نوجّه الزائر إلى صفحة دخول مُعلَّمة.
       const TQ_MAP = {
-        '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz',
+        '/teqany/tahdir': 'app', '/teqany/app': 'app', '/teqany/quiz': 'quiz', '/teqany/arena': 'arena',
         '/teqany/games': 'games', '/teqany/play': 'play', '/teqany/slides': 'slides',
         '/teqany/finals': 'finals', '/teqany/remedial': 'remedial', '/teqany/summaries': 'summaries', '/teqany/cando': 'cando', '/teqany/research': 'research',
         '/teqany/admin': 'admin', '/teqany/login': 'login', '/teqany/setup': 'setup',
@@ -1495,6 +1495,53 @@ export default {
         }
       }
       if (p === '/play') return html('play');
+      if (p === '/arena') return html('arena');
+      if (p === '/teqany/arena') return htmlTq('arena');
+      if (p === '/api/arena/courses') {
+        await loadPacks(env, url);
+        const all = await allLessons(env);
+        const meUser = await currentUser(req, env);
+        const sc = meUser ? scopeOf(meUser) : null;
+        const mCourses = new Map();
+        all.forEach(l => {
+          const k = courseKey(l);
+          if (!sc || sc.has(k)) {
+            const c = mCourses.get(k) || { key: k, subject: l.subject, grade: l.grade, total_mcq: 0, has_arena: false };
+            const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
+            c.total_mcq += qList.length;
+            if (c.total_mcq > 0) c.has_arena = true;
+            mCourses.set(k, c);
+          }
+        });
+        return json({ courses: Array.from(mCourses.values()) });
+      }
+      if (p === '/api/arena/data') {
+        await loadPacks(env, url);
+        const key = url.searchParams.get('key') || '';
+        const meUser = await currentUser(req, env);
+        const sc = meUser ? scopeOf(meUser) : null;
+        if (sc && !sc.has(key)) return json({ error: 'غير مسموح.' }, 403);
+        const all = await allLessons(env);
+        const ls = all.filter(l => courseKey(l) === key);
+        const unitsMap = new Map();
+        ls.forEach(l => {
+          const uNum = String(l.unit || '1');
+          const uName = l.unit_name || ('الوحدة ' + uNum);
+          if (!unitsMap.has(uNum)) unitsMap.set(uNum, { unit: uNum, unit_name: uName, lessons: [] });
+          const qList = (ARENA && ARENA.by_lesson && ARENA.by_lesson[String(l.id)]) || [];
+          unitsMap.get(uNum).lessons.push({
+            id: l.id,
+            title: l.title,
+            unit: l.unit,
+            mcq_count: qList.length,
+            items: qList
+          });
+        });
+        return json({
+          course: key,
+          units: Array.from(unitsMap.values())
+        });
+      }
       if (/^\/s\/[A-Za-z0-9]{6}\/?$/.test(p) || p === '/s' || p === '/s/') return html('student');
       if (p.startsWith('/api/s/')) { const r = await studentApi(req, env, p, m, url); if (r) return r; }
       if (p.startsWith('/api/play/')) { const r = await playApi(req, env, p, m, url); if (r) return r; }
