@@ -12,14 +12,15 @@ const QBANK = __QBANK__;
 let GPACK = {};
 let STUDY = { lessons: {}, units: {} };
 let FINALS = {};
+let ARENA = { total: 0, by_lesson: {}, courses: {} };
 const PACKDIR = __PACKDIR__;
 let PACKS_OK = null;
 async function loadPacks(env, url) {
   if (PACKS_OK) return PACKS_OK;
   PACKS_OK = (async () => {
     const get = async n => { const r = await env.ASSETS.fetch(new Request(new URL(PACKDIR + n + '.json', url.origin))); if (!r.ok) throw new Error('pack ' + n + ' ' + r.status); return r.json(); };
-    const [s, g, f] = await Promise.all([get('study'), get('games'), get('finals')]);
-    STUDY = s; GPACK = g; FINALS = f; return true;
+    const [s, g, f, a] = await Promise.all([get('study'), get('games'), get('finals'), get('arena')]);
+    STUDY = s; GPACK = g; FINALS = f; ARENA = a; return true;
   })().catch(e => { PACKS_OK = null; throw e; });
   return PACKS_OK;
 }
@@ -1431,7 +1432,7 @@ export default {
       }
       // على النطاق القديم: أي صفحة ليست تحت /teqany تُحوَّل إلى /teqany (لأن هذا النطاق مخصص لتقني حذيفة)
       if (url.hostname === OLD_HOST && isPageNav(req, p) && !p.startsWith('/teqany')) return redirect('/teqany');
-      if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live|courses)/.test(p)) await loadPacks(env, url);
+      if (p.startsWith('/api/') && /^\/api\/(study|games|finals|quiz|live|courses|arena)/.test(p)) await loadPacks(env, url);
       if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return json({ error: 'forbidden' }, 403);
 
       let mm0;

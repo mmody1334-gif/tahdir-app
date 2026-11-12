@@ -2184,7 +2184,41 @@ def _study_with_mm():
     for k, v in _AR_STUDY.items():
         st['lessons'].setdefault(k, {}).update(v)
     return st
-_PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN)}
+def _arena_pack():
+    by_l, valid = {}, 0
+    for q in qbank:
+        if q.get('type') != 'mcq': continue
+        ch = q.get('choices')
+        if not isinstance(ch, list) or len(ch) < 2: continue
+        c = q.get('correct')
+        if not isinstance(c, int) or c < 0 or c >= len(ch): continue
+        lid = str(q.get('lesson_id'))
+        item = {
+            'qid': q.get('qid'),
+            'lesson_id': q.get('lesson_id'),
+            'stem': q.get('stem') or '',
+            'choices': ch,
+            'correct': c,
+            'difficulty': q.get('difficulty') or 'متوسطة'
+        }
+        by_l.setdefault(lid, []).append(item)
+        valid += 1
+    courses = {}
+    for l in lessons:
+        s = l.get('subject') or ''
+        g = l.get('grade') or ''
+        k = f"{s}|{g}"
+        lid = str(l.get('id'))
+        if lid in by_l:
+            courses.setdefault(k, []).append(int(lid))
+    pack = {'total': valid, 'by_lesson': by_l, 'courses': courses}
+    try:
+        with open(os.path.join(DATA, 'arena_pack.json'), 'w', encoding='utf-8') as f:
+            json.dump(pack, f, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        pass
+    return pack
+_PK = {'study': _untat(_study_with_mm()), 'games': _untat(json.load(open(os.path.join(DATA, 'games_pack.json'), encoding='utf-8'))), 'finals': _untat(FIN), 'arena': _untat(_arena_pack())}
 _PB = {k: json.dumps(v, ensure_ascii=False, separators=(',', ':')).encode('utf-8') for k, v in _PK.items()}
 _PH = _hl.sha256(b''.join(_PB.values())).hexdigest()[:24]
 import shutil as _sh
