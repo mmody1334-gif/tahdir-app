@@ -1684,9 +1684,26 @@ CSS = base_css + extra_css
 
 FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">'
 
-import base64 as _b64, secrets as _sec
+import base64 as _b64, secrets as _sec, subprocess as _sp, shutil as _sh, hashlib as _hl, tempfile as _tf
+# كل صفحة تُشفَّر وتُحقن كسكربت واحد: خطأ نحوي واحد (فاصلة ناقصة) يوقف الصفحة كلها
+# («جارٍ تحميل الدروس» بلا نهاية). نفحص كل سكربت بـ node قبل النشر ونوقف البناء عند أي خطأ.
+_JS_OK = set()
+def _check_js(js):
+    node = _sh.which('node')
+    if not node: return
+    h = _hl.md5(js.encode('utf-8')).hexdigest()
+    if h in _JS_OK: return
+    with _tf.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
+        f.write('(function(){\n' + js + '\n})'); fn = f.name
+    r = _sp.run([node, '--check', fn], capture_output=True, text=True)
+    os.unlink(fn)
+    if r.returncode:
+        err = (r.stderr or '').strip().splitlines()
+        raise SystemExit('خطأ نحوي في سكربت صفحة — لن يُنشر:\n' + '\n'.join(l[:300] for l in err[:6]))
+    _JS_OK.add(h)
 def pack(js):
     js = chr(10).join(l.strip() for l in js.split(chr(10)) if l.strip())
+    _check_js(js)
     key = _sec.token_hex(8)
     raw = js.encode('utf-8'); kb = key.encode()
     enc = _b64.b64encode(bytes(c ^ kb[i % len(kb)] for i, c in enumerate(raw))).decode()

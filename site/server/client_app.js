@@ -312,7 +312,7 @@ var MORPH_ICONS={
   math:'<svg viewBox="0 0 240 180"><text x="120" y="120" text-anchor="middle" font-size="96" font-weight="900" fill="#1368ce" font-family="serif">π</text><g class="mz-comp" stroke="#0b3b33" stroke-width="6" stroke-linecap="round"><path d="M178 40l-22 70M178 40l22 70"/><circle cx="178" cy="40" r="7" fill="#c98a1e"/></g><text x="56" y="70" font-size="34" font-weight="900" fill="#e21b3c">+</text><text x="54" y="140" font-size="34" font-weight="900" fill="#26890c">÷</text></svg>',
   ar:'<svg viewBox="0 0 240 180"><path d="M120 50c-20-14-48-16-70-10v100c22-6 50-4 70 10 20-14 48-16 70-10V40c-22-6-50-4-70 10z" fill="#fff" stroke="#0b3b33" stroke-width="6" stroke-linejoin="round"/><path d="M120 50v100" stroke="#0b3b33" stroke-width="5"/><text x="86" y="112" text-anchor="middle" font-size="46" font-weight="900" fill="#1f8a70">ض</text><text x="156" y="112" text-anchor="middle" font-size="40" font-weight="900" fill="#c98a1e">ع</text></svg>',
   en:'<svg viewBox="0 0 240 180"><rect x="52" y="34" width="136" height="112" rx="18" fill="#fff" stroke="#0b3b33" stroke-width="6"/><text x="120" y="116" text-anchor="middle" font-size="62" font-weight="900" fill="#1368ce" font-family="sans-serif">Aa</text><path d="M188 52l20-12v100l-20-12" fill="#e21b3c"/></svg>',
-  isl:'<svg viewBox="0 0 240 180"><path d="M120 34c-24 22-48 30-48 60v52h96V94c0-30-24-38-48-60z" fill="#1f8a70" stroke="#0b3b33" stroke-width="5" stroke-linejoin="round"/><path d="M106 146v-30a14 14 0 0 1 28 0v30" fill="#e3f1eb" stroke="#0b3b33" stroke-width="4"/><path d="M60 60v86M180 60v86" stroke="#0b3b33" stroke-width="8" stroke-linecap="round"/><path d="M128 18a14 14 0 1 0 6 22a11 11 0 1 1-6-22z" fill="#ffd400"/></svg>'
+  isl:'<svg viewBox="0 0 240 180"><path d="M120 34c-24 22-48 30-48 60v52h96V94c0-30-24-38-48-60z" fill="#1f8a70" stroke="#0b3b33" stroke-width="5" stroke-linejoin="round"/><path d="M106 146v-30a14 14 0 0 1 28 0v30" fill="#e3f1eb" stroke="#0b3b33" stroke-width="4"/><path d="M60 60v86M180 60v86" stroke="#0b3b33" stroke-width="8" stroke-linecap="round"/><path d="M128 18a14 14 0 1 0 6 22a11 11 0 1 1-6-22z" fill="#ffd400"/></svg>',
   ss:'<svg viewBox="0 0 240 180"><circle cx="110" cy="96" r="62" fill="#e3f1eb" stroke="#0b3b33" stroke-width="6"/><g fill="none" stroke="#1f8a70" stroke-width="4"><ellipse cx="110" cy="96" rx="26" ry="62"/><path d="M48 96h124M58 66h104M58 126h104"/></g><path d="M78 70c10-6 22-4 26 6s-4 16 4 22-2 18-14 16c-12-8-20-22-16-44z" fill="#c98a1e" opacity=".85"/><g class="mz-pin"><path d="M176 30c-16 0-26 12-26 26 0 20 26 46 26 46s26-26 26-46c0-14-10-26-26-26z" fill="#e21b3c" stroke="#0b3b33" stroke-width="4"/><circle cx="176" cy="56" r="9" fill="#fff"/></g></svg>',
 };
 var MORPH_NAMES={bio:'الأحياء',chem:'الكيمياء',phys:'الفيزياء',sci:'العلوم',env:'العلوم البيئية',it:'تقنية المعلومات',math:'الرياضيات',ar:'اللغة العربية',en:'اللغة الإنجليزية',isl:'التربية الإسلامية',ss:'الدراسات الاجتماعية'};
@@ -449,7 +449,11 @@ function init(){
     };
     if($('pcBtn'))$('pcBtn').onclick=function(){toolDialog('');};
     if($('iosBtn'))$('iosBtn').onclick=function(){dialog({title:'التطبيق على الآيفون',html:'<ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>افتح الموقع من متصفح <b>Safari</b>.</li><li>اضغط زر <b>«مشاركة»</b> ⬆ أسفل الشاشة.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة».</li></ol><p class="m-msg">يظهر «التحضير الآلي» بأيقونة على شاشتك مثل أي تطبيق.</p>',okText:'تم',cancelText:false});};}
+  // لو تأخّر التحميل (شبكة المدرسة أو ضغط أول الدوام) لا نترك المعلم أمام «جارٍ التحميل» بلا نهاية
+  var lsDone=false,lsSlow=setTimeout(function(){if(lsDone)return;var w=$('panel')&&$('panel').querySelector('.welcome');if(!w)return;
+    var d=document.createElement('p'),bt=document.createElement('button');d.textContent='التحميل أبطأ من المعتاد… ';bt.type='button';bt.className='btn';bt.textContent='أعد المحاولة';bt.onclick=function(){location.reload();};d.appendChild(bt);w.appendChild(d);},15000);
   Promise.all([api('/api/me'),api('/api/lessons')]).then(function(r){
+    lsDone=true;clearTimeout(lsSlow);
     me=r[0];lessons=r[1].lessons;
     // نحمّل القيم الثابتة للمادة الأولى، وتُبدَّل تلقائيًا عند فتح درس مادة أخرى
     useSettingsFor(activeSubject());
@@ -459,7 +463,7 @@ function init(){
     if(me.role!=='admin'){var ed=lsGet(editsKey())||{};lessons.forEach(function(l){var e=ed[l.id];if(e)Object.keys(e).forEach(function(k){l[k]=e[k];if(l.ai_filled)l.ai_filled=l.ai_filled.filter(function(x){return x!==k;});});});}
     $('statLessons').textContent=lessons.length;$('statFilled').textContent=lessons.filter(function(l){return !isEmpty(l);}).length;
     renderTree();if(location.hash==="#prep")showPrep();else showHome();
-  },function(e){showWelcome('تعذّر تحميل الدروس',e.message);});
+  },function(e){lsDone=true;clearTimeout(lsSlow);showWelcome('تعذّر تحميل الدروس',e.message+' — حدّث الصفحة للمحاولة مرة أخرى.');});
 }
 // شريط التطبيق السفلي (common.js) ينتقل بين الرئيسية والتحضير بلا إعادة تحميل
 window.appShowPrep=showPrep;window.appShowHome=showHome;
