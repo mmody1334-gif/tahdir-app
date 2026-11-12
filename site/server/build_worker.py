@@ -1830,7 +1830,10 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
 .ar-bar-fill.opt-1{background:#1e88e5}
 .ar-bar-fill.opt-2{background:#d97706}
 .ar-bar-fill.opt-3{background:#10b981}
-.ar-bar-cnt{font-size:.82rem;width:40px;text-align:left}
+.ar-bar-cnt{font-size:.82rem;min-width:70px;text-align:left;white-space:nowrap}
+.toast{top:calc(18px + env(safe-area-inset-top,0px));bottom:auto;transform:translateY(-8px)}
+.toast.on{opacity:1;transform:none}
+.ar-top-actions .btn,.ar-ctrl-btn{min-height:44px;padding:8px 14px;font-size:.95rem;display:inline-flex;align-items:center;gap:6px}
 .ar-podium-wrap{margin:24px 0;display:flex;align-items:flex-end;justify-content:center;gap:12px;min-height:220px}
 .ar-podium-col{display:flex;flex-direction:column;align-items:center;width:105px;text-align:center}
 .ar-podium-pedestal{width:100%;border-radius:12px 12px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800}

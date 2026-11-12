@@ -398,6 +398,9 @@ class ArenaEngine {
         }
       }
       out.choiceCounts = counts;
+      if (out.question) {
+        out.question.choiceCounts = counts;
+      }
     }
 
     // معلومات خاصة باللاعب الطالب

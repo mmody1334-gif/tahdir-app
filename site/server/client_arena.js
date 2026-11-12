@@ -136,6 +136,11 @@
     return AVATARS[0];
   }
 
+  function avatarIcon(id, fallback) {
+    var av = getAvatar(id);
+    return (av && av.icon) ? av.icon : (fallback || '🦅');
+  }
+
   // قوالب العرض والأزرار العلوية
   function renderHeaderBar() {
     var av = getAvatar(state.activeAvatar);
@@ -1185,8 +1190,10 @@
     timerId: null,
     answered: false,
     selectedChoice: null,
-    myResult: null
+    myResult: null,
+    showHostHint: false // إخفاء الإجابة الصحيحة افتراضياً عن شاشة المعلم
   };
+  try { window.__arenaLive = live; } catch (e) {}
 
   // 1. AudioContext unlocker على أول لمسة / نقرة
   var audioUnlocked = false;
@@ -1302,6 +1309,7 @@
         live.answered = false;
         live.selectedChoice = null;
         live.myResult = null;
+        live.showHostHint = false;
       }
     }
 
@@ -1441,7 +1449,7 @@
     } else {
       players.forEach(function(p) {
         h += '<span class="ar-student-chip">' +
-          '<span>' + esc(p.avatar || '🦅') + '</span>' +
+          '<span>' + avatarIcon(p.avatar, '🦅') + '</span>' +
           '<b>' + esc(p.name) + '</b>' +
           '<button type="button" class="ar-kick-btn" data-kid="' + esc(p.id) + '" title="طرد الطالب">✕</button>' +
         '</span>';
@@ -1516,9 +1524,10 @@
         '<span class="ar-tag active" style="margin-inline-start:8px">' + (isReveal ? 'كشف الإجابات' : (isPaused ? 'متوقف مؤقتاً' : 'نشط')) + '</span>' +
       '</div>' +
       '<div class="ar-top-actions">' +
-        '<button type="button" class="btn ghost small" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
-        '<button type="button" class="btn ghost small" id="arHostSkipBtn">⏭️ تخطي</button>' +
-        '<button type="button" class="btn ghost small" id="arHostEndBtn">🚪 إنهاء</button>' +
+        (!isReveal ? '<button type="button" class="btn ghost ar-ctrl-btn ar-hint-toggle" id="arHostToggleHintBtn">' + (live.showHostHint ? '🙈 إخفاء الإجابة' : '👁️ إظهار الإجابة لي') + '</button>' : '') +
+        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
+        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostSkipBtn">⏭️ تخطي</button>' +
+        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostEndBtn">🚪 إنهاء</button>' +
       '</div>' +
     '</div>';
 
@@ -1531,7 +1540,7 @@
 
     if (isReveal) {
       // إحصائيات توزيع إجابات الطلاب للمعلم
-      var dist = q.distribution || [0, 0, 0, 0];
+      var dist = live.state.choiceCounts || (q && q.choiceCounts) || [0, 0, 0, 0];
       var totalAnswers = dist.reduce(function(a, b) { return a + b; }, 0) || 1;
       h += '<div class="ar-bars-dist">' +
         '<h4>📊 إحصائيات إجابات الطلاب:</h4>';
@@ -1544,19 +1553,19 @@
           '<div class="ar-bar-track">' +
             '<div class="ar-bar-fill opt-' + idx + '" style="width:' + pct + '%"></div>' +
           '</div>' +
-          '<span class="ar-bar-cnt">' + cnt + ' (' + pct + '%)' + (isCorr ? ' ✓' : '') + '</span>' +
+          '<span class="ar-bar-cnt" data-cidx="' + idx + '">' + cnt + ' (' + pct + '%)' + (isCorr ? ' ✓' : '') + '</span>' +
           '<span style="flex:2;margin-inline-start:8px;font-size:.9rem' + (isCorr ? ';color:#10b981;font-weight:700' : '') + '">' + esc(ch) + '</span>' +
         '</div>';
       });
       h += '</div>';
     } else {
-      // عرض الخيارات مع إشارة للإجابة الصحيحة للمعلم فقط
+      // عرض الخيارات مع إخفاء الإجابة الصحيحة افتراضياً (المعلم يعرض شاشته للفصل)
       h += '<div class="ar-live-grid">';
       q.choices.forEach(function(ch, idx) {
-        var isHint = idx === q.hostHintCorrect;
+        var isHint = live.showHostHint && (idx === q.hostHintCorrect);
         h += '<div class="ar-live-btn opt-' + idx + '" style="cursor:default' + (isHint ? ';border:3px solid #fff;box-shadow:0 0 0 4px #10b981' : '') + '">' +
           '<span class="ar-shape">' + (idx + 1) + '</span>' +
-          '<span>' + esc(ch) + (isHint ? ' <small style="background:rgba(0,0,0,.2);padding:2px 6px;border-radius:6px">✓ الصحيحة</small>' : '') + '</span>' +
+          '<span>' + esc(ch) + (isHint ? ' <small class="ar-host-hint-label" style="background:rgba(0,0,0,.2);padding:2px 6px;border-radius:6px">✓ الصحيحة</small>' : '') + '</span>' +
         '</div>';
       });
       h += '</div>';
@@ -1570,14 +1579,21 @@
       '<div style="display:flex;gap:10px;flex-wrap:wrap">';
     (live.state.leaderboard || []).slice(0, 5).forEach(function(p, idx) {
       h += '<div class="ar-student-chip">' +
-        '<span>' + (idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️'))) + '</span>' +
+        '<span>' + (idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️'))) + ' ' + avatarIcon(p.avatar, '') + '</span>' +
         '<b>' + esc(p.name) + '</b>' +
-        '<span style="color:var(--accent);font-weight:700">' + p.score + 'ن</span>' +
+        '<span style="color:var(--accent);font-weight:700">' + p.score + ' نقطة</span>' +
       '</div>';
     });
     h += '</div></div>';
 
     main.innerHTML = h;
+
+    if ($('arHostToggleHintBtn')) {
+      $('arHostToggleHintBtn').onclick = function() {
+        live.showHostHint = !live.showHostHint;
+        renderHostGame();
+      };
+    }
 
     $('arHostPauseBtn').onclick = function() {
       if (live.ws && live.ws.readyState === 1) {
@@ -1614,9 +1630,9 @@
     // المركز الثاني (فضة)
     if (p2) {
       h += '<div class="ar-podium-col rank-2">' +
-        '<span style="font-size:1.8rem">' + esc(p2.avatar || '🥈') + '</span>' +
+        '<span style="font-size:1.8rem">' + avatarIcon(p2.avatar, '🥈') + '</span>' +
         '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + 'ن</span>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">2</div>' +
       '</div>';
     }
@@ -1625,9 +1641,9 @@
     if (p1) {
       h += '<div class="ar-podium-col rank-1">' +
         '<span style="font-size:2.4rem">👑</span>' +
-        '<span style="font-size:2rem">' + esc(p1.avatar || '🦅') + '</span>' +
+        '<span style="font-size:2rem">' + avatarIcon(p1.avatar, '🦅') + '</span>' +
         '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
-        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + 'ن</span>' +
+        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">1</div>' +
       '</div>';
     }
@@ -1635,9 +1651,9 @@
     // المركز الثالث (برونز)
     if (p3) {
       h += '<div class="ar-podium-col rank-3">' +
-        '<span style="font-size:1.8rem">' + esc(p3.avatar || '🥉') + '</span>' +
+        '<span style="font-size:1.8rem">' + avatarIcon(p3.avatar, '🥉') + '</span>' +
         '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + 'ن</span>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">3</div>' +
       '</div>';
     }
@@ -1651,7 +1667,7 @@
       h += '<tr>' +
         '<td><b>' + (idx + 1) + '</b></td>' +
         '<td>' + esc(p.name) + '</td>' +
-        '<td style="color:var(--accent);font-weight:700">' + p.score + '</td>' +
+        '<td style="color:var(--accent);font-weight:700">' + p.score + ' نقطة</td>' +
         '<td>' + (p.correctCount || 0) + '</td>' +
       '</tr>';
     });
@@ -1752,7 +1768,7 @@
 
     var h = '<div class="ar-top-bar">' +
       '<div class="ar-user-info">' +
-        '<span class="ar-av-badge">' + esc(state.activeAvatar || '🦅') + '</span>' +
+        '<span class="ar-av-badge">' + avatarIcon(state.activeAvatar, '🦅') + '</span>' +
         '<b>الساحة المباشرة</b>' +
       '</div>' +
       '<div class="ar-top-actions">' +
@@ -1910,26 +1926,26 @@
     h += '<div class="ar-podium-wrap">';
     if (p2) {
       h += '<div class="ar-podium-col rank-2">' +
-        '<span style="font-size:1.8rem">' + esc(p2.avatar || '🥈') + '</span>' +
+        '<span style="font-size:1.8rem">' + avatarIcon(p2.avatar, '🥈') + '</span>' +
         '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + 'ن</span>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">2</div>' +
       '</div>';
     }
     if (p1) {
       h += '<div class="ar-podium-col rank-1">' +
         '<span style="font-size:2.2rem">👑</span>' +
-        '<span style="font-size:2rem">' + esc(p1.avatar || '🦅') + '</span>' +
+        '<span style="font-size:2rem">' + avatarIcon(p1.avatar, '🦅') + '</span>' +
         '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
-        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + 'ن</span>' +
+        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">1</div>' +
       '</div>';
     }
     if (p3) {
       h += '<div class="ar-podium-col rank-3">' +
-        '<span style="font-size:1.8rem">' + esc(p3.avatar || '🥉') + '</span>' +
+        '<span style="font-size:1.8rem">' + avatarIcon(p3.avatar, '🥉') + '</span>' +
         '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + 'ن</span>' +
+        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + ' نقطة</span>' +
         '<div class="ar-podium-pedestal">3</div>' +
       '</div>';
     }

@@ -200,6 +200,27 @@ const ok = (n, c, extra) => {
     await student2Page.waitForSelector('.ar-live-q-stem', { timeout: 8000 });
     ok('المعلم وجميع الطلاب ينتقلون لشاشة السؤال متزامنين', true);
 
+    // فحص أزرار التحكم وارتفاعها 44px على الأقل
+    const ctrlBtnHeight = await teacherPage.evaluate(() => {
+      const btn = document.querySelector('.ar-ctrl-btn') || document.querySelector('#arHostToggleHintBtn');
+      return btn ? btn.getBoundingClientRect().height : 0;
+    });
+    ok('أزرار التحكم أثناء اللعب بارتفاع 44px على الأقل', ctrlBtnHeight >= 44);
+
+    // فحص إخفاء الإجابة الصحيحة افتراضياً عن المعلم وزر التبديل
+    const defaultHintCount = await teacherPage.locator('.ar-host-hint-label').count();
+    ok('الإجابة الصحيحة مخفية افتراضياً على شاشة المعلم أثناء السؤال', defaultHintCount === 0);
+    const toggleBtn = teacherPage.locator('#arHostToggleHintBtn');
+    ok('زر «إظهار الإجابة لي» متاح ومرئي للمعلم', await toggleBtn.isVisible());
+
+    // اختبار زر إظهار الإجابة ثم إعادة إخفائها
+    await teacherPage.click('#arHostToggleHintBtn');
+    const toggledHintCount = await teacherPage.locator('.ar-host-hint-label').count();
+    ok('النقر على «إظهار الإجابة لي» يُظهر وسم الإجابة الصحيحة للمعلم مؤقتاً', toggledHintCount > 0);
+    await teacherPage.click('#arHostToggleHintBtn');
+    const hiddenAgainCount = await teacherPage.locator('.ar-host-hint-label').count();
+    ok('النقر مرة ثانية يُعيد إخفاء الإجابة الصحيحة بنجاح', hiddenAgainCount === 0);
+
     // التقاط لقطات شاشة السؤال
     await teacherPage.screenshot({ path: path.join(screensDir, '06_teacher_question_desktop.png') });
     await teacherPage.setViewportSize({ width: 390, height: 844 });
@@ -209,10 +230,17 @@ const ok = (n, c, extra) => {
     await student1Page.screenshot({ path: path.join(screensDir, '07_student1_question_desktop.png') });
     await student2Page.screenshot({ path: path.join(screensDir, '08_student2_question_mobile.png') });
 
-    // 7. إجابة الطلاب عبر الأزرار الكبيرة
-    console.log('\n=== تقديم إجابات الطلاب عبر أزرار اللمس الكبيرة ===');
-    await student1Page.click('.ar-live-btn.opt-0');
-    await student2Page.click('.ar-live-btn.opt-1');
+    // 7. إجابة طالب صحيحاً وطالب خطأ
+    console.log('\n=== تقديم إجابات الطلاب: طالب صحيح وطالب خطأ ===');
+    const correctIdx = await teacherPage.evaluate(() => {
+      return (window.__arenaLive && window.__arenaLive.state && window.__arenaLive.state.question)
+        ? window.__arenaLive.state.question.hostHintCorrect
+        : 0;
+    });
+    const wrongIdx = (correctIdx + 1) % 4;
+
+    await student1Page.click(`.ar-live-btn.opt-${correctIdx}`);
+    await student2Page.click(`.ar-live-btn.opt-${wrongIdx}`);
 
     // التحقق من تعطيل الأزرار فور الضغط
     const s1Disabled = await student1Page.evaluate(() => {
@@ -221,12 +249,24 @@ const ok = (n, c, extra) => {
     });
     ok('أزرار الطالب تُعطّل وتُثبّت الاختيار فور الضغط لمنع الإجابة المزدوجة', s1Disabled);
 
-    // 8. طور كشف الإجابات (REVEAL)
+    // 8. طور كشف الإجابات (REVEAL) وفحص إحصائيات الاختيارات
     console.log('\n=== طور كشف الإجابات والإحصائيات والنتائج ===');
     await teacherPage.waitForSelector('.ar-bars-dist', { timeout: 12000 });
     await student1Page.waitForSelector('.ar-reveal-card', { timeout: 12000 });
     await student2Page.waitForSelector('.ar-reveal-card', { timeout: 12000 });
     ok('انتقال تلقائي لطور كشف الإجابات (REVEAL) عند انتهاء الوقت أو إجابة الكل', true);
+
+    // فحص إحصائيات الاختيارات عند المعلم
+    const cntCorrText = await teacherPage.locator(`.ar-bar-cnt[data-cidx="${correctIdx}"]`).textContent();
+    ok('عدّاد الخيار الصحيح في إحصائيات المعلم = 1 (50%)', cntCorrText.includes('1'));
+    const cntWrongText = await teacherPage.locator(`.ar-bar-cnt[data-cidx="${wrongIdx}"]`).textContent();
+    ok('عدّاد الخيار الخاطئ في إحصائيات المعلم = 1 (50%)', cntWrongText.includes('1'));
+
+    // فحص إشعارات صحة الإجابة للطلاب
+    const s1Status = await student1Page.locator('.ar-reveal-status').textContent();
+    ok('الطالب 1 تظهر له رسالة الإجابة الصحيحة والممتازة', s1Status.includes('صحيحة'));
+    const s2Status = await student2Page.locator('.ar-reveal-status').textContent();
+    ok('الطالب 2 تظهر له رسالة الإجابة الخاطئة دون نقاط', s2Status.includes('خاطئة'));
 
     await teacherPage.screenshot({ path: path.join(screensDir, '09_teacher_reveal_desktop.png') });
     await student1Page.screenshot({ path: path.join(screensDir, '10_student1_reveal_desktop.png') });
@@ -238,6 +278,22 @@ const ok = (n, c, extra) => {
     await student1Page.waitForSelector('.ar-podium-wrap', { timeout: 25000 });
     await student2Page.waitForSelector('.ar-podium-wrap', { timeout: 25000 });
     ok('المعلم وجميع الطلاب يصلون لمنصة التتويج (PODIUM) بنجاح تام', true);
+
+    // فحص المنصة ولوحة المتصدرين: عدم ظهور falcon كنص وظهور الرمز 🦅، وترتيب الطلاب
+    const podiumWrapText = await teacherPage.locator('.ar-podium-wrap').textContent();
+    ok('المنصة لا تعرض كلمة "falcon" كنص خام بل تستعمل رمز الشخصية', !podiumWrapText.includes('falcon'));
+    const podiumHtml = await teacherPage.locator('.ar-podium-wrap').innerHTML();
+    ok('المنصة تعرض أيقونة الشخصية 🦅', podiumHtml.includes('🦅'));
+
+    const rank1Text = await teacherPage.locator('.ar-podium-col.rank-1').textContent();
+    const s1ScoreMatch = rank1Text.match(/(\d+)\s*نقطة/);
+    const s1ScoreNum = s1ScoreMatch ? parseInt(s1ScoreMatch[1], 10) : 0;
+    ok('الطالب 1 المتفوق في المركز الأول ونقاطه أكبر من الصفر بصيغة نقطة', rank1Text.includes('أحمد العماني') && s1ScoreNum > 0);
+
+    const rank2Text = await teacherPage.locator('.ar-podium-col.rank-2').textContent();
+    const s2ScoreMatch = rank2Text.match(/(\d+)\s*نقطة/);
+    const s2ScoreNum = s2ScoreMatch ? parseInt(s2ScoreMatch[1], 10) : -1;
+    ok('الطالب 2 في المركز الثاني برصيد 0 نقطة بصيغة نقطة', rank2Text.includes('سارة البلوشية') && s2ScoreNum === 0);
 
     // لقطات شاشة منصة التتويج
     await teacherPage.screenshot({ path: path.join(screensDir, '12_teacher_podium_desktop.png') });
