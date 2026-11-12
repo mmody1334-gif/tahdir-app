@@ -37,14 +37,18 @@ const ok = (n, c, extra) => {
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
+  let stdoutLogs = '';
+  let stderrLogs = '';
+  proc.stdout.on('data', d => { stdoutLogs += d.toString(); });
   proc.stderr.on('data', d => {
     const s = d.toString();
+    stderrLogs += s;
     if (s.includes('ERROR') || s.includes('Error')) console.error('Wrangler stderr:', s);
   });
 
   // انتظار إقلاع السيرفر
   let ready = false;
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
       const res = await fetch(`${BASE}/api/arena/courses`);
@@ -53,6 +57,8 @@ const ok = (n, c, extra) => {
   }
   if (!ready) {
     console.error('تعذر إقلاع wrangler dev.');
+    console.error('STDOUT:\n', stdoutLogs);
+    console.error('STDERR:\n', stderrLogs);
     proc.kill();
     process.exit(1);
   }
@@ -200,12 +206,45 @@ const ok = (n, c, extra) => {
     await student2Page.waitForSelector('.ar-live-q-stem', { timeout: 8000 });
     ok('المعلم وجميع الطلاب ينتقلون لشاشة السؤال متزامنين', true);
 
-    // فحص أزرار التحكم وارتفاعها 44px على الأقل
-    const ctrlBtnHeight = await teacherPage.evaluate(() => {
-      const btn = document.querySelector('.ar-ctrl-btn') || document.querySelector('#arHostToggleHintBtn');
-      return btn ? btn.getBoundingClientRect().height : 0;
+    // فحص أزرار التحكم: التنسيق الصريح والتباين والنصوص والأبعاد (عرض > 70px وارتفاع >= 44px)
+    const ctrlButtons = ['#arHostPauseBtn', '#arHostSkipBtn', '#arHostEndBtn', '#arHostToggleHintBtn'];
+    for (const sel of ctrlButtons) {
+      const btnInfo = await teacherPage.evaluate((s) => {
+        const el = document.querySelector(s);
+        if (!el) return null;
+        const cs = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return {
+          text: el.innerText || el.textContent,
+          color: cs.color,
+          bgColor: cs.backgroundColor,
+          width: rect.width,
+          height: rect.height,
+          border: cs.borderWidth
+        };
+      }, sel);
+
+      ok(`زر ${sel} موجود وظاهر`, !!btnInfo);
+      ok(`زر ${sel} لون نصه (${btnInfo.color}) يختلف عن لون الخلفية (${btnInfo.bgColor}) وغير أبيض`, btnInfo.color !== btnInfo.bgColor && btnInfo.color !== 'rgb(255, 255, 255)');
+      ok(`زر ${sel} بعرض صريح (${Math.round(btnInfo.width)}px) أكبر من 70px وارتفاع 44px على الأقل`, btnInfo.width > 70 && btnInfo.height >= 44);
+    }
+
+    // التحقق من احتواء نصوص الأزرار الصريحة
+    const pauseText = await teacherPage.innerText('#arHostPauseBtn');
+    ok('زر الإيقاف يحتوي نص "إيقاف"', pauseText.includes('إيقاف'));
+
+    const skipText = await teacherPage.innerText('#arHostSkipBtn');
+    ok('زر التخطي يحتوي نص "تخطي"', skipText.includes('تخطي'));
+
+    const endText = await teacherPage.innerText('#arHostEndBtn');
+    ok('زر الإنهاء يحتوي نص "إنهاء"', endText.includes('إنهاء'));
+
+    // فحص تموضع التنبيه (toast) تحت الترويسة
+    const toastTop = await teacherPage.evaluate(() => {
+      const t = document.getElementById('toast');
+      return t ? parseInt(window.getComputedStyle(t).top, 10) : 0;
     });
-    ok('أزرار التحكم أثناء اللعب بارتفاع 44px على الأقل', ctrlBtnHeight >= 44);
+    ok('رسالة التنبيه (toast) متموضعة تحت الترويسة (top >= 90px)', toastTop >= 90);
 
     // فحص إخفاء الإجابة الصحيحة افتراضياً عن المعلم وزر التبديل
     const defaultHintCount = await teacherPage.locator('.ar-host-hint-label').count();

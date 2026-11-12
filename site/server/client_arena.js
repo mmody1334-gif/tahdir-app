@@ -1524,10 +1524,10 @@
         '<span class="ar-tag active" style="margin-inline-start:8px">' + (isReveal ? 'كشف الإجابات' : (isPaused ? 'متوقف مؤقتاً' : 'نشط')) + '</span>' +
       '</div>' +
       '<div class="ar-top-actions">' +
-        (!isReveal ? '<button type="button" class="btn ghost ar-ctrl-btn ar-hint-toggle" id="arHostToggleHintBtn">' + (live.showHostHint ? '🙈 إخفاء الإجابة' : '👁️ إظهار الإجابة لي') + '</button>' : '') +
-        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
-        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostSkipBtn">⏭️ تخطي</button>' +
-        '<button type="button" class="btn ghost ar-ctrl-btn" id="arHostEndBtn">🚪 إنهاء</button>' +
+        (!isReveal ? '<button type="button" class="btn ar-ctrl-btn ar-hint-toggle" id="arHostToggleHintBtn">' + (live.showHostHint ? '🙈 إخفاء الإجابة' : '👁️ إظهار الإجابة لي') + '</button>' : '') +
+        '<button type="button" class="btn ar-ctrl-btn" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
+        '<button type="button" class="btn ar-ctrl-btn" id="arHostSkipBtn">⏭️ تخطي</button>' +
+        '<button type="button" class="btn ar-ctrl-btn" id="arHostEndBtn">🚪 إنهاء</button>' +
       '</div>' +
     '</div>';
 
