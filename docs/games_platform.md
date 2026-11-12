@@ -154,3 +154,24 @@
    - بناء `ArenaRoom` كغلاف رفيع لـ Durable Objects يعتمد حصرياً على WebSocket Hibernation (`getWebSockets`, `serializeAttachment`) بدون تخزين مقابس في متغيرات الكلاس.
    - الاعتماد على Durable Object Alarms (`ctx.storage.setAlarm`) للمؤقتات، مما يسمح للـ DO بالنوم وتوفير الموارد.
    - فرض سرية الإجابات: لا تُرسل الإجابة الصحيحة أو مفتاح الخيار للعميل أثناء طور السؤال `QUESTION` تحت أي ظرف، وتُكشف فقط في طور النتيجة `REVEAL`.
+8. **Decision (Durable Object Security & Token Verification)**:
+   - حظر استخراج الدور `role` أو معرّف اللاعب `playerId` من الـ query string.
+   - يصدر الخادم رمز مضيف سري `hostToken` عند إنشاء الغرفة (خاص بالمعلمين المسجلين)، ورمز لاعب موقّع `playerToken` عند الانضمام.
+   - يتحقق الـ DO من الرموز قبل قبول الاتصال أو تنفيذ أي أمر تحكم أو استعادة جلسة.
+   - تنظيف اسم اللاعب من أي وسوم HTML واقتطاعه بحد أقصى 30 حرفاً.
+9. **Decision (Strict Teacher Reports & Data Isolation)**:
+   - حل تعارض أسماء الأعمدة `ambiguous column name: user_id` في استعلام `top_failed` بإسناد كافة الأعمدة الصريحة إلى `s.user_id`, `s.class_id`, `s.course_key`.
+   - ربط جولات الطلاب بكود فصول المعلم النشطة `classes.code` (`class_id`).
+   - حصر تقارير المعلم غير المدير على فصوله (`classes.user_id = me.id`) وجولاته التجريبية الشخصية (`s.user_id = me.id`).
+   - حذف شرط `course_key IN scope` لمنع أي تسريب لبيانات طلاب مدارس أخرى تدرس نفس المادة.
+10. **Decision (Strict Server Answer Verification)**:
+    - عدم الوثوق إطلاقاً بحقل `is_correct` المرفوع من العميل في `/api/arena/session`.
+    - البحث عن كل `qid` في `ARENA.by_lesson` ومطابقة `chosen_idx === q.correct`.
+    - رفض أي سؤال مكرر أو غير موجود برمز خطأ HTTP 400.
+    - ربط محفظة الطالب بـ `(class_id, did)` في `arena_student_wallet` مع معاملة ذرية تمنع السحب بالسالب.
+11. **Decision (Asset Cache Busting & CSP)**:
+    - توليد اسم الأصل المهشّر `arena.<hash>.js` وفق تجزئة محتوى السكربت بخوارزمية SHA-256 مع إتاحة بديل `arena.js`.
+    - تحديث ترويسة سياسة أمان المحتوى CSP بالسماح الصريح بـ `connect-src 'self' wss: ws:;`.
+    - توثيق اشتراطات iOS Safari: تشفير `wss:` حصرياً عبر HTTPS، إعادة الاتصال التلقائي عند تبديل التطبيقات عبر أحداث `visibilitychange` و`pageshow`، وضرورة تفعيل أصوات WebAudio عبر إيماءة لمس أولية للمستخدم.
+12. **Decision (Default Feature Flag)**:
+    - ضبط `ARENA_LIVE_ENABLED=false` افتراضياً في `site/wrangler.toml` لترجع كافة نقاط البث الحي رمز 501 حتى موعد الإطلاق الفعلي.
