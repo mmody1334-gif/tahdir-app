@@ -85,7 +85,7 @@ const ok = (n, c, extra) => {
 
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const jsErrors = [];
-  page.on('pageerror', err => jsErrors.push(err.message));
+  page.on('pageerror', err => { jsErrors.push(err.message); });
 
   await page.goto(B + '/arena', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#arCourseSel', { timeout: 10000 });
@@ -141,6 +141,7 @@ const ok = (n, c, extra) => {
     mode: 'gold',
     student_name: 'طالب مجتهد',
     duration_sec: 12,
+    device_id: 'dev_lab_pc_01',
     answers: [
       { qid: 'q_1', lesson_id: '101', is_correct: 1, chosen_idx: 0, time_taken_ms: 2200 },
       { qid: 'q_2', lesson_id: '101', is_correct: 1, chosen_idx: 1, time_taken_ms: 1900 },
@@ -149,7 +150,7 @@ const ok = (n, c, extra) => {
   };
   const sessRes = await fetch(B + '/api/arena/session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.1' },
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_01' },
     body: JSON.stringify(sessionPayload)
   });
   const sessJson = await sessRes.json();
@@ -162,6 +163,7 @@ const ok = (n, c, extra) => {
     mode: 'gold',
     student_name: 'بوت سريع',
     duration_sec: 1,
+    device_id: 'dev_bot_scanner',
     answers: [
       { qid: 'q_1', is_correct: 1, time_taken_ms: 200 },
       { qid: 'q_2', is_correct: 1, time_taken_ms: 250 },
@@ -170,19 +172,49 @@ const ok = (n, c, extra) => {
   };
   const suspRes = await fetch(B + '/api/arena/session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.2' },
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_bot_scanner' },
     body: JSON.stringify(suspiciousPayload)
   });
   const suspJson = await suspRes.json();
   ok('الخادم يحظر منح الذهب عند سرعة استجابة خارقة غير بشرية (<800ms)', suspJson.score === 30 && suspJson.gold === 0);
 
-  // 4. فحص حد المعدل (Rate Limiting)
+  // 4. فحص حد المعدل (Rate Limiting) المعتمد على المستخدم/الجهاز وليس IP المدرسة
+  // أ) جهاز ثانٍ في نفس المدرسة (نفس الـ IP: 194.168.1.100) يرسل في نفس اللحظة: ينجح ولا يُحظر
+  const otherDeviceRes = await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_02' },
+    body: JSON.stringify({
+      course_key: firstOkCourse.key,
+      mode: 'gold',
+      student_name: 'طالب في جهاز مجاور',
+      device_id: 'dev_lab_pc_02',
+      duration_sec: 10,
+      answers: [{ qid: 'q_1', is_correct: 1, time_taken_ms: 2000 }]
+    })
+  });
+  ok('جهاز آخر على نفس IP المدرسة المشترك لا يُحظر بحد المعدل', otherDeviceRes.status === 200);
+
+  // ج) حفظ جولة باسم يبدأ برمز صيغة لاختبار حماية CSV Injection لاحقاً
+  await fetch(B + '/api/arena/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tahdir-Did': 'dev_lab_pc_03' },
+    body: JSON.stringify({
+      course_key: firstOkCourse.key,
+      mode: 'gold',
+      student_name: '=cmd|/C calc!A0',
+      device_id: 'dev_lab_pc_03',
+      duration_sec: 12,
+      answers: [{ qid: 'q_test_csv', is_correct: 1, time_taken_ms: 2200 }]
+    })
+  });
+
+  // ب) نفس الجهاز يرسل مرتين في أقل من 10 ثوانٍ: يُرفض بـ 429
   const rateLimitRes = await fetch(B + '/api/arena/session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-test-ip': '10.0.1.1' },
+    headers: { 'Content-Type': 'application/json', 'x-test-ip': '194.168.1.100', 'X-Tahdir-Did': 'dev_lab_pc_01' },
     body: JSON.stringify(sessionPayload)
   });
-  ok('حد المعدل يرفض حفظ جولتين في أقل من 10 ثوانٍ لنفس المصدر (HTTP 429)', rateLimitRes.status === 429);
+  ok('نفس الجهاز يُرفض إذا حفظ جولتين في أقل من 10 ثوانٍ (HTTP 429)', rateLimitRes.status === 429);
 
   // 5. تهيئة حساب المدير/المعلم وتسجيل الدخول
   await fetch(B + '/api/setup', {
@@ -248,7 +280,10 @@ const ok = (n, c, extra) => {
   const setsListJson = await setsListRes.json();
   ok('استعراض حقائب المعلم يرجع الحقيبة المنشأة', setsListRes.status === 200 && setsListJson.sets.some(s => s.id === setCreateJson.id));
 
-  // 8. فحص تقارير المعلم وتصدير CSV
+  // 8. فحص تقارير المعلم وتصدير CSV وصلاحيات الوصول وحماية المعادلات
+  const guestReportRes = await fetch(B + '/api/arena/reports');
+  ok('غير المصرح لهم يُمنعون من استعراض تقارير الطلاب (HTTP 403)', guestReportRes.status === 403);
+
   const reportsRes = await fetch(B + '/api/arena/reports?course=' + encodeURIComponent(firstOkCourse.key), { headers: authHeaders });
   const reportsJson = await reportsRes.json();
   ok('تقارير المعلم ترجع الإحصائيات العامة ونسب الدقة', reportsRes.status === 200 && typeof reportsJson.summary.total_sessions === 'number');
@@ -258,6 +293,7 @@ const ok = (n, c, extra) => {
   const reportCsvText = csvBuf.toString('utf8');
   const hasBom = csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf;
   ok('تصدير التقرير بصيغة CSV صالح ويتضمن ترويسة UTF-8 BOM', csvReportRes.status === 200 && reportCsvText.includes('معرف_الجلسة') && hasBom);
+  ok('حماية CSV Injection: تحييد الصيغ المبتدئة بـ (= أو + أو - أو @) بعلامة اقتباس مفردة', reportCsvText.includes(`"'=cmd|/C calc!A0"`));
 
   // تنظيف: حذف الحقيبة التجريبية
   const delSetRes = await fetch(B + '/api/arena/sets?id=' + encodeURIComponent(setCreateJson.id), {

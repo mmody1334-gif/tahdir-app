@@ -1180,14 +1180,19 @@ async function arenaApi(req, env, me, p, m, url) {
 
   // 4. حفظ الجولة (Session Persistence & Validation)
   if (p === '/api/arena/session' && m === 'POST') {
-    const rateKey = (me ? ('u_' + me.id) : ('ip_' + ipOf(req))) + ':asess';
-    const curTime = now();
-    if (ARENA_RATE.has(rateKey) && curTime - ARENA_RATE.get(rateKey) < 10000) {
-      return json({ error: 'يرجى الانتظار قليلاً قبل حفظ جولة أخرى.' }, 429);
-    }
-    ARENA_RATE.set(rateKey, curTime);
-
     const b = await body(req);
+    // حماية حد المعدل: لا نعتمد على IP إطلاقًا لأن مدرسة كاملة تشترك في IP واحد.
+    // نربطه بمعرّف المستخدم (للمسجلين) أو برمز الجهاز did / رمز الجلسة (للضيوف).
+    const c = cookies(req);
+    const did = String(c.did || req.headers.get('X-Tahdir-Did') || (b && b.device_id) || (b && b.session_token) || '').trim();
+    const rateKey = me ? ('u_' + me.id) : (did ? ('d_' + did) : null);
+    const curTime = now();
+    if (rateKey) {
+      if (ARENA_RATE.has(rateKey) && curTime - ARENA_RATE.get(rateKey) < 10000) {
+        return json({ error: 'يرجى الانتظار 10 ثوانٍ قبل حفظ جولة أخرى.' }, 429);
+      }
+      ARENA_RATE.set(rateKey, curTime);
+    }
     const course_key = String(b.course_key || '').trim();
     if (!course_key) return json({ error: 'المقرر مطلوب.' }, 400);
 
@@ -1334,7 +1339,20 @@ async function arenaApi(req, env, me, p, m, url) {
     const course = url.searchParams.get('course') || '';
     const classId = url.searchParams.get('class_id') || '';
 
+    // التحقق من الصلاحيات: المعلم يرى طلابه فقط (المقررات في نطاقه، أو الفصول التي يملكها)
     let whereClause = '1=1', params = [];
+    if (me.role !== 'admin') {
+      const sc = scopeOf(me);
+      if (course && sc && !sc.has(course)) return json({ error: 'غير مسموح باستعراض هذا المقرر.' }, 403);
+      whereClause += ' AND (class_id IN (SELECT code FROM classes WHERE user_id = ?) OR user_id = ?';
+      params.push(me.id, me.id);
+      if (sc && sc.size > 0) {
+        whereClause += ' OR course_key IN (' + [...sc].map(() => '?').join(',') + ')';
+        params.push(...sc);
+      }
+      whereClause += ')';
+    }
+
     if (course) { whereClause += ' AND course_key = ?'; params.push(course); }
     if (classId) { whereClause += ' AND class_id = ?'; params.push(classId); }
 
@@ -1344,20 +1362,30 @@ async function arenaApi(req, env, me, p, m, url) {
 
     const recentSessions = (await DB.prepare(`SELECT id, student_name, course_key, mode, score, gold, correct_q, total_q, duration_sec, created_at FROM arena_sessions WHERE ${whereClause} ORDER BY created_at DESC LIMIT 30`).bind(...params).all()).results || [];
 
+    function escapeCsvCell(val) {
+      let s = String(val ?? '');
+      // حماية CSV Injection (DDE / Formula Injection):
+      // أي خلية تبدأ بـ = أو + أو - أو @ تُسبق بعلامة اقتباس مفردة لمنع تنفيذ المعادلات في برامج الجداول
+      if (/^[=+\-@\t\r]/.test(s)) {
+        s = "'" + s;
+      }
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+
     if (url.searchParams.get('format') === 'csv') {
       const csvRows = ['معرف_الجلسة,اسم_الطالب,المقرر,النمط,النقاط,الذهب,الإجابات_الصحيحة,إجمالي_الأسئلة,الوقت_ثواني,التاريخ'];
       recentSessions.forEach(s => {
         csvRows.push([
-          s.id,
-          `"${(s.student_name || '').replace(/"/g, '""')}"`,
-          `"${(s.course_key || '').replace(/"/g, '""')}"`,
-          s.mode,
-          s.score,
-          s.gold,
-          s.correct_q,
-          s.total_q,
-          s.duration_sec,
-          new Date(s.created_at * 1000).toISOString()
+          escapeCsvCell(s.id),
+          escapeCsvCell(s.student_name),
+          escapeCsvCell(s.course_key),
+          escapeCsvCell(s.mode),
+          escapeCsvCell(s.score),
+          escapeCsvCell(s.gold),
+          escapeCsvCell(s.correct_q),
+          escapeCsvCell(s.total_q),
+          escapeCsvCell(s.duration_sec),
+          escapeCsvCell(new Date(s.created_at * 1000).toISOString())
         ].join(','));
       });
       return new Response('\uFEFF' + csvRows.join('\r\n'), {

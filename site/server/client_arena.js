@@ -148,6 +148,8 @@
         '</div>' +
       '</div>' +
       '<div class="ar-top-actions">' +
+        (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherSetsBtn" title="إدارة حقائب الأسئلة">📚 حقائبي</button>' : '') +
+        (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherReportsBtn" title="تقارير الطلاب">📊 التقارير</button>' : '') +
         '<button type="button" class="btn ghost small" id="arSoundToggle" title="كتم/تشغيل الصوت" aria-label="كتم أو تشغيل الصوت">' +
           (state.soundMuted ? '🔇 مكتوم' : '🔊 صوت') +
         '</button>' +
@@ -435,6 +437,14 @@
   }
 
   function bindCommonHeaderEvents() {
+    var setsBtn = $('arTeacherSetsBtn');
+    if (setsBtn) {
+      setsBtn.onclick = function() { openTeacherSetsModal(); };
+    }
+    var repsBtn = $('arTeacherReportsBtn');
+    if (repsBtn) {
+      repsBtn.onclick = function() { openTeacherReportsModal(); };
+    }
     var sndBtn = $('arSoundToggle');
     if (sndBtn) {
       sndBtn.onclick = function() {
@@ -914,11 +924,21 @@
     Array.prototype.forEach.call(selBtns, function(b) {
       b.onclick = function() {
         var id = this.getAttribute('data-avid');
-        state.activeAvatar = id;
-        saveWallet();
-        playSfx('coin');
-        toast('تم تفعيل الشخصية!');
-        renderStore();
+        api('/api/arena/avatar', { avatar: id }).then(function(res) {
+          if (res && res.ok) {
+            state.activeAvatar = id;
+            saveWallet();
+            playSfx('coin');
+            toast('تم تفعيل الشخصية!');
+            renderStore();
+          }
+        }).catch(function() {
+          state.activeAvatar = id;
+          saveWallet();
+          playSfx('coin');
+          toast('تم تفعيل الشخصية!');
+          renderStore();
+        });
       };
     });
 
@@ -932,21 +952,251 @@
           playSfx('wrong');
           return;
         }
-        state.wallet -= price;
-        state.ownedAvatars.push(id);
-        state.activeAvatar = id;
-        saveWallet();
-        playSfx('chest');
-        toast('مبروك! تم فتح الشخصية وتفعيلها.');
-        renderStore();
+        api('/api/arena/store/buy', { item_id: id }).then(function(res) {
+          if (res && res.ok) {
+            state.wallet = res.new_balance;
+            if (state.ownedAvatars.indexOf(id) === -1) state.ownedAvatars.push(id);
+            state.activeAvatar = id;
+            saveWallet();
+            playSfx('chest');
+            toast('مبروك! تم فتح الشخصية وتفعيلها.');
+            renderStore();
+          } else {
+            toast(res && res.error ? res.error : 'عذرًا، تعذر الشراء.');
+          }
+        }).catch(function() {
+          // fallback للضيوف دون حساب
+          state.wallet -= price;
+          if (state.ownedAvatars.indexOf(id) === -1) state.ownedAvatars.push(id);
+          state.activeAvatar = id;
+          saveWallet();
+          playSfx('chest');
+          toast('مبروك! تم فتح الشخصية وتفعيلها.');
+          renderStore();
+        });
       };
     });
+  }
+
+  // ==========================================
+  // واجهة المعلم: حقائب الأسئلة المخصصة وتقارير الطلاب
+  // ==========================================
+  function openTeacherSetsModal() {
+    var old = $('arSetsModal');
+    if (old) old.remove();
+
+    var div = document.createElement('div');
+    div.id = 'arSetsModal';
+    div.className = 'ar-modal-backdrop';
+    div.innerHTML = '<div class="ar-modal-box">' +
+      '<h2><span>📚 حقائب الأسئلة المخصصة (المعلم)</span><button type="button" class="btn ghost small" id="arCloseSetsModal">✖</button></h2>' +
+      '<p class="mute">يمكنك إنشاء حقائب أسئلة مخصصة لطلابك يدويًا أو عبر لصق ملف CSV واستخدامها في ساحة التحدي.</p>' +
+      '<div id="arSetsList">جارٍ جلب الحقائب...</div>' +
+      '<hr style="margin:20px 0;border:0;border-top:1px solid var(--line)">' +
+      '<h3>➕ إضافة حقيبة جديدة (CSV أو يدوي)</h3>' +
+      '<div class="ar-form-row"><label>عنوان الحقيبة:</label><input type="text" id="arNewSetTitle" placeholder="مثال: أسئلة مراجعة الوحدة الأولى"></div>' +
+      '<div class="ar-form-row"><label>المقرر المرتبط:</label><select id="arNewSetCourse">' +
+        state.courses.map(function(c) { return '<option value="' + esc(c.key) + '">' + esc(c.subject + ' — ' + c.grade) + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="ar-form-row"><label>محتوى الأسئلة (CSV):</label>' +
+        '<small class="mute" style="display:block;margin-bottom:6px">الصيغة: <code>السؤال,الخيار1,الخيار2,الخيار3,الخيار4,رقم الصحيح(1-4),تلميح</code></small>' +
+        '<textarea id="arNewSetCsv" rows="5" placeholder="ما عاصمة سلطنة عمان؟,مسقط,نزوى,صلالة,صحار,1,مدينة ساحلية"></textarea>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+        '<button type="button" class="btn primary" id="arSaveSetBtn">💾 حفظ الحقيبة والتحقق</button>' +
+      '</div>' +
+    '</div>';
+
+    document.body.appendChild(div);
+    $('arCloseSetsModal').onclick = function() { div.remove(); };
+
+    function loadSets() {
+      api('/api/arena/sets').then(function(res) {
+        var box = $('arSetsList');
+        if (!box) return;
+        var sets = res.sets || [];
+        if (!sets.length) {
+          box.innerHTML = '<p class="mute">لا توجد لديك حقائب أسئلة حتى الآن. استخدم النموذج أدناه لإنشاء حقيبتك الأولى.</p>';
+          return;
+        }
+        var h = '<table class="ar-table"><thead><tr><th>عنوان الحقيبة</th><th>المقرر</th><th>عدد الأسئلة</th><th>الإجراء</th></tr></thead><tbody>';
+        sets.forEach(function(s) {
+          h += '<tr>' +
+            '<td><b>' + esc(s.title) + '</b></td>' +
+            '<td>' + esc(s.course_key || 'عام') + '</td>' +
+            '<td>' + s.count + ' سؤال</td>' +
+            '<td>' +
+              '<button type="button" class="btn ghost small ar-del-set" data-sid="' + s.id + '" style="color:var(--danger)">🗑️ حذف</button>' +
+            '</td>' +
+          '</tr>';
+        });
+        h += '</tbody></table>';
+        box.innerHTML = h;
+
+        var delBtns = box.querySelectorAll('.ar-del-set');
+        Array.prototype.forEach.call(delBtns, function(b) {
+          b.onclick = function() {
+            var sid = this.getAttribute('data-sid');
+            if (confirm('هل أنت متأكد من حذف هذه الحقيبة؟')) {
+              api('/api/arena/sets?id=' + encodeURIComponent(sid), null, 'DELETE').then(function() {
+                toast('تم حذف الحقيبة.');
+                loadSets();
+              }).catch(function() { toast('تعذّر الحذف.'); });
+            }
+          };
+        });
+      }).catch(function() {
+        var box = $('arSetsList');
+        if (box) box.innerHTML = '<p class="err">تعذّر جلب الحقائب.</p>';
+      });
+    }
+
+    loadSets();
+
+    $('arSaveSetBtn').onclick = function() {
+      var title = ($('arNewSetTitle').value || '').trim();
+      var course = $('arNewSetCourse').value;
+      var csvText = ($('arNewSetCsv').value || '').trim();
+      if (!title) { toast('اكتب عنوان الحقيبة.'); return; }
+      if (!csvText) { toast('الصق محتوى الأسئلة بصيغة CSV.'); return; }
+
+      api('/api/arena/sets', { title: title, course_key: course, csv_text: csvText }).then(function(res) {
+        if (res && res.ok) {
+          toast('تم حفظ الحقيبة بنجاح (' + res.count + ' سؤال)!');
+          $('arNewSetTitle').value = '';
+          $('arNewSetCsv').value = '';
+          loadSets();
+        } else {
+          toast(res && res.error ? res.error : 'تعذّر حفظ الحقيبة.');
+        }
+      }).catch(function(err) {
+        toast('خطأ: ' + (err.message || 'تعذّر الحفظ.'));
+      });
+    };
+  }
+
+  function openTeacherReportsModal() {
+    var old = $('arReportsModal');
+    if (old) old.remove();
+
+    var div = document.createElement('div');
+    div.id = 'arReportsModal';
+    div.className = 'ar-modal-backdrop';
+    div.innerHTML = '<div class="ar-modal-box">' +
+      '<h2><span>📊 تقارير الطلاب وسجل ساحة التحدي</span><button type="button" class="btn ghost small" id="arCloseReportsModal">✖</button></h2>' +
+      '<div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap">' +
+        '<label><b>المقرر:</b></label>' +
+        '<select id="arReportCourseSel" style="padding:6px 10px;border-radius:8px;border:1px solid var(--line)">' +
+          '<option value="">كل المقررات المتاحة</option>' +
+          state.courses.map(function(c) { return '<option value="' + esc(c.key) + '">' + esc(c.subject + ' — ' + c.grade) + '</option>'; }).join('') +
+        '</select>' +
+        '<a id="arCsvExportLink" class="btn primary small" href="/api/arena/reports?format=csv" target="_blank" download="arena_report.csv">📥 تصدير CSV (Excel)</a>' +
+      '</div>' +
+      '<div id="arReportsBody">جارٍ جلب التقارير...</div>' +
+    '</div>';
+
+    document.body.appendChild(div);
+    $('arCloseReportsModal').onclick = function() { div.remove(); };
+
+    var courseSel = $('arReportCourseSel');
+    courseSel.onchange = function() {
+      var cKey = this.value;
+      $('arCsvExportLink').href = '/api/arena/reports?format=csv' + (cKey ? '&course=' + encodeURIComponent(cKey) : '');
+      loadReport(cKey);
+    };
+
+    function loadReport(course) {
+      var box = $('arReportsBody');
+      box.innerHTML = '<p class="mute">جارٍ تحميل الإحصائيات...</p>';
+      api('/api/arena/reports' + (course ? '?course=' + encodeURIComponent(course) : '')).then(function(rep) {
+        var sm = rep.summary || {};
+        var h = '<div class="ar-kpi-grid">' +
+          '<div class="ar-kpi-card"><b>' + (sm.total_sessions || 0) + '</b><span>إجمالي الجولات</span></div>' +
+          '<div class="ar-kpi-card"><b>' + (sm.total_students || 0) + '</b><span>الطلاب المتفاعلون</span></div>' +
+          '<div class="ar-kpi-card"><b>' + (sm.avg_score || 0) + '</b><span>متوسط النقاط</span></div>' +
+          '<div class="ar-kpi-card"><b>' + (sm.accuracy_rate || 0) + '%</b><span>نسبة الدقة العامة</span></div>' +
+        '</div>';
+
+        h += '<h3>📉 الأسئلة الأكثر تعثراً (تحتاج معالجة صفية):</h3>';
+        var topF = rep.top_failed || [];
+        if (!topF.length) {
+          h += '<p class="mute">لا توجد أسئلة مسجلة بنسب خطأ مرتفعة حتى الآن.</p>';
+        } else {
+          h += '<table class="ar-table"><thead><tr><th>السؤال/الدرس</th><th>المحاولات</th><th>مرات الخطأ</th><th>نسبة التعثر</th></tr></thead><tbody>';
+          topF.forEach(function(f) {
+            var failPct = f.attempts > 0 ? Math.round((f.fail_count * 100) / f.attempts) : 0;
+            h += '<tr><td><b>' + esc(f.qid) + '</b>' + (f.lesson_id ? ' <small class="mute">(درس ' + esc(f.lesson_id) + ')</small>' : '') + '</td><td>' + f.attempts + '</td><td style="color:var(--danger)">' + f.fail_count + '</td><td><b>' + failPct + '%</b></td></tr>';
+          });
+          h += '</tbody></table>';
+        }
+
+        h += '<h3>🕒 آخر جولات الطلاب المكتملة:</h3>';
+        var rec = rep.recent || [];
+        if (!rec.length) {
+          h += '<p class="mute">لا توجد جولات مسجلة بعد.</p>';
+        } else {
+          h += '<table class="ar-table"><thead><tr><th>اسم الطالب</th><th>المقرر</th><th>النمط</th><th>النقاط</th><th>الذهب</th><th>الوقت</th></tr></thead><tbody>';
+          rec.slice(0, 15).forEach(function(s) {
+            h += '<tr>' +
+              '<td><b>' + esc(s.student_name || 'طالب') + '</b></td>' +
+              '<td>' + esc(s.course_key) + '</td>' +
+              '<td>' + (s.mode === 'gold' ? 'سباق الذهب' : (s.mode === 'cafe' ? 'المقهى' : (s.mode === 'tower' ? 'الدفاع' : 'مراجعة'))) + '</td>' +
+              '<td>' + s.score + '</td>' +
+              '<td>🪙 ' + s.gold + '</td>' +
+              '<td>' + s.duration_sec + ' ث</td>' +
+            '</tr>';
+          });
+          h += '</tbody></table>';
+        }
+
+        box.innerHTML = h;
+      }).catch(function(e) {
+        box.innerHTML = '<p class="err">تعذّر تحميل التقارير: ' + esc(e.message || '') + '</p>';
+      });
+    }
+
+    loadReport('');
   }
 
   // ==========================================
   // الانطلاق والتحميل الأولي
   // ==========================================
   function init() {
+    // 1. مزامنة بيانات المستخدم لتفعيل أدوات المعلم (بدون تحويل قسري عند عدم تسجيل الدخول)
+    try {
+      var h = {};
+      var s = typeof sidGet === 'function' ? sidGet() : '', d = typeof didGet === 'function' ? didGet() : '';
+      if (s) h['X-Tahdir-Sid'] = s;
+      if (d) h['X-Tahdir-Did'] = d;
+      fetch('/api/me', { credentials: 'same-origin', headers: h }).then(function(r) {
+        return r.ok ? r.json() : null;
+      }).then(function(user) {
+        if (user && (user.role === 'teacher' || user.role === 'admin')) {
+          state.isTeacher = true;
+          state.user = user;
+          if (state.view === 'setup') renderSetup();
+        }
+      }).catch(function() {});
+    } catch (e) {}
+
+    // 2. مزامنة المحفظة من الخادم كمرجع أساسي
+    try {
+      api('/api/arena/wallet').then(function(w) {
+        if (w && typeof w.balance === 'number' && !w.guest) {
+          state.wallet = w.balance;
+          if (w.active_avatar) state.activeAvatar = w.active_avatar;
+          if (Array.isArray(w.items)) {
+            w.items.forEach(function(it) {
+              if (state.ownedAvatars.indexOf(it) === -1) state.ownedAvatars.push(it);
+            });
+          }
+          saveWallet();
+          var wv = $('arWalletVal');
+          if (wv) wv.textContent = state.wallet;
+        }
+      }).catch(function() {});
+    } catch (e) {}
+
     api('/api/arena/courses').then(function(res) {
       state.courses = res.courses || [];
       // تحديد أول مقرر متاح فيه أسئلة

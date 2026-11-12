@@ -1777,6 +1777,19 @@ html.inapp{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highl
 .ar-av-action .btn{width:100%;min-height:38px}
 .ar-tag.active{display:inline-block;padding:4px 8px;border-radius:8px;background:var(--main);color:#fff;font-size:.82rem;font-weight:700}
 .ar-store-foot{text-align:center;padding-top:10px;border-top:1px solid var(--line)}
+.ar-modal-backdrop{position:fixed;inset:0;background:rgba(16,38,31,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)}
+.ar-modal-box{background:var(--paper);border:1px solid var(--line);border-radius:16px;max-width:860px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:var(--shadow);position:relative}
+.ar-modal-box h2{margin:0 0 14px;font-size:1.3rem;display:flex;align-items:center;justify-content:space-between}
+.ar-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0}
+.ar-kpi-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+.ar-kpi-card b{display:block;font-size:1.5rem;color:var(--main)}
+.ar-kpi-card span{font-size:.85rem;color:var(--mute)}
+.ar-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
+.ar-table th,.ar-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start}
+.ar-table th{background:var(--bg);font-weight:700;color:var(--mute);font-size:.82rem}
+.ar-form-row{margin-bottom:12px}
+.ar-form-row label{display:block;font-weight:700;font-size:.88rem;margin-bottom:4px}
+.ar-form-row input,.ar-form-row textarea,.ar-form-row select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
 @media(prefers-reduced-motion:reduce){.ar-progress-fill,.ar-rep-fill,.ar-tower-hp-fill,.ar-choice-btn,.ar-chest-box{transition:none !important;animation:none !important}}
 '''
 CSS = base_css + extra_css
