@@ -21,12 +21,13 @@ jobs:
           wait || true
           python3 - <<'PY'
           import json,collections
-          ev=[]
-          for line in open('out/tail.jsonl',encoding='utf-8',errors='ignore'):
-              line=line.strip()
-              if not line.startswith('{'): continue
-              try: ev.append(json.loads(line))
-              except Exception: pass
+          ev=[];txt=open('out/tail.jsonl',encoding='utf-8',errors='ignore').read();dec=json.JSONDecoder();i=0
+          while True:
+              j=txt.find('{',i)
+              if j<0: break
+              try: o,i=dec.raw_decode(txt,j); ev.append(o)
+              except Exception: i=j+1
+          print('bytes',len(txt))
           c=collections.Counter(e.get('outcome') for e in ev)
           print('events',len(ev),dict(c))
           paths=collections.Counter()
@@ -37,11 +38,14 @@ jobs:
               p='/'+u.split('/',3)[3] if u.count('/')>=3 else u
               paths[(p,e.get('outcome'))]+=1
               if e.get('outcome')!='ok' or e.get('exceptions'):
-                  bad.append({'t':e.get('eventTimestamp'),'p':p,'o':e.get('outcome'),'x':[x.get('message') for x in e.get('exceptions') or []],'cpu':e.get('cpuTime'),'wall':e.get('wallTime')})
+                  bad.append({'t':e.get('eventTimestamp'),'p':p,'o':e.get('outcome'),'x':[x.get('message') for x in e.get('exceptions') or []],'cpu':e.get('cpuTime'),'wall':e.get('wallTime'),'logs':[str(l.get('message'))[:200] for l in e.get('logs') or []][:3]})
           for k,v in paths.most_common(40): print(v,k)
+          w=sorted([(e.get('wallTime') or 0,e.get('cpuTime') or 0,((e.get('event') or {}).get('request') or {}).get('url','')[:80]) for e in ev],reverse=True)[:25]
+          print('--- slowest (wall ms, cpu ms, url)')
+          for x in w: print(x)
           print('--- non-ok',len(bad))
           for b in bad[:200]: print(json.dumps(b,ensure_ascii=False))
           PY
-          tail -n 40 out/probe.txt; head -c 2000 out/tail.err
+          echo slow probes:; awk '$4>1' out/probe.txt; wc -l out/probe.txt; head -c 2000 out/tail.err
       - uses: actions/upload-artifact@v4
         with: { name: tail-logs, path: out/, retention-days: 7 }
