@@ -149,6 +149,11 @@ function browserKind(){var u=navigator.userAgent;
      if(/Safari/.test(u)||/Macintosh/.test(u))return 'safari';
      return '';}
 function extUrl(){return EXT_STORE[browserKind()]||'';}
+// فايرفوكس وإيدج: إضافة «الكبسولة» من المتجر هي الأداة الأساسية، وTampermonkey موقوف مؤقتًا
+// (لا نطلب تحديثه ولا نقترحه). كروم وسافاري يبقيان على Tampermonkey/Userscripts كما هما.
+// لإعادة Tampermonkey في فايرفوكس وإيدج: اجعل TM_PAUSED=false.
+var TM_PAUSED=true;
+function extFirst(b){b=b||browserKind();return TM_PAUSED&&(b==='firefox'||b==='edge')&&!!EXT_STORE[b];}
 function toolOk(min){var v=toolVersion();return !!v&&verCmp(v,min||TOOL_FORCE)>=0;}
 // مسار واحد بسيط: Tampermonkey فقط. الإضافة الرسمية تُذكر فقط لو فُعّلت روابطها.
 var BROWSER_NAME={chrome:'Chrome',edge:'Edge',firefox:'Firefox',safari:'Safari'};
@@ -421,7 +426,7 @@ function toolDialog(reason){
    tabbar+panes+
    '<p class="m-msg muted small">هذا كل شيء — مرة واحدة للأبد. بعدها تتحدث الأداة تلقائيًا من الموقع.</p>'+
    '<p class="m-msg" style="border-top:1px solid #dfe9e5;padding-top:10px"><b>على الموبايل:</b><br>أندرويد: <a href="'+APK_URL+'" target="_blank" rel="noopener">حمّل تطبيق «الكبسولة»</a> — الأداة مدمجة فيه.<br>آيفون: ثبّت <b>Userscripts</b> (مجاني) ثم افتح رابط الأداة واضغط Install.</p>';
-  var sel=cur,okLabel=function(k){return 'تثبيت الأداة';};
+  var sel=cur,okLabel=function(k){return extFirst(k)?'تثبيت الإضافة':'تثبيت الأداة';};
   var pr=dialog({title:'تثبيت أداة نور',html:h,okText:okLabel(cur),cancelText:'إغلاق'});
   Array.prototype.forEach.call(document.querySelectorAll('#modalBox [data-copy]'),function(b){b.onclick=function(){copyText(b.getAttribute('data-copy'));};});
   // ربط التبويبات داخل النافذة (بعد إدراجها في DOM)
@@ -434,7 +439,7 @@ function toolDialog(reason){
   });
   // زر «العرض التفاعلي» في تبويب iPhone (دالة iosPlay معرفة لاحقًا — الربط برفعها ينجح)
   if($('iosPlayBtn'))$('iosPlayBtn').onclick=iosPlay;
-  return pr.then(function(r){if(!r)return;window.open(TOOL_URL,'_blank');});
+  return pr.then(function(r){if(!r)return;window.open(extFirst(sel)?EXT_STORE[sel]:TOOL_URL,'_blank');});
 }
 // ---------- مسح الأداة ----------
 // الموقع لا يستطيع إزالة إضافة المتجر/سكربت Tampermonkey برمجيًا — فنُرشد المعلم بخطوات
@@ -565,7 +570,7 @@ function extUpdateNote(){
 }
 function toolUpdateNote(){
   if(IN_APP)return;
-  if(hasExt())return;
+  if(hasExt()||extFirst())return;
   var v=toolVersion(),ov=$('modal');
   if(!v){ updSave({to:TOOL_LATEST,n:0}); return; }         // غير مثبتة: لا نُزعج في كل صفحة
   if(verCmp(v,TOOL_LATEST)>=0){ updSave({to:TOOL_LATEST,n:0,done:1}); return; }
@@ -579,16 +584,31 @@ function toolUpdateNote(){
 // نُبقي مراقبة الإصدار لتحديث زر «أداة نور» في الشريط، والإعلان يتولّى التنبيه للمعلم.
 // تحديث إجباري: لو الأداة المثبتة أقدم من MIN_REQUIRED تظهر نافذة التحديث في كل صفحة حتى يحدّثها المعلم
 function toolForceNote(){
-  if(IN_APP)return;
+  if(IN_APP||hasExt())return;                 // إضافة «الكبسولة» مثبتة: لا علاقة لها بـ Tampermonkey (المتجر يحدّثها)
+  if(extFirst())return extSwitchNote();       // فايرفوكس/إيدج بـ Tampermonkey فقط: ثبّت الإضافة بدل تحديثه
   var v=toolVersion();if(!v||verCmp(v,TOOL_FORCE)>=0)return;
   var ov=$('modal');if(ov&&(!ov.hidden||ov.classList.contains('locked')))return;
   dialog({title:'تحديث «أداة نور» إلزامي',html:'<p class="m-msg">عندك الإصدار <b>'+esc(v)+'</b>، والمطلوب <b>'+esc(TOOL_FORCE)+'</b> على الأقل لتعمل الأداة مع الموقع بشكل صحيح.</p><ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط «حدّث الآن»؛ تُفتح صفحة Tampermonkey.</li><li>اضغط <b>«تحديث» (Update)</b> فيها.</li><li>ارجع هنا وحدّث الصفحة.</li></ol>',okText:'حدّث الآن',cancelText:false})
     .then(function(r){if(r===null)return;window.open(TOOL_URL,'_blank');
       dialog({title:'بعد التحديث',message:'بعد الضغط على «تحديث» في صفحة Tampermonkey، اضغط «تم» لإعادة تحميل الصفحة.',okText:'تم',cancelText:false}).then(function(){location.reload();});});
 }
+// فايرفوكس/إيدج: من عنده سكربت Tampermonkey وليس عنده إضافة «الكبسولة» يُطلب منه تثبيتها من المتجر
+// (أيًّا كان إصدار السكربت) ثم إيقاف Tampermonkey. تختفي النافذة تلقائيًا بمجرد اكتشاف الإضافة.
+function extSwitchNote(){
+  var b=browserKind(),u=EXT_STORE[b],nm=BROWSER_NAME[b]||'';
+  if(!u||hasExt()||!toolVersion())return;
+  var ov=$('modal');if(ov&&(!ov.hidden||ov.classList.contains('locked')))return;
+  var tmOff=b==='edge'?'edge://extensions':'about:addons';
+  dialog({title:'ثبّت إضافة «الكبسولة — أداة نور»',html:'<p class="m-msg">على '+esc(nm)+' أصبحت <b>إضافة «الكبسولة»</b> من المتجر هي الأداة الأساسية، وتتحدّث تلقائيًا. Tampermonkey <b>موقوف مؤقتًا</b> — لا تحتاج تحديثه.</p><ol class="m-msg" style="line-height:2;padding-inline-start:1.2em"><li>اضغط «تثبيت الإضافة» ثم <b>'+(b==='edge'?'«الحصول عليه / Get»':'«إضافة إلى Firefox»')+'</b> ووافق.</li><li>أوقف Tampermonkey: افتح <code class="ltr" style="user-select:all">'+tmOff+'</code> وأطفئ مفتاح <b>Tampermonkey</b>.</li><li>ارجع هنا وحدّث الصفحة.</li></ol>',okText:'تثبيت الإضافة',cancelText:false})
+    .then(function(r){if(r===null)return;window.open(u,'_blank');
+      dialog({title:'بعد التثبيت',message:'بعد تثبيت الإضافة وإيقاف Tampermonkey، اضغط «تم» لإعادة تحميل الصفحة.',okText:'تم',cancelText:false}).then(function(){location.reload();});});
+}
 function watchTool(){
   if(IN_APP)return;
-  setTimeout(function(){var ov=$('modal');if(toolVersion()&&verCmp(toolVersion(),TOOL_FORCE)<0)toolForceNote();else if(!ov||ov.hidden)extUpdateNote();},3000);
+  setTimeout(function(){var ov=$('modal');
+    if(hasExt()){if(!ov||ov.hidden)extUpdateNote();return;}          // الإضافة موجودة: لا نافذة Tampermonkey أبدًا
+    if(toolVersion()&&(extFirst()||verCmp(toolVersion(),TOOL_FORCE)<0))toolForceNote();
+  },3000);
   var t=null;try{new MutationObserver(function(){clearTimeout(t);t=setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},400);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tahdir-tool','data-tahdir-ext']});}catch(e){}
   setTimeout(function(){var v=toolVersion();if((v||hasExt())&&$('toolBtn')){$('toolBtn').classList.remove('pulse');$('toolBtn').textContent='أداة نور ✓';}},2500);
 }
@@ -607,6 +627,7 @@ function showAnnouncement(){
   if(ov.classList.contains('locked')||!ov.hidden)return;  // لا نقاطع نافذة مفتوحة
   if(annSeen().indexOf(a.id)>=0)return;
   // لو الأداة محدّثة فعلًا فلا داعي للإعلان
+  if(hasExt()||extFirst())return;                         // الإضافة/فايرفوكس وإيدج: لا إعلان عن Tampermonkey
   var v=toolVersion();
   if(v&&verCmp(v,TOOL_LATEST)>=0){annMark(a.id);return;}
   // لا نُسجّله كمقروء الآن: لو كانت هناك نافذة مفتوحة نؤجّل ونعرضه في زيارة تالية،
@@ -801,7 +822,7 @@ function tourSteps(){
   var pg=tourPage();
   if(pg==='app')return [
     {sel:null,title:'أهلًا بك في «الكبسولة» 💊',text:'خطوتان تفصلانك عن تحضير جاهز يُرسل إلى نور بضغطة: ثبّت أداة نور (مرة واحدة)، ثم اختر صفّك. تقدر تعيد هذا الدليل في أي وقت من زر «دليل الاستخدام» أعلى الصفحة.'},
-    {sel:'#toolBtn',step:'tool',title:'١) ثبّت «أداة نور» — مرة واحدة فقط',text:'هذه هي الخطوة الأولى والأهم: هي التي تُرسل التحضير والواجب إلى نور وتصحّح الواجبات تلقائيًا. اضغط الزر واتبع خطوات متصفحك (كروم وإيدج وفايرفوكس: Tampermonkey). في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.',cta:'كيف أثبّتها؟'},
+    {sel:'#toolBtn',step:'tool',title:'١) ثبّت «أداة نور» — مرة واحدة فقط',text:'هذه هي الخطوة الأولى والأهم: هي التي تُرسل التحضير والواجب إلى نور وتصحّح الواجبات تلقائيًا. اضغط الزر واتبع خطوات متصفحك (فايرفوكس وإيدج: إضافة «الكبسولة» من المتجر · كروم: Tampermonkey). في تطبيق الكبسولة الأداة مدمجة — لا تحتاج تثبيت شيء.',cta:'كيف أثبّتها؟'},
     {sel:'#subjSel',title:'٢) اختر المادة',text:'بعد تثبيت الأداة: القائمة الأولى للمواد المتاحة لك، والثانية للصفوف. تظهر لك المواد التي سمح بها المدير فقط.'},
     {sel:'.g-btn',title:'٣) اختر الصف',text:'اضغط الصف ليفتح، ثم اختر الوحدة، ثم الدرس. كل درس مقسّم بنفس خانات نموذج «إضافة تحضير» في نور.'},
     {sel:'#sendPrepBtn',title:'٤) أرسل التحضير إلى نور',text:'اضغط «إرسال التحضير إلى نور» ونور مفتوحة: تُفتح «إضافة تحضير» للصف ويُختار الدرس وتُملأ الأركان. يبقى لك التاريخ وزر «إضافة».'},

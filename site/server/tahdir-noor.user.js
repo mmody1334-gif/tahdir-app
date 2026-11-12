@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         لصق التحضير والواجب - نور (التحضير الآلي)
 // @namespace    https://tahdir-al-aali.local/
-// @version      3.5.2
+// @version      3.5.3
 // @description  يرسل التحضير والواجب من موقع التحضير الآلي إلى نور: يفتح صفحة الصف، يختار الدرس، ويملأ الحقول. لا يضغط حفظ أبدًا. إعداد: أ. محمد مجدي.
 // @author       أ. محمد مجدي
 // @match        https://lms.moe.gov.om/*
@@ -94,7 +94,7 @@
       g.__TAHDIR_READY = ready;
     }catch(e){}
   })();
-  const VERSION = '3.4.9';
+  const VERSION = '3.5.3'; // يجب أن يطابق @version أعلاه (يتحقق منه build_worker.py)
   const MIN_REQUIRED = '3.5.2'; // أقل إصدار يُجبر الموقع المعلمين عليه (ميزات جديدة لا تفرض تحديثًا على الجميع)
 
   function boot() {
