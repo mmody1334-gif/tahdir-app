@@ -153,8 +153,8 @@
         '</div>' +
       '</div>' +
       '<div class="ar-top-actions">' +
-        (state.liveEnabled ? '<button type="button" class="btn primary small" id="arLiveBtn" title="بدء مسابقة حية متعددة اللاعبين">⚔️ لعبة مباشرة</button>' : '') +
-        '<button type="button" class="btn ghost small" id="arJoinLiveBtn" title="انضمام كطالب لغرفة مباشرة بكود الغرفة">🎯 انضمام لغرفة</button>' +
+        (state.liveEnabled && state.isTeacher ? '<button type="button" class="btn primary small" id="arLiveBtn" title="غرفة يدخلها الطلاب برقمها">🎮 استضف لعبة مباشرة</button>' : '') +
+        (state.liveEnabled ? '<a class="btn ghost small" href="/blooket" id="arJoinLiveBtn">🎯 دخول برقم الغرفة</a>' : '') +
         (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherSetsBtn" title="إدارة حقائب الأسئلة">📚 حقائبي</button>' : '') +
         (state.isTeacher ? '<button type="button" class="btn ghost small" id="arTeacherReportsBtn" title="تقارير الطلاب">📊 التقارير</button>' : '') +
         '<button type="button" class="btn ghost small" id="arSoundToggle" title="كتم/تشغيل الصوت" aria-label="كتم أو تشغيل الصوت">' +
@@ -456,12 +456,6 @@
     if (liveBtn) {
       liveBtn.onclick = function() {
         openLiveSetupModal();
-      };
-    }
-    var joinBtn = $('arJoinLiveBtn');
-    if (joinBtn) {
-      joinBtn.onclick = function() {
-        renderStudentJoinForm();
       };
     }
     var sndBtn = $('arSoundToggle');
@@ -1178,787 +1172,688 @@
   }
 
   // ==========================================
-  // المرحلة 4: شاشات اللعب المباشر التفاعلي (Live Multiplayer)
+  // اللعب المباشر: غرف برقم من 6 أرقام (elkabsula.site/blooket/147147)
+  // المعلم يستضيف، والطلاب يدخلون اللوبي ويظهرون عنده فورًا، ثم يلعب كل طالب بسرعته
+  // ولوحة المعلم تتحدث لحظة بلحظة.
   // ==========================================
 
+  var LIVE_AVATARS = ['🦅', '🦉', '🦁', '🐯', '🦊', '🐼', '🐨', '🐸', '🐙', '🦄', '🐲', '🐧', '🦈', '🐝', '🚀', '⚡'];
+  var SHAPES = ['▲', '◆', '●', '■'];
   var live = {
-    role: null,         // 'host' أو 'student'
-    code: null,         // رمز الغرفة
-    token: null,        // hostToken أو playerToken
-    ws: null,
-    state: null,        // كائن sync من الخادم
-    timerId: null,
-    answered: false,
-    selectedChoice: null,
-    myResult: null,
-    showHostHint: false // إخفاء الإجابة الصحيحة افتراضياً عن شاشة المعلم
+    role: null, code: null, token: null, ws: null, state: null, offset: 0,
+    timerId: null, retry: 0, closedByUs: false, pingId: null,
+    phase: 'question', // للطالب: question | feedback | chest | chestResult
+    lastResult: null, chestResult: null, pendingView: null, hostRenderAt: 0, hostRenderQueued: false
   };
   try { window.__arenaLive = live; } catch (e) {}
 
-  // 1. AudioContext unlocker على أول لمسة / نقرة
   var audioUnlocked = false;
   function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
-    try {
-      var ctx = getAudioCtx();
-      if (ctx && ctx.state === 'suspended') ctx.resume();
-    } catch (e) {}
-    document.removeEventListener('pointerdown', unlockAudio);
-    document.removeEventListener('touchstart', unlockAudio);
-    document.removeEventListener('keydown', unlockAudio);
+    try { var c = getAudioCtx(); if (c && c.state === 'suspended') c.resume(); } catch (e) {}
   }
   document.addEventListener('pointerdown', unlockAudio, { passive: true });
-  document.addEventListener('touchstart', unlockAudio, { passive: true });
   document.addEventListener('keydown', unlockAudio, { passive: true });
 
-  // 2. إعادة الاتصال التلقائي عند visibilitychange و pageshow
-  function checkResumeLive() {
-    try {
-      var tok = sessionStorage.getItem('arena_live_token');
-      var cod = sessionStorage.getItem('arena_live_code');
-      var rol = sessionStorage.getItem('arena_live_role');
-      if (tok && cod && rol && (!live.ws || live.ws.readyState > 1)) {
-        connectLiveWs(cod, tok, rol);
-      }
-    } catch (e) {}
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function fmtCode(c) { c = String(c || ''); return c.length === 6 ? c.slice(0, 3) + ' ' + c.slice(3) : c; }
+  function fmtNum(n) { n = Math.round(+n || 0); return n.toLocaleString('en-US'); }
+  function roomUrl(code) { return location.origin + '/blooket/' + code; }
+  function serverNow() { return Date.now() + live.offset; }
+  function remainingSec() {
+    var s = live.state;
+    if (!s || !s.endsAt) return null;
+    return Math.max(0, Math.ceil((s.endsAt - serverNow()) / 1000));
   }
-  window.addEventListener('visibilitychange', function() {
-    if (!document.hidden) checkResumeLive();
-  });
-  window.addEventListener('pageshow', checkResumeLive);
+  function fmtClock(sec) {
+    if (sec == null) return '';
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function scoreLabel(p) {
+    if (!live.state) return '';
+    return live.state.mode === 'race' ? (p.correct + ' / ' + live.state.goal) : fmtNum(p.gold);
+  }
+  function modeName(m) { return m === 'race' ? 'سباق الإجابات' : 'سباق الذهب'; }
 
-  // 3. فتح الاتصال بمقبس WebSocket الحقيقي
-  function connectLiveWs(code, token, role) {
-    if (live.ws) {
-      try { live.ws.close(); } catch (e) {}
-      live.ws = null;
-    }
-    live.role = role;
-    live.code = code;
-    live.token = token;
-    try {
-      sessionStorage.setItem('arena_live_token', token);
-      sessionStorage.setItem('arena_live_code', code);
-      sessionStorage.setItem('arena_live_role', role);
-    } catch (e) {}
+  function setPlayMode(on) {
+    document.body.classList.toggle('ar-play', !!on);
+  }
 
+  // ---------- الاتصال ----------
+  function connectLive(code, token, role) {
+    live.code = code; live.token = token; live.role = role; live.closedByUs = false;
+    if (live.ws) { try { live.closedByUs = true; live.ws.close(); } catch (e) {} live.closedByUs = false; }
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var wsUrl = proto + '//' + location.host + '/api/arena/live/ws?code=' + encodeURIComponent(code) + '&token=' + encodeURIComponent(token);
-    var ws = new WebSocket(wsUrl);
+    var ws = new WebSocket(proto + '//' + location.host + '/api/arena/live/ws?code=' + encodeURIComponent(code) + '&token=' + encodeURIComponent(token));
     live.ws = ws;
-
+    ws.onopen = function() {
+      live.retry = 0;
+      if (live.pingId) clearInterval(live.pingId);
+      live.pingId = setInterval(function() { try { if (ws.readyState === 1) ws.send('ping'); } catch (e) {} }, 30000);
+    };
     ws.onmessage = function(ev) {
-      try {
-        var msg = JSON.parse(ev.data);
-        if (msg.type === 'sync') {
-          handleLiveSync(msg.state);
-        } else if (msg.type === 'answer_ack') {
-          live.answered = true;
-          if (live.role === 'student') {
-            live.myResult = msg;
-            renderStudentQuestion();
-          }
-        } else if (msg.type === 'kicked') {
-          leaveLiveSession('تم استبعادك من الجلسة المباشرة بواسطة المعلم.');
-        } else if (msg.type === 'error') {
-          toast(msg.error || 'خطأ في الغرفة المباشرة');
-        }
-      } catch (e) {}
+      if (ev.data === 'pong') return;
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      onLiveMessage(msg);
     };
-
     ws.onclose = function(ev) {
-      if (live.role && state.view.indexOf('live_') === 0 && ev.code !== 1000 && ev.code !== 4001) {
-        setTimeout(function() {
-          if (live.token && live.code) connectLiveWs(live.code, live.token, live.role);
-        }, 1200);
-      }
+      if (live.pingId) { clearInterval(live.pingId); live.pingId = null; }
+      if (live.ws !== ws || live.closedByUs) return;
+      if (ev.code === 4001) return kickedOut();
+      if (live.state && live.state.state === 'ENDED') return;
+      // رمز غير صالح أو غرفة محذوفة: لا نعيد المحاولة إلى ما لا نهاية
+      live.retry++;
+      if (live.retry > 8) return liveFatal('انقطع الاتصال بالغرفة. تأكد من الإنترنت ثم أعد تحميل الصفحة.');
+      showConnBanner(true);
+      setTimeout(function() { if (live.ws === ws) connectLive(live.code, live.token, live.role); }, Math.min(8000, 600 * live.retry));
     };
   }
 
-  function leaveLiveSession(msg) {
-    if (msg) toast(msg);
-    if (live.timerId) { clearInterval(live.timerId); live.timerId = null; }
-    if (live.ws) {
-      try { live.ws.close(1000, 'leave'); } catch (e) {}
-      live.ws = null;
-    }
-    try {
-      sessionStorage.removeItem('arena_live_token');
-      sessionStorage.removeItem('arena_live_code');
-      sessionStorage.removeItem('arena_live_role');
-    } catch (e) {}
-    live.role = null;
-    live.code = null;
-    live.token = null;
-    live.state = null;
-    live.answered = false;
-    live.selectedChoice = null;
-    live.myResult = null;
-    renderSetup();
+  function sendLive(obj) {
+    if (live.ws && live.ws.readyState === 1) { live.ws.send(JSON.stringify(obj)); return true; }
+    toast('جارٍ إعادة الاتصال…');
+    return false;
   }
 
-  function handleLiveSync(newState) {
-    if (!newState) return;
-    var prevState = live.state ? live.state.state : null;
-    var prevQ = live.state ? live.state.currentQIndex : null;
-    live.state = newState;
-
-    if (newState.state === 'QUESTION') {
-      if (prevQ !== newState.currentQIndex || prevState !== 'QUESTION') {
-        live.answered = false;
-        live.selectedChoice = null;
-        live.myResult = null;
-        live.showHostHint = false;
-      }
+  window.addEventListener('visibilitychange', function() {
+    if (!document.hidden && live.token && (!live.ws || live.ws.readyState > 1) && !(live.state && live.state.state === 'ENDED')) {
+      live.retry = 0;
+      connectLive(live.code, live.token, live.role);
     }
+  });
 
-    if (live.role === 'host') {
-      if (newState.state === 'LOBBY') renderHostLobby();
-      else if (newState.state === 'QUESTION' || newState.state === 'REVEAL' || newState.state === 'PAUSED' || newState.state === 'STARTING') renderHostGame();
-      else if (newState.state === 'PODIUM') renderHostPodium();
-    } else if (live.role === 'student') {
-      if (newState.state === 'LOBBY') renderStudentLobby();
-      else if (newState.state === 'QUESTION' || newState.state === 'PAUSED' || newState.state === 'STARTING') renderStudentQuestion();
-      else if (newState.state === 'REVEAL') renderStudentReveal();
-      else if (newState.state === 'PODIUM') renderStudentPodium();
+  function showConnBanner(on) {
+    var b = $('arConnBanner');
+    if (on && !b) {
+      b = document.createElement('div');
+      b.id = 'arConnBanner';
+      b.className = 'ar-conn-banner';
+      b.textContent = 'جارٍ إعادة الاتصال…';
+      document.body.appendChild(b);
+    } else if (!on && b) b.remove();
+  }
+
+  function onLiveMessage(msg) {
+    showConnBanner(false);
+    if (msg.type === 'sync') {
+      if (msg.state && msg.state.now) live.offset = msg.state.now - Date.now();
+      if (live.role === 'host') { live.state = msg.state; return renderHost(); }
+      return onStudentSync(msg);
+    }
+    if (msg.type === 'delta' && live.role === 'host') return applyHostDelta(msg);
+    if (msg.type === 'kicked') return kickedOut();
+    if (msg.type === 'error') {
+      if (!msg.soft) toast(msg.error || 'خطأ');
+      else if (live.role === 'student' && live.phase === 'waiting') { live.phase = 'question'; renderStudent(); }
     }
   }
 
-  // 4. واجهة المعلم: إعداد الغرفة المباشرة (Live Setup Modal)
+  function kickedOut() {
+    lsSet('arena_p_' + live.code, null);
+    live.closedByUs = true;
+    try { live.ws && live.ws.close(); } catch (e) {}
+    liveFatal('أخرجك المعلم من هذه الغرفة.');
+  }
+
+  function liveFatal(text) {
+    stopTimer();
+    var main = $('arenaMain');
+    if (!main) return;
+    main.innerHTML = '<div class="ar-live-shell"><div class="ar-join-card">' +
+      '<div class="ar-join-ic">⚠️</div><h2>' + esc(text) + '</h2>' +
+      '<a class="btn primary" href="/blooket">الدخول بلعبة أخرى</a></div></div>';
+  }
+
+  function stopTimer() { if (live.timerId) { clearInterval(live.timerId); live.timerId = null; } }
+  function startTimer(fn) {
+    stopTimer();
+    live.timerId = setInterval(fn, 500);
+  }
+
+  // ==========================================
+  // شاشة إدخال رقم الغرفة (/blooket)
+  // ==========================================
+  function renderEnterCode(err) {
+    setPlayMode(true);
+    var main = $('arenaMain');
+    main.innerHTML = '<div class="ar-live-shell">' + brandBar() +
+      '<div class="ar-join-card">' +
+        '<div class="ar-join-ic">🎮</div>' +
+        '<h1>ادخل إلى اللعبة</h1>' +
+        '<p class="muted">اكتب رقم الغرفة الذي يظهر على شاشة معلمك</p>' +
+        '<form id="arCodeForm" autocomplete="off">' +
+          '<input id="arCodeIn" class="ar-code-input" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" placeholder="رقم الغرفة" aria-label="رقم الغرفة">' +
+          (err ? '<p class="err" id="arCodeErr">' + esc(err) + '</p>' : '<p class="err" id="arCodeErr"></p>') +
+          '<button type="submit" class="btn primary ar-big-btn">دخول ←</button>' +
+        '</form>' +
+      '</div>' +
+      '<p class="ar-host-hint">معلم؟ <a href="/arena">استضف لعبة مباشرة من ساحة التحدي</a></p>' +
+    '</div>';
+    var inp = $('arCodeIn');
+    inp.focus();
+    inp.oninput = function() { this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6); };
+    $('arCodeForm').onsubmit = function(ev) {
+      ev.preventDefault();
+      var c = inp.value.replace(/\D/g, '');
+      if (c.length !== 6) { $('arCodeErr').textContent = 'رقم الغرفة يتكون من 6 أرقام.'; return; }
+      location.href = '/blooket/' + c;
+    };
+  }
+
+  function brandBar() {
+    return '<div class="ar-brand-bar"><a href="/blooket" class="ar-brand">⚔️ ساحة التحدي</a>' +
+      '<button type="button" class="ar-snd" id="arSndBtn" aria-label="الصوت">' + (state.soundMuted ? '🔇' : '🔊') + '</button></div>';
+  }
+  function bindBrandBar() {
+    var b = $('arSndBtn');
+    if (b) b.onclick = function() { state.soundMuted = !state.soundMuted; saveWallet(); this.textContent = state.soundMuted ? '🔇' : '🔊'; };
+  }
+
+  // ==========================================
+  // فتح رابط غرفة (/blooket/147147): معلم أم طالب؟
+  // ==========================================
+  function openRoom(code) {
+    setPlayMode(true);
+    var main = $('arenaMain');
+    main.innerHTML = '<div class="ar-live-shell">' + brandBar() + '<div class="ar-join-card"><div class="ar-spin"></div><p>جارٍ فتح الغرفة ' + esc(fmtCode(code)) + '…</p></div></div>';
+    var ht = lsGet('arena_h_' + code);
+    if (ht && ht.token) return connectLive(code, ht.token, 'host');
+    var pl = lsGet('arena_p_' + code);
+    if (pl && pl.token) return connectLive(code, pl.token, 'student');
+
+    fetch('/api/arena/live/room?code=' + code, { credentials: 'same-origin' }).then(function(r) {
+      return r.json().then(function(j) { return { ok: r.ok, j: j }; });
+    }).then(function(res) {
+      if (!res.ok) return renderEnterCode(res.j.error || 'لا توجد لعبة بهذا الرقم.');
+      var info = res.j;
+      // صاحب الغرفة يفتح الرابط من جهاز أو متصفح آخر: نسترجع رمز المضيف من الخادم
+      tryHostToken(code).then(function(tok) {
+        if (tok) { lsSet('arena_h_' + code, { token: tok }); return connectLive(code, tok, 'host'); }
+        if (info.state === 'ENDED') return renderEnterCode('انتهت هذه اللعبة.');
+        renderJoinForm(code, info);
+      });
+    }).catch(function() { renderEnterCode('تعذّر الاتصال، حاول مرة أخرى.'); });
+  }
+
+  function tryHostToken(code) {
+    var h = {};
+    try { var s = sidGet(), d = didGet(); if (s) h['X-Tahdir-Sid'] = s; if (d) h['X-Tahdir-Did'] = d; } catch (e) {}
+    h['Content-Type'] = 'application/json';
+    return fetch('/api/arena/live/host-token', { method: 'POST', credentials: 'same-origin', headers: h, body: JSON.stringify({ code: code }) })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(j) { return j && j.hostToken ? j.hostToken : null; })
+      .catch(function() { return null; });
+  }
+
+  // ==========================================
+  // الطالب: الاسم والشخصية
+  // ==========================================
+  function renderJoinForm(code, info) {
+    var myAv = lsGet('arena_live_av') || LIVE_AVATARS[Math.floor(Math.random() * 6)];
+    var myName = lsGet('arena_live_name') || '';
+    var main = $('arenaMain');
+    main.innerHTML = '<div class="ar-live-shell">' + brandBar() +
+      '<div class="ar-join-card">' +
+        '<div class="ar-room-pill">الغرفة <b>' + esc(fmtCode(code)) + '</b></div>' +
+        (info.title ? '<p class="muted">' + esc(info.title) + ' · ' + esc(modeName(info.mode)) + '</p>' : '<p class="muted">' + esc(modeName(info.mode)) + '</p>') +
+        '<form id="arJoinForm" autocomplete="off">' +
+          '<label class="ar-lbl" for="arNameIn">اسمك</label>' +
+          '<input id="arNameIn" class="ar-name-input" maxlength="30" placeholder="اكتب اسمك" value="' + esc(myName) + '">' +
+          '<div class="ar-lbl">اختر شخصيتك</div>' +
+          '<div class="ar-av-pick" id="arAvPick">' + LIVE_AVATARS.map(function(a) {
+            return '<button type="button" class="ar-av-opt' + (a === myAv ? ' on' : '') + '" data-av="' + a + '" aria-label="شخصية ' + a + '">' + a + '</button>';
+          }).join('') + '</div>' +
+          '<details class="ar-class-opt"><summary>عندي كود فصل (اختياري لحفظ ذهبي)</summary>' +
+            '<input id="arClassIn" class="ar-name-input" maxlength="12" placeholder="كود الفصل" value="' + esc(lsGet('arena_live_class') || '') + '"></details>' +
+          '<p class="err" id="arJoinErr"></p>' +
+          '<button type="submit" class="btn primary ar-big-btn" id="arJoinBtn">ادخل اللعبة 🚀</button>' +
+        '</form>' +
+      '</div></div>';
+    bindBrandBar();
+    var av = myAv;
+    Array.prototype.forEach.call(document.querySelectorAll('.ar-av-opt'), function(b) {
+      b.onclick = function() {
+        av = this.getAttribute('data-av');
+        Array.prototype.forEach.call(document.querySelectorAll('.ar-av-opt'), function(x) { x.classList.toggle('on', x === b); });
+      };
+    });
+    $('arNameIn').focus();
+    $('arJoinForm').onsubmit = function(ev) {
+      ev.preventDefault();
+      var name = $('arNameIn').value.trim();
+      if (!name) { $('arJoinErr').textContent = 'اكتب اسمك أولًا.'; return; }
+      var cls = ($('arClassIn') && $('arClassIn').value.trim()) || '';
+      var btn = $('arJoinBtn');
+      btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
+      api('/api/arena/live/join', { code: code, name: name, avatar: av, class_id: cls }).then(function(res) {
+        lsSet('arena_live_name', name); lsSet('arena_live_av', av); lsSet('arena_live_class', cls || null);
+        lsSet('arena_p_' + code, { token: res.playerToken, playerId: res.playerId });
+        playSfx('coin');
+        connectLive(code, res.playerToken, 'student');
+      }).catch(function(err) {
+        btn.disabled = false; btn.textContent = 'ادخل اللعبة 🚀';
+        $('arJoinErr').textContent = err.message || 'تعذّر الدخول.';
+      });
+    };
+  }
+
+  // ==========================================
+  // الطالب: اللوبي واللعب والنتيجة
+  // ==========================================
+  function onStudentSync(msg) {
+    var prev = live.state;
+    live.state = msg.state;
+    if (!live.state.me) { lsSet('arena_p_' + live.code, null); return liveFatal('لم تعد ضمن هذه الغرفة.'); }
+    if (msg.hit) showHit(msg.hit);
+    if (msg.result) {
+      live.lastResult = msg.result;
+      live.phase = 'feedback';
+      playSfx(msg.result.correct ? 'correct' : 'wrong');
+      renderStudent();
+      setTimeout(function() {
+        if (live.phase !== 'feedback') return;
+        live.phase = live.state.me && live.state.me.chest ? 'chest' : 'question';
+        renderStudent();
+      }, msg.result.correct ? 700 : 1500);
+      return;
+    }
+    if (msg.chestResult) {
+      live.chestResult = msg.chestResult;
+      live.phase = 'chestResult';
+      playSfx(msg.chestResult.outcome.delta >= 0 ? 'chest' : 'hit');
+      return renderStudent();
+    }
+    if (live.state.state === 'PLAYING' && prev && prev.state === 'LOBBY') { live.phase = live.state.me.chest ? 'chest' : 'question'; playSfx('chest'); }
+    // إعادة الاتصال أثناء صندوق مفتوح
+    if (live.state.state === 'PLAYING' && live.state.me.chest && live.phase === 'question') live.phase = 'chest';
+    if (live.phase === 'feedback' || live.phase === 'chestResult') return updateStudentHud();
+    renderStudent();
+  }
+
+  function showHit(h) {
+    var txt = h.k === 'steal' ? (h.by + ' سرق منك ' + fmtNum(h.amount) + ' 🪙') : (h.by + ' بدّل ذهبه معك! 🔄');
+    var d = document.createElement('div');
+    d.className = 'ar-hit-banner';
+    d.textContent = txt;
+    document.body.appendChild(d);
+    playSfx('hit');
+    setTimeout(function() { d.remove(); }, 2600);
+  }
+
+  function studentHud() {
+    var s = live.state, me = s.me;
+    var timer = s.mode === 'gold' && s.state === 'PLAYING' ? '<span class="ar-hud-timer" id="arHudTimer">⏱ ' + fmtClock(remainingSec()) + '</span>' : '';
+    var score = s.mode === 'race'
+      ? '<span class="ar-hud-score" id="arHudScore">✅ ' + me.correct + ' / ' + s.goal + '</span>'
+      : '<span class="ar-hud-score" id="arHudScore">🪙 ' + fmtNum(me.gold) + '</span>';
+    return '<div class="ar-hud"><span class="ar-hud-me">' + esc(me.avatar) + ' ' + esc(me.name) + '</span>' + score +
+      '<span class="ar-hud-rank" id="arHudRank">#' + (me.rank || '-') + '</span>' + timer + '</div>';
+  }
+
+  function updateStudentHud() {
+    var s = live.state; if (!s || !s.me) return;
+    var sc = $('arHudScore'), rk = $('arHudRank');
+    if (sc) sc.textContent = s.mode === 'race' ? ('✅ ' + s.me.correct + ' / ' + s.goal) : ('🪙 ' + fmtNum(s.me.gold));
+    if (rk) rk.textContent = '#' + (s.me.rank || '-');
+  }
+
+  function renderStudent() {
+    var s = live.state, main = $('arenaMain');
+    if (!s || !main) return;
+    if (s.state === 'LOBBY') return renderStudentLobby();
+    if (s.state === 'ENDED') return renderStudentEnded();
+    var h = '<div class="ar-live-shell ar-st">' + studentHud();
+    if (live.phase === 'feedback' && live.lastResult) {
+      var r = live.lastResult;
+      h += '<div class="ar-fb ' + (r.correct ? 'ok' : 'bad') + '"><div class="ar-fb-ic">' + (r.correct ? '✔' : '✖') + '</div>' +
+        '<div class="ar-fb-t">' + (r.correct ? 'إجابة صحيحة!' : 'إجابة خاطئة') + '</div>' +
+        (!r.correct && live.lastQ ? '<div class="ar-fb-ans">الصحيح: ' + esc(live.lastQ.choices[r.correctIndex] || '') + '</div>' : '') + '</div>';
+    } else if (live.phase === 'chest' && s.me.chest) {
+      h += '<div class="ar-chest-stage"><h2>اختر صندوقًا!</h2><div class="ar-chests">' +
+        [0, 1, 2].map(function(i) { return '<button type="button" class="ar-chest" data-i="' + i + '" aria-label="الصندوق ' + (i + 1) + '"><span>🎁</span></button>'; }).join('') +
+        '</div></div>';
+    } else if (live.phase === 'chestResult' && live.chestResult) {
+      h += renderChestResult(live.chestResult);
+    } else if (live.phase === 'waiting') {
+      h += '<div class="ar-fb"><div class="ar-spin"></div></div>';
+    } else if (s.question) {
+      var q = s.question;
+      live.lastQ = q;
+      h += '<div class="ar-q-card"><div class="ar-q-num">سؤال ' + q.n + '</div><div class="ar-q-stem" dir="auto">' + esc(q.stem) + '</div></div>' +
+        '<div class="ar-ans-grid">' + q.choices.map(function(c, i) {
+          return '<button type="button" class="ar-ans opt-' + i + '" data-c="' + i + '"><span class="ar-shape">' + SHAPES[i] + '</span><span dir="auto">' + esc(c) + '</span></button>';
+        }).join('') + '</div>';
+    } else {
+      h += '<div class="ar-fb"><div class="ar-spin"></div></div>';
+    }
+    h += '</div>';
+    main.innerHTML = h;
+    if (window.scrollY > 0) window.scrollTo(0, 0);
+
+    Array.prototype.forEach.call(main.querySelectorAll('.ar-ans'), function(b) {
+      b.onclick = function() {
+        if (live.phase !== 'question') return;
+        var c = +this.getAttribute('data-c');
+        if (sendLive({ action: 'answer', q: s.question.i, choice: c })) {
+          live.phase = 'waiting';
+          this.classList.add('picked');
+          Array.prototype.forEach.call(main.querySelectorAll('.ar-ans'), function(x) { x.disabled = true; });
+        }
+      };
+    });
+    Array.prototype.forEach.call(main.querySelectorAll('.ar-chest'), function(b) {
+      b.onclick = function() {
+        if (live.phase !== 'chest') return;
+        live.phase = 'waiting';
+        this.classList.add('opening');
+        sendLive({ action: 'chest', idx: +this.getAttribute('data-i') });
+      };
+    });
+    var nx = $('arChestNext');
+    if (nx) nx.onclick = function() { live.phase = 'question'; live.chestResult = null; renderStudent(); };
+    if (s.mode === 'gold') startTimer(function() { var t = $('arHudTimer'); if (t) t.textContent = '⏱ ' + fmtClock(remainingSec()); });
+    else stopTimer();
+  }
+
+  function outcomeText(o) {
+    if (o.k === 'gain') return { ic: '🪙', t: '+' + o.n + ' ذهبة' };
+    if (o.k === 'mult') return { ic: '✨', t: 'ذهبك ×' + o.n };
+    if (o.k === 'lose') return { ic: '💸', t: 'خسرت ' + o.n + '%' };
+    if (o.k === 'steal') return { ic: '🦹', t: o.target ? ('سرقت ' + fmtNum(o.amount) + ' من ' + o.target) : ('سرقة ' + o.n + '%') };
+    if (o.k === 'swap') return { ic: '🔄', t: o.target ? ('بدّلت ذهبك مع ' + o.target) : 'تبديل الذهب' };
+    return { ic: '🫙', t: o.note || 'صندوق فارغ' };
+  }
+
+  function renderChestResult(cr) {
+    var main = outcomeText(cr.outcome);
+    var others = cr.options.map(function(o, i) {
+      if (i === cr.picked) return '';
+      var t = outcomeText(o);
+      return '<span class="ar-other">' + t.ic + ' ' + esc(t.t) + '</span>';
+    }).join('');
+    return '<div class="ar-chest-stage"><div class="ar-chest-res ' + (cr.outcome.delta < 0 ? 'bad' : 'good') + '">' +
+      '<div class="ar-cr-ic">' + main.ic + '</div><div class="ar-cr-t">' + esc(main.t) + '</div></div>' +
+      '<div class="ar-others">كان في الصناديق الأخرى: ' + others + '</div>' +
+      '<button type="button" class="btn primary ar-big-btn" id="arChestNext">السؤال التالي ←</button></div>';
+  }
+
+  function renderStudentLobby() {
+    stopTimer();
+    var s = live.state, me = s.me, main = $('arenaMain');
+    var others = (s.lobby || []).filter(function(p) { return p.name !== me.name; });
+    main.innerHTML = '<div class="ar-live-shell ar-st">' + brandBar() +
+      '<div class="ar-lobby-me"><div class="ar-big-av">' + esc(me.avatar) + '</div>' +
+        '<h1>' + esc(me.name) + '</h1>' +
+        '<p class="ar-wait">أنت داخل! انتظر حتى يبدأ المعلم اللعبة<span class="ar-dots"><i>.</i><i>.</i><i>.</i></span></p>' +
+        '<div class="ar-room-pill">الغرفة <b>' + esc(fmtCode(s.code)) + '</b> · ' + esc(modeName(s.mode)) + '</div>' +
+      '</div>' +
+      '<div class="ar-lobby-others"><div class="ar-lbl">في اللوبي معك (' + others.length + ')</div><div class="ar-mini-roster">' +
+        others.map(function(p) { return '<span class="ar-mini">' + esc(p.avatar) + ' ' + esc(p.name) + '</span>'; }).join('') +
+      '</div></div>' +
+      '<p class="ar-host-hint"><button type="button" class="btn ghost small" id="arLeaveBtn">مغادرة الغرفة</button></p>' +
+    '</div>';
+    bindBrandBar();
+    $('arLeaveBtn').onclick = function() {
+      if (!confirm('مغادرة الغرفة؟')) return;
+      lsSet('arena_p_' + live.code, null);
+      live.closedByUs = true;
+      try { live.ws.close(1000); } catch (e) {}
+      location.href = '/blooket';
+    };
+  }
+
+  function renderStudentEnded() {
+    stopTimer();
+    lsSet('arena_p_' + live.code, null);
+    var s = live.state, me = s.me, main = $('arenaMain');
+    var medal = me.rank === 1 ? '🥇' : me.rank === 2 ? '🥈' : me.rank === 3 ? '🥉' : '🏁';
+    if (me.rank && me.rank <= 3) playSfx('chest');
+    main.innerHTML = '<div class="ar-live-shell ar-st">' + brandBar() +
+      '<div class="ar-end-me"><div class="ar-end-medal">' + medal + '</div>' +
+        '<h1>المركز ' + (me.rank || '-') + ' من ' + s.playersCount + '</h1>' +
+        '<div class="ar-end-stats"><span>' + (s.mode === 'race' ? '✅ ' + me.correct : '🪙 ' + fmtNum(me.gold)) + '</span>' +
+        '<span>إجابات صحيحة ' + me.correct + ' من ' + me.answered + '</span></div></div>' +
+      '<div class="ar-end-top"><div class="ar-lbl">الأوائل</div>' + (s.top || []).map(function(p, i) {
+        return '<div class="ar-top-row' + (p.id === me.id ? ' me' : '') + '"><b>' + (i + 1) + '</b><span>' + esc(p.avatar) + ' ' + esc(p.name) + '</span><em>' + scoreLabel(p) + '</em></div>';
+      }).join('') + '</div>' +
+      '<p class="ar-host-hint"><a class="btn primary" href="/blooket">لعبة أخرى</a></p></div>';
+    bindBrandBar();
+  }
+
+  // ==========================================
+  // المعلم: إنشاء الغرفة من ساحة التحدي
+  // ==========================================
   function openLiveSetupModal() {
-    var old = $('arLiveSetupModal');
-    if (old) old.remove();
-
-    var curCourse = state.courses.find(function(c) { return c.key === state.selectedCourse; });
-    var courseLabel = curCourse ? (curCourse.subject + ' (' + curCourse.grade + ')') : 'مقرر عام';
-
+    var ids = Object.keys(state.selectedLessons).filter(function(k) { return state.selectedLessons[k]; });
+    if (!ids.length) { toast('حدّد الدروس أولًا من القائمة، ثم استضف اللعبة.'); return; }
+    var old = $('arLiveSetupModal'); if (old) old.remove();
     var m = document.createElement('div');
     m.id = 'arLiveSetupModal';
     m.className = 'ar-modal-backdrop';
-    m.innerHTML = '<div class="ar-modal-box" style="max-width:540px">' +
-      '<h2><span>⚔️ إعداد اللعبة المباشرة</span><button type="button" class="btn ghost small" id="arCloseLiveModalBtn">✕</button></h2>' +
-      '<div class="ar-form-row">' +
-        '<label>المقرر الدراسي:</label>' +
-        '<div style="font-size:1.05rem;font-weight:700;color:var(--main-d);margin-bottom:6px">' + esc(courseLabel) + '</div>' +
+    m.innerHTML = '<div class="ar-modal-box ar-host-setup" style="max-width:560px">' +
+      '<h2><span>🎮 استضافة لعبة مباشرة</span><button type="button" class="btn ghost small" id="arCloseLive" aria-label="إغلاق">✕</button></h2>' +
+      '<p class="muted">الأسئلة من ' + ids.length + ' ' + (ids.length === 1 ? 'درس محدد' : 'دروس محددة') + '. يدخل الطلاب برقم الغرفة، ويلعب كل طالب بسرعته.</p>' +
+      '<div class="ar-lbl">نوع اللعبة</div>' +
+      '<div class="ar-mode-2">' +
+        '<label class="ar-mode-card on"><input type="radio" name="arLm" value="gold" checked><span class="ar-mc-ic">🏆</span><b>سباق الذهب</b><small>أجب صح لتفتح صناديق: ذهب، مضاعفة، سرقة وتبديل. الأغنى عند انتهاء الوقت يفوز.</small></label>' +
+        '<label class="ar-mode-card"><input type="radio" name="arLm" value="race"><span class="ar-mc-ic">🏁</span><b>سباق الإجابات</b><small>أول طالب يصل لعدد الإجابات الصحيحة المطلوب يفوز.</small></label>' +
       '</div>' +
-      '<div class="ar-form-row">' +
-        '<label for="arLiveTimeSel">الوقت المخصص لكل سؤال:</label>' +
-        '<select id="arLiveTimeSel" class="ar-select">' +
-          '<option value="5">5 ثوانٍ (سريع للتجربة)</option>' +
-          '<option value="10">10 ثوانٍ (سريع جداً)</option>' +
-          '<option value="15" selected>15 ثانية (مثالي)</option>' +
-          '<option value="20">20 ثانية (مريح)</option>' +
-          '<option value="30">30 ثانية (تفكيري)</option>' +
-        '</select>' +
-      '</div>' +
-      '<div class="ar-form-row">' +
-        '<label for="arLiveCountSel">عدد الأسئلة:</label>' +
-        '<select id="arLiveCountSel" class="ar-select">' +
-          '<option value="1">سؤال واحد (سريع)</option>' +
-          '<option value="2">سؤالان</option>' +
-          '<option value="5">5 أسئلة</option>' +
-          '<option value="10" selected>10 أسئلة</option>' +
-          '<option value="15">15 سؤالاً</option>' +
-          '<option value="20">20 سؤالاً</option>' +
-        '</select>' +
-      '</div>' +
-      '<div class="ar-form-row">' +
-        '<label for="arLiveModeSel">نمط المسابقة:</label>' +
-        '<select id="arLiveModeSel" class="ar-select">' +
-          '<option value="gold_rush" selected>🏆 سباق الذهب والتتويج</option>' +
-          '<option value="speed">⚡ التحدي السريع (نقاط السرعة)</option>' +
-          '<option value="classic">🎯 كلاسيكي متوازن</option>' +
-        '</select>' +
-      '</div>' +
-      '<div class="ar-host-actions" style="margin-top:20px">' +
-        '<button type="button" class="btn primary" id="arSubmitLiveCreateBtn" style="min-height:46px;font-size:1.05rem">🚀 إنشاء الغرفة وبدء البهو</button>' +
-        '<button type="button" class="btn ghost" id="arCancelLiveModalBtn">إلغاء</button>' +
-      '</div>' +
+      '<div class="ar-form-row" id="arDurRow"><div class="ar-lbl">مدة اللعبة</div><div class="ar-seg" data-name="dur">' +
+        [3, 5, 7, 10, 15].map(function(n) { return '<button type="button" class="ar-seg-b' + (n === 7 ? ' on' : '') + '" data-v="' + n + '">' + n + ' د</button>'; }).join('') + '</div></div>' +
+      '<div class="ar-form-row" id="arGoalRow" hidden><div class="ar-lbl">عدد الإجابات الصحيحة للفوز</div><div class="ar-seg" data-name="goal">' +
+        [10, 15, 20, 30].map(function(n) { return '<button type="button" class="ar-seg-b' + (n === 15 ? ' on' : '') + '" data-v="' + n + '">' + n + '</button>'; }).join('') + '</div></div>' +
+      '<label class="ar-check"><input type="checkbox" id="arLateJoin" checked> السماح بالانضمام بعد بدء اللعبة</label>' +
+      '<p class="err" id="arLiveErr"></p>' +
+      '<button type="button" class="btn primary ar-big-btn" id="arCreateRoom">إنشاء الغرفة ←</button>' +
     '</div>';
-
     document.body.appendChild(m);
-
-    function closeModal() { if (m) m.remove(); }
-    $('arCloseLiveModalBtn').onclick = closeModal;
-    $('arCancelLiveModalBtn').onclick = closeModal;
-
-    $('arSubmitLiveCreateBtn').onclick = function() {
-      var btn = this;
-      btn.disabled = true;
-      btn.textContent = 'جارٍ إنشاء الغرفة…';
-      var timeLimit = +$('arLiveTimeSel').value || 15;
-      var qCount = +$('arLiveCountSel').value || 10;
-      var mode = $('arLiveModeSel').value || 'gold_rush';
-
-      api('/api/arena/live/create', {
-        course_key: state.selectedCourse,
-        time_limit: timeLimit,
-        question_count: qCount,
-        mode: mode
-      }).then(function(res) {
-        closeModal();
-        if (res && res.code && res.hostToken) {
-          toast('تم إنشاء الغرفة المباشرة بنجاح!');
-          connectLiveWs(res.code, res.hostToken, 'host');
-        } else {
-          toast(res.error || 'تعذّر إنشاء الغرفة');
-        }
-      }).catch(function(err) {
-        btn.disabled = false;
-        btn.textContent = '🚀 إنشاء الغرفة وبدء البهو';
-        toast(err.message || 'تعذّر إنشاء الغرفة المباشرة');
-      });
-    };
-  }
-
-  // 5. واجهة المعلم: شاشة البهو وانتظار الطلاب (Host Lobby)
-  function renderHostLobby() {
-    state.view = 'live_host_lobby';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var players = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<span class="ar-av-badge">👑</span>' +
-        '<b>لوحة تحكم المعلم (المضيف)</b>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        '<button type="button" class="btn ghost small" id="arHostExitBtn">🚪 خروج من الغرفة</button>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="ar-live-code-card">' +
-      '<span style="font-size:1.1rem;color:var(--mute)">رمز الغرفة المباشرة للطلاب:</span>' +
-      '<div><span class="ar-room-code-badge" id="arRoomCodeVal">' + esc(live.state.code) + '</span></div>' +
-      '<p style="margin:8px 0;font-size:1rem;color:var(--ink)">رابط الدخول المباشر: <b>' + esc(location.origin + '/arena?code=' + live.state.code) + '</b></p>' +
-      '<button type="button" class="btn ghost small" id="arCopyCodeLink">📋 نسخ الرابط</button>' +
-    '</div>';
-
-    h += '<div class="card ar-players-panel">' +
-      '<div class="ar-players-title">' +
-        '<span>👥 الطلاب المنضمون في البهو:</span>' +
-        '<b id="arPlayerCount" style="color:var(--main);font-size:1.25rem">' + players.length + '</b>' +
-      '</div>' +
-      '<div class="ar-students-roster" id="arRosterBox">';
-
-    if (!players.length) {
-      h += '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--mute)">في انتظار انضمام الطلاب عبر الرمز أعلاه…</div>';
-    } else {
-      players.forEach(function(p) {
-        h += '<span class="ar-student-chip">' +
-          '<span>' + avatarIcon(p.avatar, '🦅') + '</span>' +
-          '<b>' + esc(p.name) + '</b>' +
-          '<button type="button" class="ar-kick-btn" data-kid="' + esc(p.id) + '" title="طرد الطالب">✕</button>' +
-        '</span>';
-      });
-    }
-
-    h += '</div>' +
-      '<div class="ar-host-actions">' +
-        '<button type="button" class="btn primary ar-start-btn" id="arHostStartBtn"' + (players.length === 0 ? ' disabled' : '') + '>🚀 بدء المنافسة الآن</button>' +
-        '<button type="button" class="btn secondary" id="arHostLockBtn">' + (live.state.locked ? '🔓 فتح الغرفة' : '🔒 قفل الغرفة') + '</button>' +
-      '</div>' +
-    '</div>';
-
-    main.innerHTML = h;
-
-    $('arHostExitBtn').onclick = function() {
-      if (confirm('هل تريد إغلاق الغرفة وإنهاء الجلسة للجميع؟')) leaveLiveSession();
-    };
-
-    $('arCopyCodeLink').onclick = function() {
-      var lnk = location.origin + '/arena?code=' + live.state.code;
-      navigator.clipboard ? navigator.clipboard.writeText(lnk).then(function() { toast('تم نسخ الرابط!'); }) : toast(lnk);
-    };
-
-    var sBtn = $('arHostStartBtn');
-    if (sBtn) {
-      sBtn.onclick = function() {
-        this.disabled = true;
-        this.textContent = 'جارٍ الانطلاق…';
-        if (live.ws && live.ws.readyState === 1) {
-          live.ws.send(JSON.stringify({ action: 'start' }));
-        }
+    function close() { m.remove(); }
+    $('arCloseLive').onclick = close;
+    m.onclick = function(ev) { if (ev.target === m) close(); };
+    Array.prototype.forEach.call(m.querySelectorAll('input[name=arLm]'), function(r) {
+      r.onchange = function() {
+        Array.prototype.forEach.call(m.querySelectorAll('.ar-mode-card'), function(c) { c.classList.toggle('on', c.contains(r) ? r.checked : !r.checked); });
+        $('arDurRow').hidden = r.value === 'race' && r.checked;
+        $('arGoalRow').hidden = !(r.value === 'race' && r.checked);
       };
-    }
-
-    var lBtn = $('arHostLockBtn');
-    if (lBtn) {
-      lBtn.onclick = function() {
-        if (live.ws && live.ws.readyState === 1) {
-          live.ws.send(JSON.stringify({ action: 'lock', locked: !live.state.locked }));
-        }
-      };
-    }
-
-    var kBtns = document.querySelectorAll('.ar-kick-btn');
-    Array.prototype.forEach.call(kBtns, function(b) {
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.ar-seg-b'), function(b) {
       b.onclick = function() {
-        var kid = this.getAttribute('data-kid');
-        if (kid && confirm('هل أنت متأكد من استبعاد هذا الطالب؟')) {
-          if (live.ws && live.ws.readyState === 1) {
-            live.ws.send(JSON.stringify({ action: 'kick', targetPlayerId: kid }));
-          }
-        }
+        Array.prototype.forEach.call(b.parentNode.children, function(x) { x.classList.toggle('on', x === b); });
       };
     });
-  }
-
-  // 6. واجهة المعلم: شاشة إدارة السؤال وكشف الإجابات (Host Game & Reveal)
-  function renderHostGame() {
-    state.view = 'live_host_game';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var q = live.state.question || { index: 0, total: 1, stem: 'السؤال', choices: [] };
-    var isReveal = live.state.state === 'REVEAL';
-    var isPaused = live.state.state === 'PAUSED';
-    var activePlayers = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<b>السؤال ' + (q.index + 1) + ' من ' + q.total + '</b>' +
-        '<span class="ar-tag active" style="margin-inline-start:8px">' + (isReveal ? 'كشف الإجابات' : (isPaused ? 'متوقف مؤقتاً' : 'نشط')) + '</span>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        (!isReveal ? '<button type="button" class="btn ar-ctrl-btn ar-hint-toggle" id="arHostToggleHintBtn">' + (live.showHostHint ? '🙈 إخفاء الإجابة' : '👁️ إظهار الإجابة لي') + '</button>' : '') +
-        '<button type="button" class="btn ar-ctrl-btn" id="arHostPauseBtn">' + (isPaused ? '▶️ استئناف' : '⏸️ إيقاف') + '</button>' +
-        '<button type="button" class="btn ar-ctrl-btn" id="arHostSkipBtn">⏭️ تخطي</button>' +
-        '<button type="button" class="btn ar-ctrl-btn" id="arHostEndBtn">🚪 إنهاء</button>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="card ar-live-q-box">' +
-      '<div class="ar-live-q-top">' +
-        '<span style="font-size:1rem;color:var(--mute)">كود الغرفة: <b>' + esc(live.state.code) + '</b></span>' +
-        '<div class="ar-live-timer' + (live.state.remainingSeconds <= 3 && !isReveal ? ' urgent' : '') + '">⏱️ ' + live.state.remainingSeconds + 'ث</div>' +
-      '</div>' +
-      '<div class="ar-live-q-stem">' + esc(q.stem) + '</div>';
-
-    if (isReveal) {
-      // إحصائيات توزيع إجابات الطلاب للمعلم
-      var dist = live.state.choiceCounts || (q && q.choiceCounts) || [0, 0, 0, 0];
-      var totalAnswers = dist.reduce(function(a, b) { return a + b; }, 0) || 1;
-      h += '<div class="ar-bars-dist">' +
-        '<h4>📊 إحصائيات إجابات الطلاب:</h4>';
-      q.choices.forEach(function(ch, idx) {
-        var isCorr = idx === q.correct;
-        var cnt = dist[idx] || 0;
-        var pct = Math.round((cnt / totalAnswers) * 100);
-        h += '<div class="ar-bar-row">' +
-          '<span class="ar-bar-label">' + (idx + 1) + '</span>' +
-          '<div class="ar-bar-track">' +
-            '<div class="ar-bar-fill opt-' + idx + '" style="width:' + pct + '%"></div>' +
-          '</div>' +
-          '<span class="ar-bar-cnt" data-cidx="' + idx + '">' + cnt + ' (' + pct + '%)' + (isCorr ? ' ✓' : '') + '</span>' +
-          '<span style="flex:2;margin-inline-start:8px;font-size:.9rem' + (isCorr ? ';color:#10b981;font-weight:700' : '') + '">' + esc(ch) + '</span>' +
-        '</div>';
-      });
-      h += '</div>';
-    } else {
-      // عرض الخيارات مع إخفاء الإجابة الصحيحة افتراضياً (المعلم يعرض شاشته للفصل)
-      h += '<div class="ar-live-grid">';
-      q.choices.forEach(function(ch, idx) {
-        var isHint = live.showHostHint && (idx === q.hostHintCorrect);
-        h += '<div class="ar-live-btn opt-' + idx + '" style="cursor:default' + (isHint ? ';border:3px solid #fff;box-shadow:0 0 0 4px #10b981' : '') + '">' +
-          '<span class="ar-shape">' + (idx + 1) + '</span>' +
-          '<span>' + esc(ch) + (isHint ? ' <small class="ar-host-hint-label" style="background:rgba(0,0,0,.2);padding:2px 6px;border-radius:6px">✓ الصحيحة</small>' : '') + '</span>' +
-        '</div>';
-      });
-      h += '</div>';
-    }
-
-    h += '</div>';
-
-    // لوحة المتصدرين المصغرة
-    h += '<div class="card" style="padding:16px">' +
-      '<h4 style="margin:0 0 10px;font-size:1.05rem">🏆 لوحة المتصدرين الحالية:</h4>' +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap">';
-    (live.state.leaderboard || []).slice(0, 5).forEach(function(p, idx) {
-      h += '<div class="ar-student-chip">' +
-        '<span>' + (idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🎖️'))) + ' ' + avatarIcon(p.avatar, '') + '</span>' +
-        '<b>' + esc(p.name) + '</b>' +
-        '<span style="color:var(--accent);font-weight:700">' + p.score + ' نقطة</span>' +
-      '</div>';
-    });
-    h += '</div></div>';
-
-    main.innerHTML = h;
-
-    if ($('arHostToggleHintBtn')) {
-      $('arHostToggleHintBtn').onclick = function() {
-        live.showHostHint = !live.showHostHint;
-        renderHostGame();
-      };
-    }
-
-    $('arHostPauseBtn').onclick = function() {
-      if (live.ws && live.ws.readyState === 1) {
-        live.ws.send(JSON.stringify({ action: isPaused ? 'resume' : 'pause' }));
-      }
-    };
-    $('arHostSkipBtn').onclick = function() {
-      if (live.ws && live.ws.readyState === 1 && confirm('هل تريد تخطي هذا السؤال؟')) {
-        live.ws.send(JSON.stringify({ action: 'skip' }));
-      }
-    };
-    $('arHostEndBtn').onclick = function() {
-      if (confirm('هل تريد إنهاء المسابقة المباشرة الآن؟')) leaveLiveSession();
-    };
-  }
-
-  // 7. واجهة المعلم: شاشة التتويج والمنصة (Host Podium)
-  function renderHostPodium() {
-    state.view = 'live_host_podium';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var list = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
-    var p1 = list[0] || null;
-    var p2 = list[1] || null;
-    var p3 = list[2] || null;
-
-    var h = '<div class="card ar-result-card">' +
-      '<div class="ar-res-trophy">🏆</div>' +
-      '<h2>منصة تتويج أبطال الساحة</h2>' +
-      '<p class="ar-res-lead">تهانينا لجميع الطلاب المتنافسين! تم حفظ النتائج بنجاح.</p>' +
-      '<div class="ar-podium-wrap">';
-
-    // المركز الثاني (فضة)
-    if (p2) {
-      h += '<div class="ar-podium-col rank-2">' +
-        '<span style="font-size:1.8rem">' + avatarIcon(p2.avatar, '🥈') + '</span>' +
-        '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">2</div>' +
-      '</div>';
-    }
-
-    // المركز الأول (ذهب)
-    if (p1) {
-      h += '<div class="ar-podium-col rank-1">' +
-        '<span style="font-size:2.4rem">👑</span>' +
-        '<span style="font-size:2rem">' + avatarIcon(p1.avatar, '🦅') + '</span>' +
-        '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
-        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">1</div>' +
-      '</div>';
-    }
-
-    // المركز الثالث (برونز)
-    if (p3) {
-      h += '<div class="ar-podium-col rank-3">' +
-        '<span style="font-size:1.8rem">' + avatarIcon(p3.avatar, '🥉') + '</span>' +
-        '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">3</div>' +
-      '</div>';
-    }
-
-    h += '</div>';
-
-    // جدول الترتيب الكامل
-    h += '<table class="ar-leaderboard-tbl">' +
-      '<thead><tr><th>المركز</th><th>اسم الطالب</th><th>النقاط</th><th>الإجابات الصحيحة</th></tr></thead><tbody>';
-    list.forEach(function(p, idx) {
-      h += '<tr>' +
-        '<td><b>' + (idx + 1) + '</b></td>' +
-        '<td>' + esc(p.name) + '</td>' +
-        '<td style="color:var(--accent);font-weight:700">' + p.score + ' نقطة</td>' +
-        '<td>' + (p.correctCount || 0) + '</td>' +
-      '</tr>';
-    });
-    h += '</tbody></table>';
-
-    h += '<div class="ar-res-actions">' +
-      '<button type="button" class="btn primary" id="arHostDoneBtn">العودة للرئيسية 🏠</button>' +
-      '<button type="button" class="btn secondary" id="arHostRepBtn">عرض تقارير الطلاب 📊</button>' +
-    '</div></div>';
-
-    main.innerHTML = h;
-
-    $('arHostDoneBtn').onclick = function() { leaveLiveSession(); };
-    $('arHostRepBtn').onclick = function() {
-      leaveLiveSession();
-      renderTeacherReports();
-    };
-  }
-
-  // 8. واجهة الطالب: نموذج الانضمام (Student Join Screen)
-  function renderStudentJoinForm(initialCode) {
-    state.view = 'live_join';
-    var main = $('arenaMain');
-    if (!main) return;
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<span class="ar-av-badge">🎯</span>' +
-        '<b>انضمام لمسابقة مباشرة</b>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        '<button type="button" class="btn ghost small" id="arCancelJoinBtn">رجوع للساحة</button>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="card ar-setup-card" style="max-width:520px;margin:24px auto;padding:24px;text-align:center">' +
-      '<h2 style="margin:0 0 16px;font-size:1.3rem;color:var(--main-d)">ادخل بياناتك للانضمام</h2>' +
-      '<div class="ar-form-row" style="text-align:right">' +
-        '<label for="arLiveCodeInput">رمز الغرفة (6 أحرف):</label>' +
-        '<input type="text" id="arLiveCodeInput" maxlength="6" value="' + esc(initialCode || '') + '" placeholder="ABCDEF" style="text-transform:uppercase;font-family:monospace;font-size:1.6rem;letter-spacing:4px;text-align:center" required>' +
-      '</div>' +
-      '<div class="ar-form-row" style="text-align:right">' +
-        '<label for="arLiveNameInput">اسمك (للظهور في المسابقة):</label>' +
-        '<input type="text" id="arLiveNameInput" maxlength="30" placeholder="مثال: أحمد العماني" required>' +
-      '</div>' +
-      '<div class="ar-form-row" style="text-align:right">' +
-        '<label for="arLiveClassInput">كود الفصل (اختياري لحفظ رصيد الجوائز):</label>' +
-        '<input type="text" id="arLiveClassInput" placeholder="مثال: 6K52W2">' +
-      '</div>' +
-      '<div class="ar-host-actions" style="margin-top:20px">' +
-        '<button type="button" class="btn primary ar-start-btn" id="arSubmitJoinBtn" style="width:100%;min-height:48px;font-size:1.1rem">دخول الساحة المباشرة ←</button>' +
-      '</div>' +
-    '</div>';
-
-    main.innerHTML = h;
-
-    $('arCancelJoinBtn').onclick = function() { renderSetup(); };
-
-    $('arSubmitJoinBtn').onclick = function() {
+    $('arCreateRoom').onclick = function() {
       var btn = this;
-      var code = ($('arLiveCodeInput').value || '').trim().toUpperCase();
-      var name = ($('arLiveNameInput').value || '').trim();
-      var classId = ($('arLiveClassInput').value || '').trim();
-
-      if (!code || code.length !== 6) { toast('أدخل رمز الغرفة المكون من 6 أحرف!'); return; }
-      if (!name) { toast('اكتب اسمك للمشاركة!'); return; }
-
-      btn.disabled = true;
-      btn.textContent = 'جارٍ الانضمام…';
-
-      api('/api/arena/live/join', {
-        code: code,
-        name: name,
-        class_id: classId,
-        avatar: state.activeAvatar
+      var mode = m.querySelector('input[name=arLm]:checked').value;
+      var dur = +m.querySelector('[data-name=dur] .on').getAttribute('data-v');
+      var goal = +m.querySelector('[data-name=goal] .on').getAttribute('data-v');
+      btn.disabled = true; btn.textContent = 'جارٍ إنشاء الغرفة…';
+      api('/api/arena/live/create', {
+        lesson_ids: ids, course_key: state.selectedCourse, mode: mode, duration_min: dur, goal: goal,
+        late_join: $('arLateJoin').checked
       }).then(function(res) {
-        if (res && res.playerToken) {
-          toast('أهلاً بك يا ' + res.name + '!');
-          connectLiveWs(res.code, res.playerToken, 'student');
-        } else {
-          btn.disabled = false;
-          btn.textContent = 'دخول الساحة المباشرة ←';
-          toast(res.error || 'تعذّر الانضمام');
-        }
+        lsSet('arena_h_' + res.code, { token: res.hostToken });
+        location.href = '/blooket/' + res.code;
       }).catch(function(err) {
-        btn.disabled = false;
-        btn.textContent = 'دخول الساحة المباشرة ←';
-        toast(err.message || 'تعذّر الانضمام للغرفة المباشرة');
+        btn.disabled = false; btn.textContent = 'إنشاء الغرفة ←';
+        $('arLiveErr').textContent = err.message || 'تعذّر إنشاء الغرفة.';
       });
     };
   }
 
-  // 9. واجهة الطالب: شاشة الانتظار في البهو (Student Lobby)
-  function renderStudentLobby() {
-    state.view = 'live_student_lobby';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<span class="ar-av-badge">' + avatarIcon(state.activeAvatar, '🦅') + '</span>' +
-        '<b>الساحة المباشرة</b>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        '<button type="button" class="btn ghost small" id="arStudentLeaveLobby">🚪 مغادرة</button>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="card ar-setup-card" style="max-width:520px;margin:30px auto;padding:32px 20px;text-align:center">' +
-      '<div style="font-size:3.5rem;margin-bottom:12px">⏳</div>' +
-      '<h2 style="font-size:1.4rem;color:var(--main-d);margin-bottom:8px">أنت الآن في البهو!</h2>' +
-      '<p style="font-size:1.1rem;color:var(--ink);margin-bottom:16px">رمز الغرفة: <b style="font-family:monospace;letter-spacing:2px">' + esc(live.state.code) + '</b></p>' +
-      '<div class="ar-notice-strip" style="justify-content:center">' +
-        '<span>المعلم يجهز المنافسة، سيبدأ السؤال الأول على هاتفك تلقائياً فور الانطلاق… استعد!</span>' +
-      '</div>' +
-    '</div>';
-
-    main.innerHTML = h;
-
-    $('arStudentLeaveLobby').onclick = function() {
-      if (confirm('هل تريد مغادرة الغرفة؟')) leaveLiveSession();
-    };
+  // ==========================================
+  // المعلم: اللوبي واللوحة الحية والنتائج
+  // ==========================================
+  function renderHost() {
+    var s = live.state;
+    if (!s) return;
+    if (s.state === 'LOBBY') return renderHostLobby();
+    if (s.state === 'PLAYING') return renderHostLive();
+    return renderHostEnded();
   }
 
-  // 10. واجهة الطالب: شاشة الإجابة بأزرار كبيرة ولمسية (Student Question Screen)
-  function renderStudentQuestion() {
-    state.view = 'live_student_question';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var q = live.state.question || { index: 0, total: 1, stem: '', choices: [] };
-    var answered = live.answered;
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<b>السؤال ' + (q.index + 1) + ' من ' + q.total + '</b>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        '<div class="ar-live-timer' + (live.state.remainingSeconds <= 3 ? ' urgent' : '') + '">⏱️ ' + live.state.remainingSeconds + 'ث</div>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="card ar-live-q-box">' +
-      '<div class="ar-live-q-stem">' + esc(q.stem) + '</div>';
-
-    if (answered) {
-      h += '<div class="ar-notice-strip" style="justify-content:center;margin:16px 0;background:#e1f3ec;color:#0b3b33">' +
-        '<span>✓ تم تسجيل إجابتك بنجاح! في انتظار انتهاء وقت السؤال لكشف النتيجة…</span>' +
-      '</div>';
-    }
-
-    var shapes = ['▲', '◆', '●', '◼'];
-    h += '<div class="ar-live-grid">';
-    q.choices.forEach(function(ch, idx) {
-      var isSel = live.selectedChoice === idx;
-      h += '<button type="button" class="ar-live-btn opt-' + idx + (isSel ? ' selected' : '') + '" data-cidx="' + idx + '"' + (answered ? ' disabled' : '') + '>' +
-        '<span class="ar-shape">' + shapes[idx] + '</span>' +
-        '<span>' + esc(ch) + '</span>' +
-      '</button>';
+  function applyHostDelta(msg) {
+    var s = live.state;
+    if (!s) return;
+    if (msg.now) live.offset = msg.now - Date.now();
+    var byId = {};
+    s.players.forEach(function(p, i) { byId[p.id] = i; });
+    (msg.players || []).forEach(function(np) {
+      if (byId[np.id] != null) s.players[byId[np.id]] = np; else s.players.push(np);
     });
-    h += '</div></div>';
-
-    main.innerHTML = h;
-
-    if (!answered) {
-      var btns = document.querySelectorAll('.ar-live-btn');
-      Array.prototype.forEach.call(btns, function(b) {
-        b.onclick = function() {
-          var cidx = +this.getAttribute('data-cidx');
-          live.selectedChoice = cidx;
-          live.answered = true;
-          playSfx('coin');
-          if (live.ws && live.ws.readyState === 1) {
-            live.ws.send(JSON.stringify({ action: 'answer', choiceIndex: cidx }));
-          }
-          renderStudentQuestion();
-        };
-      });
+    var lastId = s.feed.length ? s.feed[s.feed.length - 1].id : 0;
+    (msg.feed || []).forEach(function(ev) { if (ev.id > lastId) { s.feed.push(ev); if (ev.t === 'join' && s.state === 'LOBBY') playSfx('coin'); } });
+    if (s.feed.length > 14) s.feed.splice(0, s.feed.length - 14);
+    s.playersCount = msg.playersCount != null ? msg.playersCount : s.players.length;
+    s.players.sort(function(a, b) {
+      var sa = s.mode === 'race' ? a.correct : a.gold, sb = s.mode === 'race' ? b.correct : b.gold;
+      return (sb - sa) || (b.correct - a.correct);
+    });
+    // إعادة رسم مجمّعة لتفادي الوميض مع كثرة الإجابات
+    var now = Date.now();
+    if (now - live.hostRenderAt > 250) { live.hostRenderAt = now; renderHost(); }
+    else if (!live.hostRenderQueued) {
+      live.hostRenderQueued = true;
+      setTimeout(function() { live.hostRenderQueued = false; live.hostRenderAt = Date.now(); renderHost(); }, 260);
     }
   }
 
-  // 11. واجهة الطالب: كشف النتيجة والنقاط (Student Reveal Screen)
-  function renderStudentReveal() {
-    state.view = 'live_student_reveal';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
-
-    var q = live.state.question || { choices: [], correct: 0 };
-    var res = live.myResult;
-    var isCorrect = res && res.isCorrect;
-
-    var h = '<div class="ar-top-bar">' +
-      '<div class="ar-user-info">' +
-        '<b>كشف الإجابات 🎯</b>' +
-      '</div>' +
-      '<div class="ar-top-actions">' +
-        '<span>السؤال القادم قريباً…</span>' +
-      '</div>' +
-    '</div>';
-
-    h += '<div class="card ar-reveal-card">';
-    if (isCorrect) {
-      h += '<div class="ar-reveal-status ok">🎉 إجابة صحيحة وممتازة!</div>' +
-        '<div class="ar-reveal-pts">+' + (res.pointsAwarded || 500) + ' نقطة</div>';
-      playSfx('correct');
-    } else if (live.answered) {
-      h += '<div class="ar-reveal-status fail">❌ إجابة خاطئة! حظاً أوفر</div>' +
-        '<div style="color:var(--mute);margin-bottom:12px">لم تكتسب نقاطاً في هذا السؤال</div>';
-      playSfx('wrong');
-    } else {
-      h += '<div class="ar-reveal-status fail">⏳ انتهى الوقت دون إجابة!</div>';
-    }
-
-    h += '<div class="ar-notice-strip" style="justify-content:center;margin:16px 0">' +
-      '<span>الإجابة الصحيحة هي: <b>' + esc(q.answer || q.choices[q.correct] || '') + '</b></span>' +
-    '</div>';
-
-    // الترتيب الحالي للطالب
-    var me = (live.state.leaderboard || []).find(function(p) { return p.id === (live.state.playerId || (live.myResult && live.myResult.playerId)); });
-    if (me) {
-      h += '<div style="margin-top:16px;font-size:1.1rem;color:var(--ink)">' +
-        'مركزك الحالي: <b style="color:var(--main);font-size:1.3rem">#' + me.rank + '</b> (مجموعك: <b>' + me.score + '</b> نقطة)' +
-      '</div>';
-    }
-
-    h += '</div>';
-
-    main.innerHTML = h;
+  function hostTopBar(extra) {
+    var s = live.state;
+    return '<div class="ar-host-bar">' +
+      '<div class="ar-hb-code">رقم الغرفة <b>' + esc(fmtCode(s.code)) + '</b></div>' +
+      '<div class="ar-hb-mid">' + esc(modeName(s.mode)) + (s.title ? ' · ' + esc(s.title) : '') + '</div>' +
+      '<div class="ar-hb-act">' + (extra || '') + '</div></div>';
   }
 
-  // 12. واجهة الطالب: منصة التتويج النهائية (Student Podium Screen)
-  function renderStudentPodium() {
-    state.view = 'live_student_podium';
-    var main = $('arenaMain');
-    if (!main || !live.state) return;
+  function renderHostLobby() {
+    stopTimer();
+    var s = live.state, main = $('arenaMain');
+    var n = s.players.length;
+    var link = location.host + '/blooket';
+    main.innerHTML = '<div class="ar-live-shell ar-host">' +
+      hostTopBar('<button type="button" class="ar-hb-btn" id="arLockBtn">' + (s.locked ? '🔓 فتح الغرفة' : '🔒 قفل الغرفة') + '</button>' +
+        '<button type="button" class="ar-hb-btn" id="arCancelRoom">✕ إلغاء</button>') +
+      '<div class="ar-lobby-hero">' +
+        '<div class="ar-lh-step">ادخلوا على <b dir="ltr">' + esc(link) + '</b></div>' +
+        '<div class="ar-lh-code" dir="ltr">' + esc(fmtCode(s.code)) + '</div>' +
+        '<div class="ar-lh-actions"><button type="button" class="ar-hb-btn" id="arCopyLink">📋 نسخ رابط الغرفة</button></div>' +
+      '</div>' +
+      '<div class="ar-lobby-bar"><div class="ar-lb-count"><b id="arLobbyCount">' + n + '</b> ' + (n === 1 ? 'طالب' : 'طلاب') + ' في اللوبي</div>' +
+        '<button type="button" class="btn primary ar-start-live" id="arStartLive"' + (n ? '' : ' disabled') + '>' +
+          (n ? 'ابدأ اللعبة ▶' : 'بانتظار الطلاب…') + '</button></div>' +
+      '<div class="ar-lobby-grid" id="arLobbyGrid">' +
+        (n ? s.players.map(function(p) {
+          return '<button type="button" class="ar-lobby-p' + (p.connected ? '' : ' off') + '" data-kick="' + esc(p.id) + '" title="اضغط لإخراج ' + esc(p.name) + '">' +
+            '<span class="ar-lp-av">' + esc(p.avatar) + '</span><span class="ar-lp-n">' + esc(p.name) + '</span><span class="ar-lp-x">✕</span></button>';
+        }).join('') : '<div class="ar-lobby-empty">لم ينضم أحد بعد. اعرض الرقم على السبورة ليدخل الطلاب من جوالاتهم.</div>') +
+      '</div></div>';
 
-    var list = (live.state.leaderboard || []).filter(function(p) { return !p.isHost; });
-    var p1 = list[0] || null;
-    var p2 = list[1] || null;
-    var p3 = list[2] || null;
+    $('arStartLive').onclick = function() {
+      if (!live.state.players.length) return;
+      this.disabled = true;
+      sendLive({ action: 'start' });
+    };
+    $('arLockBtn').onclick = function() { sendLive({ action: 'lock', locked: !live.state.locked }); };
+    $('arCancelRoom').onclick = function() {
+      if (!confirm('إلغاء الغرفة وإنهاء اللعبة؟')) return;
+      sendLive({ action: 'end' });
+    };
+    $('arCopyLink').onclick = function() {
+      var u = roomUrl(s.code);
+      try { navigator.clipboard.writeText(u).then(function() { toast('تم نسخ الرابط'); }, function() { toast(u); }); } catch (e) { toast(u); }
+    };
+    Array.prototype.forEach.call(main.querySelectorAll('[data-kick]'), function(b) {
+      b.onclick = function() {
+        var id = this.getAttribute('data-kick');
+        var name = this.querySelector('.ar-lp-n').textContent;
+        if (confirm('إخراج ' + name + ' من الغرفة؟')) sendLive({ action: 'kick', playerId: id });
+      };
+    });
+  }
 
-    var me = list.find(function(p) { return p.id === live.state.playerId; }) || list[0];
+  function feedLine(ev) {
+    if (ev.t === 'join') return esc(ev.avatar) + ' انضم ' + esc(ev.name);
+    if (ev.t === 'steal') return '🦹 ' + esc(ev.name) + ' سرق ' + fmtNum(ev.amount) + ' من ' + esc(ev.target);
+    if (ev.t === 'swap') return '🔄 ' + esc(ev.name) + ' بدّل ذهبه مع ' + esc(ev.target);
+    if (ev.t === 'jackpot') return '💰 ' + esc(ev.name) + ' ربح ' + ev.amount + ' دفعة واحدة';
+    if (ev.t === 'triple') return '✨ ' + esc(ev.name) + ' ضاعف ذهبه ×3';
+    if (ev.t === 'goal') return '🏁 ' + esc(ev.name) + ' وصل للهدف!';
+    if (ev.t === 'start') return '▶ بدأت اللعبة';
+    return '';
+  }
 
-    var h = '<div class="card ar-result-card">' +
-      '<div class="ar-res-trophy">🏆</div>' +
-      '<h2>انتهت المسابقة المباشرة!</h2>' +
-      '<p class="ar-res-lead">أحسنت المشاركة والمنافسة اليوم!</p>';
+  function renderHostLive() {
+    var s = live.state, main = $('arenaMain');
+    var lead = s.players.length ? Math.max(1, s.mode === 'race' ? s.goal : s.players[0].gold) : 1;
+    var totalAns = 0, totalOk = 0;
+    s.players.forEach(function(p) { totalAns += p.answered; totalOk += p.correct; });
+    var acc = totalAns ? Math.round(totalOk * 100 / totalAns) : 0;
+    var timer = s.mode === 'gold' ? '<div class="ar-big-timer" id="arHostTimer">' + fmtClock(remainingSec()) + '</div>' : '<div class="ar-big-timer">🏁 ' + s.goal + '</div>';
+    main.innerHTML = '<div class="ar-live-shell ar-host">' +
+      hostTopBar('<button type="button" class="ar-hb-btn" id="arLockBtn">' + (s.locked ? '🔓 فتح' : '🔒 قفل') + '</button>' +
+        '<button type="button" class="ar-hb-btn danger" id="arEndBtn">⏹ إنهاء اللعبة</button>') +
+      '<div class="ar-live-stats">' + timer +
+        '<div class="ar-ls"><b>' + s.players.length + '</b><span>لاعب</span></div>' +
+        '<div class="ar-ls"><b>' + fmtNum(totalAns) + '</b><span>إجابة</span></div>' +
+        '<div class="ar-ls"><b>' + acc + '%</b><span>دقة الفصل</span></div>' +
+        '<div class="ar-ls join"><span>للانضمام</span><b dir="ltr">' + esc(fmtCode(s.code)) + '</b></div>' +
+      '</div>' +
+      '<div class="ar-live-body"><div class="ar-board">' +
+        s.players.map(function(p, i) {
+          var val = s.mode === 'race' ? p.correct : p.gold;
+          var pct = Math.max(2, Math.min(100, Math.round(val * 100 / lead)));
+          var accP = p.answered ? Math.round(p.correct * 100 / p.answered) : 0;
+          return '<div class="ar-row' + (i < 3 ? ' top' + (i + 1) : '') + (p.connected ? '' : ' off') + '">' +
+            '<span class="ar-rk">' + (i + 1) + '</span><span class="ar-rav">' + esc(p.avatar) + '</span>' +
+            '<div class="ar-rmain"><div class="ar-rname">' + esc(p.name) + '<small>' + p.correct + '/' + p.answered + ' · ' + accP + '%</small></div>' +
+            '<div class="ar-rbar"><i style="width:' + pct + '%"></i></div></div>' +
+            '<span class="ar-rval">' + scoreLabel(p) + '</span></div>';
+        }).join('') + '</div>' +
+        '<div class="ar-feed"><div class="ar-lbl">ما يحدث الآن</div>' +
+          s.feed.slice().reverse().map(function(ev) { var t = feedLine(ev); return t ? '<div class="ar-fe">' + t + '</div>' : ''; }).join('') +
+        '</div></div></div>';
+    $('arEndBtn').onclick = function() { if (confirm('إنهاء اللعبة الآن وإعلان النتائج؟')) sendLive({ action: 'end' }); };
+    $('arLockBtn').onclick = function() { sendLive({ action: 'lock', locked: !live.state.locked }); };
+    if (s.mode === 'gold') startTimer(function() {
+      var t = $('arHostTimer'), r = remainingSec();
+      if (t) { t.textContent = fmtClock(r); t.classList.toggle('urgent', r != null && r <= 30); }
+    });
+  }
 
-    if (me) {
-      h += '<div style="background:var(--main-l);border:2px solid var(--main);border-radius:14px;padding:14px;margin:16px 0">' +
-        '<span style="font-size:1.15rem;color:var(--main-d)">نتيجتك النهائية: </span>' +
-        '<b style="font-size:1.4rem;color:var(--main-d)">المركز #' + (me.rank || 1) + ' بمجموع ' + (me.score || 0) + ' نقطة</b>' +
-      '</div>';
-    }
-
-    h += '<div class="ar-podium-wrap">';
-    if (p2) {
-      h += '<div class="ar-podium-col rank-2">' +
-        '<span style="font-size:1.8rem">' + avatarIcon(p2.avatar, '🥈') + '</span>' +
-        '<b style="font-size:.9rem;margin:4px 0">' + esc(p2.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p2.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">2</div>' +
-      '</div>';
-    }
-    if (p1) {
-      h += '<div class="ar-podium-col rank-1">' +
-        '<span style="font-size:2.2rem">👑</span>' +
-        '<span style="font-size:2rem">' + avatarIcon(p1.avatar, '🦅') + '</span>' +
-        '<b style="font-size:1.05rem;margin:4px 0">' + esc(p1.name) + '</b>' +
-        '<span style="font-size:.95rem;color:var(--accent);font-weight:700">' + p1.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">1</div>' +
-      '</div>';
-    }
-    if (p3) {
-      h += '<div class="ar-podium-col rank-3">' +
-        '<span style="font-size:1.8rem">' + avatarIcon(p3.avatar, '🥉') + '</span>' +
-        '<b style="font-size:.9rem;margin:4px 0">' + esc(p3.name) + '</b>' +
-        '<span style="font-size:.85rem;color:var(--accent);font-weight:700">' + p3.score + ' نقطة</span>' +
-        '<div class="ar-podium-pedestal">3</div>' +
-      '</div>';
-    }
-    h += '</div>';
-
-    h += '<div class="ar-res-actions">' +
-      '<button type="button" class="btn primary" id="arStudentDoneBtn">العودة للساحة الرئيسية 🏠</button>' +
-    '</div></div>';
-
-    main.innerHTML = h;
-
-    $('arStudentDoneBtn').onclick = function() {
-      leaveLiveSession();
+  function renderHostEnded() {
+    stopTimer();
+    var s = live.state, main = $('arenaMain'), p = s.players;
+    var pod = [1, 0, 2].map(function(i) {
+      var x = p[i];
+      if (!x) return '<div class="ar-pod empty"></div>';
+      return '<div class="ar-pod p' + (i + 1) + '"><div class="ar-pod-av">' + esc(x.avatar) + '</div><div class="ar-pod-n">' + esc(x.name) + '</div>' +
+        '<div class="ar-pod-col"><b>' + (i + 1) + '</b><span>' + scoreLabel(x) + '</span></div></div>';
+    }).join('');
+    main.innerHTML = '<div class="ar-live-shell ar-host">' +
+      hostTopBar('<a class="ar-hb-btn" href="/arena">🎮 لعبة جديدة</a><button type="button" class="ar-hb-btn" id="arCsvBtn">⬇ تحميل النتائج</button>') +
+      '<h1 class="ar-end-h">🏆 النتائج النهائية</h1>' +
+      '<div class="ar-podium">' + pod + '</div>' +
+      '<table class="ar-res-tbl"><thead><tr><th>#</th><th>الطالب</th><th>' + (s.mode === 'race' ? 'الإجابات الصحيحة' : 'الذهب') + '</th><th>صح / أجاب</th><th>الدقة</th></tr></thead><tbody>' +
+        p.map(function(x, i) {
+          return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.avatar) + ' ' + esc(x.name) + '</td><td>' + scoreLabel(x) + '</td><td>' + x.correct + ' / ' + x.answered + '</td><td>' + (x.answered ? Math.round(x.correct * 100 / x.answered) : 0) + '%</td></tr>';
+        }).join('') + '</tbody></table>' +
+      '<p class="muted ar-saved-note">حُفظت النتائج في تقارير ساحة التحدي.</p></div>';
+    playSfx('chest');
+    $('arCsvBtn').onclick = function() {
+      var rows = [['الترتيب', 'الطالب', s.mode === 'race' ? 'الإجابات الصحيحة' : 'الذهب', 'صحيح', 'عدد الإجابات', 'الدقة %']];
+      p.forEach(function(x, i) { rows.push([i + 1, x.name, s.mode === 'race' ? x.correct : x.gold, x.correct, x.answered, x.answered ? Math.round(x.correct * 100 / x.answered) : 0]); });
+      var csv = '﻿' + rows.map(function(r) {
+        return r.map(function(v) { v = String(v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\r\n');
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'نتائج-الغرفة-' + s.code + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
     };
   }
 
@@ -1966,23 +1861,16 @@
   // الانطلاق والتحميل الأولي
   // ==========================================
   function init() {
-    // 0. فحص رابط الانضمام المباشر أو استئناف الجلسة الحية
-    try {
-      var urlParams = new URLSearchParams(window.location.search);
-      var codeParam = urlParams.get('code');
-      var joinParam = urlParams.get('join');
-      if (codeParam || joinParam) {
-        renderStudentJoinForm(codeParam || '');
-        return;
-      }
-      var savedTok = sessionStorage.getItem('arena_live_token');
-      var savedCod = sessionStorage.getItem('arena_live_code');
-      var savedRol = sessionStorage.getItem('arena_live_role');
-      if (savedTok && savedCod && savedRol) {
-        connectLiveWs(savedCod, savedTok, savedRol);
-        return;
-      }
-    } catch (e) {}
+    // 0. صفحات الغرف المباشرة: /blooket (إدخال الرقم) و /blooket/147147 (الغرفة)
+    var path = location.pathname.replace(/\/+$/, '');
+    var mRoom = path.match(/^\/(?:blooket|arena)\/(\d{6})$/);
+    if (mRoom) { openRoom(mRoom[1]); return; }
+    if (path === '/blooket') {
+      var qc = new URLSearchParams(location.search).get('code');
+      if (qc && /^\d{6}$/.test(qc)) { location.replace('/blooket/' + qc); return; }
+      renderEnterCode();
+      return;
+    }
 
     // 1. مزامنة بيانات المستخدم لتفعيل أدوات المعلم (بدون تحويل قسري عند عدم تسجيل الدخول)
     try {

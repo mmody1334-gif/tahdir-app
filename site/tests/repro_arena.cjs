@@ -387,187 +387,92 @@ const ok = (n, c, extra) => {
   srv.stop();
 
   // 9. فحص المرحلة 3: محرك اللعبة النقي ومحاكاة 12 لاعباً متزامنين (Stage 3 Simulation)
-  console.log('\n=== فحص 5: محرك ساحة التحدي النقي ومحاكاة 12 لاعباً متزامنين (المرحلة 3) ===');
-  const { ArenaEngine, ENGINE_STATES } = require('../server/arena_engine.js');
-  const simEngine = new ArenaEngine({
-    code: 'SIM123',
-    hostId: 'teacher_live',
-    hostName: 'أ. محمد',
-    mode: 'gold_rush',
-    timePerQuestion: 15,
-    revealDuration: 5,
-    startingDuration: 3,
-    questions: [
-      { qid: 'sq1', stem: 'س1', choices: ['أ', 'ب', 'ج', 'د'], correct: 1 },
-      { qid: 'sq2', stem: 'س2', choices: ['1', '2', '3', '4'], correct: 2 }
-    ]
-  });
-
-  ok('تهيئة المحرك النقي في حالة LOBBY', simEngine.state === ENGINE_STATES.LOBBY);
-  simEngine.join('teacher_live', { name: 'المعلم', avatar: '👑' });
-  for (let i = 1; i <= 12; i++) {
-    simEngine.join(`sim_p${i}`, { name: `طالب ${i}`, avatar: '🦅' });
+  console.log('\n=== فحص 5: محرك الغرف المباشرة (لعب ذاتي الإيقاع) ===');
+  const { ArenaEngine } = require('../server/arena_engine.js');
+  const qs = [0, 1, 2, 3, 4, 5].map(i => ({ qid: 'q' + i, stem: 'سؤال ' + i, choices: ['أ', 'ب', 'ج', 'د'], correct: i % 4 }));
+  const eng = new ArenaEngine({ code: '147147', hostUserId: 7, mode: 'gold', durationSec: 300, questions: qs });
+  ok('لا يبدأ المعلم اللعبة قبل انضمام طالب', !eng.start(1000).ok);
+  ok('انضمام طالب', eng.addPlayer('a', { name: 'سالم' }, 1000).ok);
+  ok('رفض الاسم المكرر (بعد إزالة المسافات)', !eng.addPlayer('b', { name: '  سالم ' }, 1000).ok);
+  for (let i = 0; i < 12; i++) eng.addPlayer('p' + i, { name: 'طالب ' + i }, 1000);
+  ok('بدء اللعبة مع مؤقت', eng.start(2000).ok && eng.endsAt === 2000 + 300000);
+  const qa = eng.questionFor('a');
+  ok('السؤال المرسل للطالب بلا الإجابة الصحيحة', qa && !('correct' in qa));
+  let t = 3000;
+  const ra = eng.answer('a', qa.i, eng.questions[qa.i].correct, t += 600);
+  ok('الإجابة الصحيحة تفتح صندوقًا في سباق الذهب', ra.ok && ra.correct && ra.chest);
+  ok('لا سؤال جديد قبل فتح الصندوق', eng.questionFor('a') === null && !eng.answer('a', 0, 0, t += 600).ok);
+  const oc = eng.openChest('a', 0, t += 100);
+  ok('فتح الصندوق يكشف الصناديق الثلاثة ويعطي سؤالًا جديدًا', oc.ok && oc.options.length === 3 && !!eng.questionFor('a'));
+  const qb = eng.questionFor('p0');
+  ok('رفض الإجابة السريعة جدًا', eng.answer('p0', qb.i, 0, t).ok && !eng.answer('p0', eng.questionFor('p0') ? eng.questionFor('p0').i : 0, 0, t + 10).ok);
+  // محاكاة 12 طالبًا متزامنين لعدة جولات
+  for (let r = 0; r < 8; r++) for (let i = 0; i < 12; i++) {
+    const id = 'p' + i, q = eng.questionFor(id);
+    if (!q) { if (eng.players.get(id).chest) eng.openChest(id, r % 3, t); continue; }
+    eng.answer(id, q.i, i % 3 ? eng.questions[q.i].correct : 9 % 4, t += 600);
   }
-  ok('انضمام 12 لاعباً متزامناً بنجاح', simEngine.players.size === 13);
+  const lb = eng.leaderboard();
+  ok('الترتيب تنازلي حسب الذهب', lb.every((p, i) => i === 0 || lb[i - 1].gold >= p.gold));
+  ok('لا ذهب سالب لأي لاعب', lb.every(p => p.gold >= 0));
+  const snap = eng.snapshot('p1');
+  const copy = ArenaEngine.deserialize(JSON.parse(JSON.stringify(eng.serialize())));
+  copy.players.get('p1').v = 0; copy.players.get('p1').gold = 0;
+  ok('استعادة حالة اللاعب من مرفق المقبس بعد السبات', copy.restorePlayer('p1', snap) && copy.players.get('p1').gold === eng.players.get('p1').gold);
+  ok('انتهاء اللعبة بانتهاء الوقت', eng.tick(2000 + 300000).ended && eng.state === 'ENDED');
+  const race = new ArenaEngine({ code: '1', mode: 'race', goal: 5, questions: qs });
+  race.addPlayer('x', { name: 'س' }); race.start(0);
+  let tt = 0; while (race.state === 'PLAYING') { const q = race.questionFor('x'); race.answer('x', q.i, race.questions[q.i].correct, tt += 600); }
+  ok('سباق الإجابات ينتهي عند بلوغ الهدف ويحدد الفائز', race.state === 'ENDED' && race.winnerId === 'x' && race.players.get('x').correct === 5);
 
-  // سرية الإجابة
-  let simTime = 2000000;
-  simEngine.start('teacher_live', simTime);
-  simTime += 3000;
-  simEngine.tick(simTime); // انتقال لـ QUESTION 1
-  const studentView = simEngine.getStateFor('sim_p1', simTime);
-  ok('حظر إرسال الإجابة الصحيحة أثناء طور السؤال', studentView.question && studentView.question.correct === undefined && studentView.question.answer === undefined);
-
-  // إجابات متزامنة
-  for (let i = 1; i <= 10; i++) {
-    simEngine.submitAnswer(`sim_p${i}`, 1, simTime + i * 500); // إجابة صحيحة
-  }
-  simEngine.submitAnswer('sim_p11', 0, simTime + 6000); // خاطئة
-  simEngine.submitAnswer('sim_p12', 2, simTime + 7000); // خاطئة
-
-  // كشف الإجابات
-  simTime += 15000;
-  simEngine.tick(simTime);
-  ok('الانتقال التلقائي لطور REVEAL بعد انتهاء الوقت', simEngine.state === ENGINE_STATES.REVEAL);
-  const revealView = simEngine.getStateFor('sim_p1', simTime);
-  ok('كشف الإجابة الصحيحة في طور REVEAL فقط', revealView.question && revealView.question.correct === 1 && revealView.myRoundResult.isCorrect === true);
-
-  // لوحة الصدارة
-  const simLb = simEngine.getLeaderboard();
-  ok('ترتيب لوحة المتصدرين بدقة واحتساب النقاط والتتالي', simLb.length === 12 && simLb[0].id === 'sim_p1' && simLb[0].score > 0);
-
-  // طرد لاعب وتحكم المضيف
-  const simKick = simEngine.kick('sim_p12', 'teacher_live');
-  ok('طرد لاعب بواسطة المعلم ينجح فورياً', simKick.ok && simEngine.players.has('sim_p12') === false);
-
-  // السؤال 2 والتتويج
-  simTime += 5000;
-  simEngine.tick(simTime); // س2
-  for (let i = 1; i <= 5; i++) simEngine.submitAnswer(`sim_p${i}`, 2, simTime + 1000);
-  simTime += 15000;
-  simEngine.tick(simTime); // كشف س2
-  simTime += 5000;
-  simEngine.tick(simTime); // منصة التتويج
-  ok('اكتمال تدفق اللعبة والوصول لمنصة التتويج (PODIUM)', simEngine.state === ENGINE_STATES.PODIUM);
-
-  console.log('\n=== فحص 6: حماية الخطة المجانية، أكواد الغرف، ومنع التكرار (Free Plan Protection) ===');
-  // 1. فحص أبجدية أكواد الغرف (طول 6 وحروف غير ملتبسة)
-  const roomChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  ok('أبجدية أكواد الغرف خالية من الحروف الملتبسة (لا تتضمن 0 أو O أو 1 أو I)', !roomChars.includes('0') && !roomChars.includes('O') && !roomChars.includes('1') && !roomChars.includes('I'));
-
-  // 2. فحص غلاف Durable Object لمنع تكرار الغرف النشطة (409 Conflict)
+  console.log('\n=== فحص 6: غلاف الغرفة (Durable Object) بلا Cloudflare ===');
   const { ArenaRoom } = require('../server/arena_room.js');
-  let storagePuts = 0;
-  let storageDeletes = 0;
+  let puts = 0, wiped = 0;
+  const store = new Map();
   const mockStorage = {
-    map: new Map(),
-    async get(k) { return this.map.get(k); },
-    async put(k, v) { storagePuts++; this.map.set(k, v); },
-    async deleteAll() { storageDeletes++; this.map.clear(); },
+    async get(k) { return store.get(k); },
+    async put(k, v) { puts++; if (typeof k === 'object') { for (const [kk, vv] of Object.entries(k)) store.set(kk, JSON.parse(JSON.stringify(vv))); } else store.set(k, v); },
+    async deleteAll() { wiped++; store.clear(); },
     async setAlarm(ts) { this.alarm = ts; }
   };
-  const mockCtx = {
-    storage: mockStorage,
-    acceptWebSocket() {},
-    getWebSockets() { return []; }
-  };
-
-  const d1Inserts = [];
-  const mockDb = {
-    prepare(sql) {
-      return {
-        bind(...args) {
-          return {
-            async first() {
-              if (sql.includes('arena_daily_usage')) return { session_count: 0 };
-              return null;
-            },
-            async run() {
-              d1Inserts.push({ sql, args });
-              return {};
-            }
-          };
-        }
-      };
-    },
-    async batch(list) {
-      for (const item of list) await item.run();
-    }
-  };
-
-  const roomInstance = new ArenaRoom(mockCtx, { DB: mockDb });
-
-  // تهيئة الغرفة أول مرة (تنجح 200)
-  const initReq1 = new Request('http://arena/init', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code: 'SAFE49',
-      hostId: 'u_10',
-      hostName: 'المعلم',
-      hostToken: 'ht_secret',
-      courseKey: 'bio_9',
-      questions: [{ qid: 'q1', stem: 'س', choices: ['أ', 'ب'], correct: 0 }]
-    })
-  });
-  const initRes1 = await roomInstance.fetch(initReq1);
-  ok('تهيئة الغرفة المباشرة لأول مرة تنجح (HTTP 200)', initRes1.status === 200);
-
-  // محاولة تهيئة نفس الغرفة وهي لا تزال نشطة (تُرفض 409 Conflict)
-  const initReq2 = new Request('http://arena/init', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: 'SAFE49', hostId: 'u_10' })
-  });
-  const initRes2 = await roomInstance.fetch(initReq2);
-  ok('منع تكرار الغرف النشطة: رفض إعادة تهيئة غرفة نشطة بـ HTTP 409 Conflict', initRes2.status === 409);
-
-  // 3. فحص حماية DO: عدم استهلاك Storage Puts عند إجابة فردية طالما لم يجب الجميع
-  let mockAttachment = { playerId: 'student_free1', role: 'student', name: 'طالب مجاني 1' };
-  const mockWs = {
-    deserializeAttachment() {
-      return mockAttachment;
-    },
-    serializeAttachment(att) {
-      mockAttachment = att;
-    },
-    send() {}
-  };
-  mockCtx.getWebSockets = () => [mockWs];
-
-  // تسجيل طالبين لضمان عدم اكتمال الإجابات عند إجابة الأول فقط
-  roomInstance.engine.join('student_free1', { name: 'طالب مجاني 1', classId: 'CLS_99', did: 'dev_did_free1' });
-  roomInstance.engine.join('student_free2', { name: 'طالب مجاني 2', classId: 'CLS_99', did: 'dev_did_free2' });
-  roomInstance.engine.state = ENGINE_STATES.QUESTION;
-  roomInstance.engine.currentQIndex = 0;
-  roomInstance.engine.stateStartedAt = Date.now();
-  roomInstance.engine.deadlineAt = Date.now() + 20000;
-  // حفظ حالة بدء السؤال في التخزين (وهو ما يفعله النظام تلقائياً عند بدء السؤال)
-  await roomInstance.saveEngine();
-
-  const putsBefore = storagePuts;
-  // إرسال إجابة الطالب الأول فقط (لم يجب الطالب الثاني بعد)
-  await roomInstance.webSocketMessage(mockWs, JSON.stringify({ action: 'answer', choiceIndex: 0 }));
-  ok('حماية DO: الإجابة الفردية لا تستدعي ctx.storage.put (صفر عمليات كتابة إضافية)', storagePuts === putsBefore);
-  ok('حماية DO: حفظ الإجابة في مرفق المقبس (WebSocket Attachment)', !!(mockAttachment.answers && mockAttachment.answers[0]));
-
-  // 3ب. فحص محاكاة السبات (Hibernation Simulation):
-  // تفريغ المحرك بالكامل من الذاكرة العشوائية واستعادته من التخزين مع دمج المرفقات
-  roomInstance.engine = null; // إفراغ الذاكرة لمحاكاة إخماد/سبات الـ DO
-  const restoredEngine = await roomInstance.getEngine();
-  ok('حماية السبات: استعادة المحرك ودمج إجابة الطالب من مرفق المقبس بعد السبات', restoredEngine.roundAnswers.has('student_free1'));
-  ok('حماية السبات: نقاط الطالب لم تضع وظلت محسوبة بدقة بعد الإفاقة', restoredEngine.players.get('student_free1').score > 0);
-
-  // 4. فحص الحفظ التلقائي في D1 عند PODIUM (المرحلة 3هـ)
-  roomInstance.engine.state = ENGINE_STATES.PODIUM;
-  await roomInstance.persistLiveResultsToD1();
-  const sessionInsert = d1Inserts.find(ins => ins.sql.includes('INSERT INTO arena_sessions'));
-  ok('المرحلة 3هـ: الخادم يكتب نتائج الطلاب تلقائياً في arena_sessions عند PODIUM', !!sessionInsert);
-  ok('المرحلة 3هـ: ربط جولة الطالب بـ class_id و answers_json في D1', sessionInsert && sessionInsert.args[3] === 'CLS_99' && sessionInsert.args[11].includes('q1'));
-
-  // 5. فحص حذف التخزين بـ deleteAll بعد ساعة من التتويج
-  await roomInstance.alarm();
-  ok('حماية DO: حذف بيانات التخزين بـ deleteAll بعد انتهاء اللعبة', storageDeletes >= 1);
+  const sockets = [];
+  const mkWs = (tags, att) => ({ tags, att, sent: [], readyState: 1,
+    deserializeAttachment() { return this.att; }, serializeAttachment(a) { this.att = JSON.parse(JSON.stringify(a)); },
+    send(m) { this.sent.push(JSON.parse(m)); }, close() { this.readyState = 3; } });
+  const mockCtx = { storage: mockStorage, getWebSockets(tag) { return tag ? sockets.filter(s => s.tags.includes(tag)) : sockets.slice(); } };
+  const inserts = [];
+  const mockDb = { prepare(sql) { return { bind(...args) { return { sql, args, async first() { return sql.includes('arena_daily_usage') ? { session_count: 0 } : null; }, async run() { inserts.push({ sql, args }); } }; } }; },
+    async batch(list) { for (const x of list) await x.run(); } };
+  const room = new ArenaRoom(mockCtx, { DB: mockDb });
+  const post = (path, body) => room.fetch(new Request('http://arena' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  ok('تهيئة الغرفة', (await post('/init', { code: '555111', hostId: 'u_7', hostUserId: 7, hostToken: 'ht_x', questions: qs, mode: 'gold', courseKey: 'bio' })).status === 200);
+  ok('رفض إعادة تهيئة غرفة نشطة (409)', (await post('/init', { code: '555111', hostToken: 'ht_y', questions: qs })).status === 409);
+  ok('رمز المضيف لصاحب الغرفة فقط', (await post('/host-token', { userId: 7 })).status === 200 && (await post('/host-token', { userId: 8 })).status === 403);
+  const hostWs = mkWs(['host'], { role: 'host', playerId: 'u_7' }); sockets.push(hostWs);
+  ok('تسجيل طالب يصل للمعلم فورًا', (await post('/register', { playerId: 's1', playerToken: 'pt_1', name: 'مريم', classId: 'CLS9', did: 'd1' })).status === 200 && hostWs.sent.some(m => m.type === 'delta' && m.players[0].name === 'مريم'));
+  const sWs = mkWs(['student', 'player:s1'], { role: 'student', playerId: 's1' }); sockets.push(sWs);
+  await room.webSocketMessage(hostWs, JSON.stringify({ action: 'start' }));
+  ok('بدء اللعبة يصل للطالب', sWs.sent.some(m => m.type === 'sync' && m.state.state === 'PLAYING'));
+  const putsBefore = puts;
+  const q1 = room.engine.questionFor('s1');
+  await room.webSocketMessage(sWs, JSON.stringify({ action: 'answer', q: q1.i, choice: room.engine.questions[q1.i].correct }));
+  ok('الإجابة لا تكتب في التخزين فورًا (حفظ مؤجل)', puts === putsBefore && room.dirty);
+  ok('حالة الطالب نُسخت في مرفق مقبسه', sWs.att.snap && sWs.att.snap.correct === 1);
+  await room.webSocketMessage(sWs, JSON.stringify({ action: 'chest', idx: 1 }));
+  const goldNow = room.engine.players.get('s1').gold;
+  // محاكاة السبات: الذاكرة تضيع، والتخزين أقدم من المرفق
+  room.engine = null;
+  const restored = await room.getEngine();
+  ok('بعد السبات: ذهب الطالب يُستعاد من المرفق', restored.players.get('s1').gold === goldNow && restored.players.get('s1').correct === 1);
+  await room.alarm();
+  ok('المنبه يحفظ التغييرات المؤجلة', !room.dirty && puts > putsBefore);
+  await room.webSocketMessage(hostWs, JSON.stringify({ action: 'end' }));
+  const ins = inserts.find(x => x.sql.includes('INSERT INTO arena_sessions'));
+  ok('إنهاء اللعبة يحفظ نتيجة الطالب في D1 مرة واحدة', !!ins && ins.args[2] === 'مريم' && ins.args[3] === 'CLS9' && inserts.filter(x => x.sql.includes('INSERT INTO arena_sessions')).length === 1);
+  ok('الطالب يستلم النتيجة النهائية', sWs.sent.some(m => m.type === 'sync' && m.state.state === 'ENDED' && m.state.me.rank === 1));
+  room.engine.endedAt = Date.now() - 3 * 3600000;
+  await room.alarm();
+  ok('تنظيف الغرفة بعد انتهائها بساعتين', wiped >= 1 && !store.has('engine'));
 
   console.log('\n=== النتيجة: ' + pass + ' ناجح، ' + fail + ' فاشل ===');
   process.exit(fail ? 1 : 0);

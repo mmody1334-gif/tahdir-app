@@ -1567,176 +1567,129 @@ async function arenaApi(req, env, me, p, m, url) {
   return null;
 }
 
-const ARENA_ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// رقم الغرفة: 6 أرقام (100000–999999) بمولّد عشوائي آمن، مثل elkabsula.site/blooket/147147
 function newArenaCode() {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  let code = '';
-  for (let i = 0; i < 6; i++) code += ARENA_ROOM_CHARS[bytes[i] % ARENA_ROOM_CHARS.length];
-  return code;
+  const b = new Uint32Array(1);
+  crypto.getRandomValues(b);
+  return String(100000 + (b[0] % 900000));
+}
+const ARENA_CODE_RE = /^\d{6}$/;
+function arenaRoomStub(env, code) { return env.ARENA_ROOM.get(env.ARENA_ROOM.idFromName('room:' + code)); }
+function arenaLiveOn(env) { return String(env.ARENA_LIVE_ENABLED || '').toLowerCase() === 'true' || env.ARENA_LIVE_ENABLED === true; }
+function arenaQuotaErr(err) {
+  const msg = String(err && (err.message || err) || '');
+  return /quota|limit|exceeded|over quota/i.test(msg);
 }
 
 async function arenaLiveApi(req, env, me, p, m, url) {
-  const liveEnabled = String(env.ARENA_LIVE_ENABLED || '').toLowerCase() === 'true' || env.ARENA_LIVE_ENABLED === true;
-  if (!liveEnabled) {
-    return json({ error: 'خدمة التحدي المباشر غير مفعّلة حالياً.' }, 501);
-  }
-  if (!env.ARENA_ROOM) {
-    return json({ error: 'محرّك الغرف المباشرة غير مهيأ.' }, 500);
-  }
+  if (!arenaLiveOn(env)) return json({ error: 'اللعب المباشر غير مفعّل حاليًا.' }, 501);
+  if (!env.ARENA_ROOM) return json({ error: 'محرّك الغرف المباشرة غير مهيأ.' }, 500);
+  const isTeacher = me && (me.role === 'teacher' || me.role === 'admin');
 
-  // 1) إنشاء غرفة تحدٍّ مباشر جديدة (خاص بالمعلمين: يصدر رمز المضيف السري)
-  if (p === '/api/arena/live/create' && m === 'POST') {
-    if (!me || (me.role !== 'teacher' && me.role !== 'admin')) {
-      return json({ error: 'إنشاء الغرف المباشرة متاح للمعلمين فقط.' }, 403);
-    }
-    const b = await body(req);
-    await loadPacks(env, url);
-
-    let questions = [];
-    if (b.set_id) {
-      const setRow = await env.DB.prepare('SELECT questions_json FROM arena_sets WHERE id=? AND user_id=?').bind(b.set_id, me.id).first();
-      if (!setRow) return json({ error: 'الحقيبة المحددة غير موجودة أو غير مصرح بها.' }, 404);
-      try { questions = JSON.parse(setRow.questions_json || '[]'); } catch { questions = []; }
-    } else if (Array.isArray(b.lesson_ids) && b.lesson_ids.length > 0) {
-      const lidSet = new Set(b.lesson_ids.map(String));
-      for (const [lid, qList] of Object.entries((ARENA && ARENA.by_lesson) || {})) {
-        if (lidSet.has(lid)) {
-          questions.push(...qList);
-        }
+  try {
+    // 1) إنشاء غرفة (للمعلم فقط)
+    if (p === '/api/arena/live/create' && m === 'POST') {
+      if (!isTeacher) return json({ error: 'إنشاء الغرف متاح للمعلمين فقط. سجّل الدخول أولًا.' }, 403);
+      const b = await body(req);
+      await loadPacks(env, url);
+      let questions = [];
+      let title = '';
+      if (b.set_id) {
+        const setRow = await env.DB.prepare('SELECT title, questions_json FROM arena_sets WHERE id=? AND user_id=?').bind(b.set_id, me.id).first();
+        if (!setRow) return json({ error: 'الحقيبة غير موجودة.' }, 404);
+        try { questions = JSON.parse(setRow.questions_json || '[]'); } catch { questions = []; }
+        title = setRow.title || '';
+      } else {
+        const sc = scopeOf(me);
+        const all = await allLessons(env);
+        let ls;
+        if (Array.isArray(b.lesson_ids) && b.lesson_ids.length) {
+          const want = new Set(b.lesson_ids.map(String));
+          ls = all.filter(l => want.has(String(l.id)));
+        } else if (b.course_key) {
+          ls = all.filter(l => courseKey(l) === b.course_key);
+        } else ls = [];
+        if (sc) ls = ls.filter(l => sc.has(courseKey(l)));
+        for (const l of ls) questions.push(...(((ARENA && ARENA.by_lesson) || {})[String(l.id)] || []));
+        if (ls.length === 1) title = ls[0].title || '';
+        else if (ls.length) title = (ls[0].subject || '') + ' · ' + ls.length + ' دروس';
       }
-    } else if (b.course_key) {
-      const all = await allLessons(env);
-      const ls = all.filter(l => courseKey(l) === b.course_key);
-      const lidSet = new Set(ls.map(l => String(l.id)));
-      for (const [lid, qList] of Object.entries((ARENA && ARENA.by_lesson) || {})) {
-        if (lidSet.has(lid)) {
-          questions.push(...qList);
-        }
-      }
-    }
-
-    if (!questions.length) {
-      return json({ error: 'لا توجد أسئلة اختيار من متعدد في الدروس المحددة.' }, 400);
-    }
-
-    const limit = Math.max(1, Math.min(50, +(b.question_count || 10)));
-    questions = questions.sort(() => Math.random() - 0.5).slice(0, limit);
-
-    const hostToken = 'ht_' + rand(24);
-    let code = '';
-    let initRes = null;
-    let attempts = 0;
-
-    while (attempts < 5) {
-      attempts++;
-      code = newArenaCode();
-      const doId = env.ARENA_ROOM.idFromName(code);
-      const room = env.ARENA_ROOM.get(doId);
-
-      try {
-        initRes = await room.fetch(new Request('http://arena/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      if (!questions.length) return json({ error: 'لا توجد أسئلة اختيار من متعدد في الدروس المحددة.' }, 400);
+      const hostToken = 'ht_' + rand(24);
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const code = newArenaCode();
+        const res = await arenaRoomStub(env, code).fetch(new Request('http://arena/init', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            code,
-            hostId: 'u_' + me.id,
-            hostName: me.name,
-            hostToken,
-            mode: b.mode || 'gold_rush',
-            courseKey: b.course_key || '',
-            timePerQuestion: b.time_limit || 20,
-            revealDuration: b.reveal_duration || 6,
-            questions
+            code, hostId: 'u_' + me.id, hostUserId: me.id, hostName: me.name, hostToken, title,
+            courseKey: b.course_key || '', mode: b.mode === 'race' ? 'race' : 'gold',
+            durationSec: Math.round(Number(b.duration_min || 7) * 60), goal: b.goal || 20,
+            lateJoin: b.late_join !== false, questions
           })
         }));
-
-        if (initRes.status === 409) {
-          continue; // conflict: active room with same code, retry
-        }
-        break;
-      } catch (err) {
-        const msg = String(err && (err.message || err.toString()) || '');
-        if (/quota|limit|exceeded|over quota/i.test(msg)) {
-          return json({ error: 'اللعب المباشر متوقف مؤقتًا حتى الغد.' }, 503);
-        }
-        throw err;
+        if (res.status === 409) continue;
+        if (!res.ok) return json({ error: 'تعذّر إنشاء الغرفة.' }, 500);
+        return json({ ok: true, code, hostToken, questions_count: Math.min(questions.length, 300) });
       }
+      return json({ error: 'تعذّر إيجاد رقم غرفة متاح، حاول مرة أخرى.' }, 503);
     }
 
-    if (!initRes || !initRes.ok) {
-      if (initRes && initRes.status === 503) {
-        return json({ error: 'اللعب المباشر متوقف مؤقتًا حتى الغد.' }, 503);
+    const code = String(url.searchParams.get('code') || '').trim();
+
+    // 2) معلومات الغرفة (عامة)
+    if (p === '/api/arena/live/room' && m === 'GET') {
+      if (!ARENA_CODE_RE.test(code)) return json({ error: 'رقم الغرفة يتكون من 6 أرقام.' }, 400);
+      const r = await arenaRoomStub(env, code).fetch(new Request('http://arena/info'));
+      if (!r.ok) return json({ error: 'لا توجد لعبة بهذا الرقم. تأكد من الرقم مع معلمك.' }, 404);
+      return json(await r.json());
+    }
+
+    // 3) رمز المضيف لصاحب الغرفة (عند فتح الرابط من جهاز أو تبويب آخر)
+    if (p === '/api/arena/live/host-token' && m === 'POST') {
+      if (!isTeacher) return json({ error: 'غير مسموح.' }, 403);
+      const b = await body(req);
+      const c = String(b.code || '').trim();
+      if (!ARENA_CODE_RE.test(c)) return json({ error: 'رقم غير صالح.' }, 400);
+      const r = await arenaRoomStub(env, c).fetch(new Request('http://arena/host-token', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: me.id })
+      }));
+      const j = await r.json().catch(() => ({}));
+      return json(j, r.status);
+    }
+
+    // 4) انضمام طالب: يتحقق الخادم من الاسم ويصدر رمز لاعب سري
+    if (p === '/api/arena/live/join' && m === 'POST') {
+      const b = await body(req);
+      const c = String(b.code || '').trim();
+      if (!ARENA_CODE_RE.test(c)) return json({ error: 'رقم الغرفة يتكون من 6 أرقام.' }, 400);
+      const name = String(b.name || '').replace(/<[^>]*>/g, '').trim().slice(0, 30);
+      if (!name) return json({ error: 'اكتب اسمك للدخول.' }, 400);
+      let classId = null;
+      if (b.class_id) {
+        const cRow = await env.DB.prepare('SELECT code FROM classes WHERE code = ? AND active = 1').bind(String(b.class_id).trim()).first();
+        if (cRow) classId = cRow.code;
       }
-      return json({ error: 'تعذر تهيئة غرفة التحدي المباشر.' }, 500);
-    }
-    return json({ ok: true, code, hostToken, questions_count: questions.length });
-  }
-
-  // 2) انضمام طالب وتسجيله لإصدار رمز لاعب موقّع (Player Token)
-  if (p === '/api/arena/live/join' && m === 'POST') {
-    const b = await body(req);
-    const code = String((b && b.code) || '').toUpperCase().trim();
-    if (!code || code.length !== 6) return json({ error: 'رمز الغرفة غير صالح' }, 400);
-
-    const rawName = String((b && b.name) || '').trim();
-    const cleanName = rawName.replace(/<[^>]*>/g, '').trim().slice(0, 30);
-    if (!cleanName) return json({ error: 'اكتب اسمك للانضمام للساحة' }, 400);
-
-    let classId = null;
-    if (b.class_id) {
-      const cRow = await env.DB.prepare('SELECT id, code, active FROM classes WHERE code = ? AND active = 1').bind(String(b.class_id).trim()).first();
-      if (cRow) classId = cRow.code;
+      const did = String(cookies(req).did || req.headers.get('X-Tahdir-Did') || '').trim() || null;
+      const playerId = 'p_' + rand(10);
+      const playerToken = 'pt_' + rand(24);
+      const r = await arenaRoomStub(env, c).fetch(new Request('http://arena/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, playerToken, name, avatar: String(b.avatar || '🦅').slice(0, 8), classId, did })
+      }));
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return json({ error: j.error || 'تعذّر الدخول إلى الغرفة.' }, r.status);
+      return json({ ok: true, code: c, playerId, playerToken, name: j.name || name });
     }
 
-    const c = cookies(req);
-    // did في اللعب الحي: خذه من الكوكي did أو الترويسة الموثوقة (وليس من جسم الطلب) لمنع تزوير رصيد الأجهزة
-    const did = String(c.did || req.headers.get('X-Tahdir-Did') || '').trim() || null;
-
-    const playerId = 'p_' + rand(10);
-    const playerToken = 'pt_' + rand(24);
-    const avatar = String(b.avatar || '🦅').slice(0, 10);
-
-    const doId = env.ARENA_ROOM.idFromName(code);
-    const room = env.ARENA_ROOM.get(doId);
-
-    const regRes = await room.fetch(new Request('http://arena/register-player', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, playerToken, name: cleanName, avatar, classId, did })
-    }));
-
-    if (!regRes.ok) {
-      const err = await regRes.json().catch(() => ({}));
-      return json({ error: err.error || 'تعذر الانضمام للغرفة.' }, regRes.status);
+    // 5) ترقية الاتصال إلى WebSocket (التحقق بالرمز داخل الغرفة)
+    if (p === '/api/arena/live/ws') {
+      if (!ARENA_CODE_RE.test(code)) return json({ error: 'رقم غير صالح' }, 400);
+      if (!url.searchParams.get('token')) return json({ error: 'رمز الدخول مطلوب' }, 401);
+      return arenaRoomStub(env, code).fetch(req);
     }
-
-    return json({ ok: true, code, playerId, playerToken, name: cleanName, avatar });
-  }
-
-  // 3) الاستعلام عن حالة الغرفة ومعلوماتها
-  if (p === '/api/arena/live/room' && m === 'GET') {
-    const code = String(url.searchParams.get('code') || '').toUpperCase().trim();
-    if (!code || code.length !== 6) return json({ error: 'رمز الغرفة غير صالح' }, 400);
-
-    const doId = env.ARENA_ROOM.idFromName(code);
-    const room = env.ARENA_ROOM.get(doId);
-    const infoRes = await room.fetch(new Request('http://arena/info'));
-    if (!infoRes.ok) return json({ error: 'الغرفة غير موجودة أو انتهت' }, 404);
-    const info = await infoRes.json();
-    return json(info);
-  }
-
-  // 4) ترقية الاتصال إلى WebSocket مع الغرفة المباشرة (التحقق بالرموز الموقّعة حصراً)
-  if (p === '/api/arena/live/ws') {
-    const code = String(url.searchParams.get('code') || '').toUpperCase().trim();
-    const token = String(url.searchParams.get('token') || '').trim();
-    if (!code) return json({ error: 'رمز الغرفة مطلوب' }, 400);
-    if (!token) return json({ error: 'رمز المصادقة مطلوب للاتصال بالساحة المباشرة' }, 401);
-
-    const doId = env.ARENA_ROOM.idFromName(code);
-    const room = env.ARENA_ROOM.get(doId);
-    return room.fetch(req);
+  } catch (err) {
+    if (arenaQuotaErr(err)) return json({ error: 'اللعب المباشر متوقف مؤقتًا حتى الغد (تم بلوغ الحد اليومي).' }, 503);
+    throw err;
   }
 
   return json({ error: 'مسار غير معروف' }, 404);
@@ -2202,7 +2155,7 @@ export default {
         }
       }
       if (p === '/play') return html('play');
-      if (p === '/arena') return html('arena');
+      if (p === '/arena' || p === '/blooket' || p === '/blooket/' || /^\/(blooket|arena)\/\d{6}\/?$/.test(p)) return html('arena');
       if (p === '/teqany/arena') return htmlTq('arena');
       if (p.startsWith('/api/arena/')) {
         const meUser = await currentUser(req, env);

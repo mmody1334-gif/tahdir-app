@@ -5,7 +5,7 @@ compatibility_date = "2025-06-01"
 workers_dev = true
 
 [vars]
-ARENA_LIVE_ENABLED = false
+ARENA_LIVE_ENABLED = true
 
 [durable_objects]
 bindings = [

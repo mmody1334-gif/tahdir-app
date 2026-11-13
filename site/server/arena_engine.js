@@ -1,488 +1,439 @@
 // site/server/arena_engine.js
-// محرك ساحة التحدي النقي (Pure JavaScript Game Engine)
-// خالٍ تماماً من أي اعتماديات على Cloudflare أو Node.js أو المتصفح.
+// محرك غرف «ساحة التحدي» المباشرة — لعب ذاتي الإيقاع بأسلوب الغرف الصفية:
+// المعلم ينشئ غرفة برقم من 6 أرقام، الطلاب يدخلون اللوبي ويظهرون عنده فورًا،
+// وبعد البدء يجيب كل طالب بسرعته على أسئلة مخلوطة له وحده، ولوحة المعلم تتحدث لحظيًا.
+// كود JS نقي بلا أي اعتماد على Cloudflare أو المتصفح، ليُختبر مباشرة في Node.
 
-const ENGINE_STATES = {
-  LOBBY: 'LOBBY',
-  STARTING: 'STARTING',
-  QUESTION: 'QUESTION',
-  REVEAL: 'REVEAL',
-  PODIUM: 'PODIUM',
-  PAUSED: 'PAUSED'
-};
+const ENGINE_STATES = { LOBBY: 'LOBBY', PLAYING: 'PLAYING', ENDED: 'ENDED' };
+const MAX_PLAYERS = 80;
+const MIN_ANSWER_GAP_MS = 500; // أقل زمن بين إجابتين لنفس الطالب (حماية من النقر الآلي)
+const MAX_ANSWERS_LOG = 300;
+const FEED_MAX = 30;
+
+function clampInt(v, lo, hi, def) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return def;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function cleanText(s, max) {
+  return String(s == null ? '' : s).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function shuffled(n, rnd) {
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+// جدول صناديق الذهب: أوزان الاحتمالات (المجموع غير مهم، تُطبَّع تلقائيًا)
+const CHEST_TABLE = [
+  { k: 'gain', n: 10, w: 10 },
+  { k: 'gain', n: 20, w: 12 },
+  { k: 'gain', n: 30, w: 11 },
+  { k: 'gain', n: 40, w: 9 },
+  { k: 'gain', n: 50, w: 7 },
+  { k: 'gain', n: 75, w: 4 },
+  { k: 'gain', n: 100, w: 3 },
+  { k: 'mult', n: 2, w: 6 },
+  { k: 'mult', n: 3, w: 2 },
+  { k: 'lose', n: 25, w: 6 },
+  { k: 'lose', n: 50, w: 3 },
+  { k: 'steal', n: 10, w: 5 },
+  { k: 'steal', n: 25, w: 3 },
+  { k: 'swap', n: 0, w: 3 },
+  { k: 'none', n: 0, w: 5 }
+];
+const CHEST_TOTAL_W = CHEST_TABLE.reduce((s, c) => s + c.w, 0);
 
 class ArenaEngine {
-  constructor(config = {}) {
-    this.code = String(config.code || '').toUpperCase();
-    this.hostId = String(config.hostId || 'host');
-    this.hostName = String(config.hostName || 'المعلم');
-    this.courseKey = String(config.courseKey || '').trim();
-    this.mode = config.mode || 'gold_rush'; // gold_rush | cafe | tower
-    this.timePerQuestion = Math.max(5, Math.min(120, +(config.timePerQuestion || 20))); // ثوانٍ
-    this.revealDuration = Math.max(3, Math.min(30, +(config.revealDuration || 6))); // ثوانٍ
-    this.startingDuration = Math.max(3, Math.min(10, +(config.startingDuration || 3))); // ثوانٍ
-    this.maxPlayers = Math.max(2, Math.min(100, +(config.maxPlayers || 60)));
-
-    // قائمة الأسئلة: كل سؤال يحتوي على qid, stem, choices, correct, difficulty
-    this.questions = Array.isArray(config.questions) ? config.questions : [];
-    this.currentQIndex = -1;
-
+  constructor(cfg = {}) {
+    const now = cfg.now || Date.now();
+    this.code = String(cfg.code || '');
+    this.hostId = String(cfg.hostId || 'host');
+    this.hostUserId = cfg.hostUserId != null ? Number(cfg.hostUserId) : null;
+    this.hostName = cleanText(cfg.hostName || 'المعلم', 40);
+    this.title = cleanText(cfg.title || '', 80);
+    this.courseKey = String(cfg.courseKey || '');
+    this.mode = cfg.mode === 'race' ? 'race' : 'gold';
+    this.durationSec = clampInt(cfg.durationSec, 60, 1800, 420);
+    this.goal = clampInt(cfg.goal, 5, 100, 20);
+    this.lateJoin = cfg.lateJoin !== false;
+    this.questions = ArenaEngine.cleanQuestions(cfg.questions || []);
     this.state = ENGINE_STATES.LOBBY;
-    this.previousState = null; // للحفظ عند الإيقاف المؤقت (PAUSED)
-    this.players = new Map(); // id -> PlayerState
-
-    // مؤقتات الحالة الحالية (بالمللي ثانية)
-    this.stateStartedAt = Date.now();
-    this.deadlineAt = 0;
-    this.pausedRemainingMs = 0;
-
-    // إحصائيات الجولة الحالية
-    this.roundAnswers = new Map(); // playerId -> { choiceIndex, answeredAt, durationMs, isCorrect, pointsAwarded }
-    this.kickedIds = new Set();
-    this.locked = false; // قفل الغرفة من دخول لاعبين جدد
+    this.locked = false;
+    this.createdAt = now;
+    this.startedAt = null;
+    this.endsAt = null;
+    this.endedAt = null;
+    this.winnerId = null;
+    this.resultsSaved = false;
+    this.players = new Map();
+    this.kicked = new Set();
+    this.feed = [];
+    this.feedSeq = 0;
+    this.rnd = typeof cfg.random === 'function' ? cfg.random : Math.random;
   }
 
-  // انضمام لاعب
-  join(playerId, profile = {}) {
-    playerId = String(playerId || '').trim();
-    if (!playerId) return { ok: false, error: 'معرّف اللاعب مطلوب' };
-    if (this.kickedIds.has(playerId)) return { ok: false, error: 'تم استبعادك من هذه الغرفة' };
-
-    // إذا كان اللاعب موجوداً مسبقاً (إعادة اتصال)
-    if (this.players.has(playerId)) {
-      const p = this.players.get(playerId);
-      p.connected = true;
-      p.lastSeen = Date.now();
-      if (profile.name) p.name = String(profile.name).trim().slice(0, 30);
-      if (profile.avatar) p.avatar = String(profile.avatar).slice(0, 10);
-      return { ok: true, reconnected: true, player: p };
-    }
-
-    if (this.state !== ENGINE_STATES.LOBBY) {
-      return { ok: false, error: 'اللعبة بدأت بالفعل ولا يمكن الانضمام الآن' };
-    }
-    if (this.locked) {
-      return { ok: false, error: 'الغرفة مغلقة من قبل المضيف' };
-    }
-    const nonHostCount = [...this.players.values()].filter(p => !p.isHost).length;
-    if (nonHostCount >= this.maxPlayers) {
-      return { ok: false, error: 'اكتمل العدد الأقصى للاعبين' };
-    }
-
-    const isHost = playerId === this.hostId;
-    const player = {
-      id: playerId,
-      name: String(profile.name || (isHost ? this.hostName : `طالب ${nonHostCount + 1}`)).trim().slice(0, 30),
-      avatar: String(profile.avatar || (isHost ? '👑' : '🦅')).slice(0, 10),
-      classId: profile.classId ? String(profile.classId).trim() : null,
-      did: profile.did ? String(profile.did).trim() : null,
-      isHost,
-      score: 0,
-      gold: 0,
-      streak: 0,
-      maxStreak: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      connected: true,
-      joinedAt: Date.now(),
-      lastSeen: Date.now(),
-      rounds: []
-    };
-
-    this.players.set(playerId, player);
-    return { ok: true, player };
-  }
-
-  // مغادرة أو فصل اتصال
-  leave(playerId) {
-    if (!this.players.has(playerId)) return false;
-    const p = this.players.get(playerId);
-    p.connected = false;
-    p.lastSeen = Date.now();
-    // إذا كانت الغرفة في اللوبي ولم تبدأ، يُحذف اللاعب تماماً
-    if (this.state === ENGINE_STATES.LOBBY && !p.isHost) {
-      this.players.delete(playerId);
-    }
-    return true;
-  }
-
-  // طرد لاعب بواسطة المضيف
-  kick(playerId, hostId) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة للطرد' };
-    if (!this.players.has(playerId)) return { ok: false, error: 'اللاعب غير موجود' };
-    if (playerId === this.hostId) return { ok: false, error: 'لا يمكن للمضيف طرد نفسه' };
-
-    this.players.delete(playerId);
-    this.kickedIds.add(playerId);
-    return { ok: true };
-  }
-
-  // قفل/فتح الانضمام
-  setLock(locked, hostId) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة' };
-    this.locked = !!locked;
-    return { ok: true, locked: this.locked };
-  }
-
-  // بدء اللعبة
-  start(hostId, nowMs = Date.now()) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة لبدء اللعبة' };
-    if (this.state !== ENGINE_STATES.LOBBY) return { ok: false, error: 'اللعبة في حالة لا تسمح بالبدء' };
-    if (this.questions.length === 0) return { ok: false, error: 'لا توجد أسئلة في الغرفة' };
-
-    const students = [...this.players.values()].filter(p => !p.isHost);
-    if (students.length === 0) return { ok: false, error: 'لا يوجد طلاب في الغرفة بعد' };
-
-    this.state = ENGINE_STATES.STARTING;
-    this.stateStartedAt = nowMs;
-    this.deadlineAt = nowMs + this.startingDuration * 1000;
-    this.currentQIndex = -1;
-    return { ok: true, nextAlarmAt: this.deadlineAt };
-  }
-
-  // الانتقال إلى السؤال التالي
-  nextQuestion(nowMs = Date.now()) {
-    this.currentQIndex++;
-    if (this.currentQIndex >= this.questions.length) {
-      // انتهت الأسئلة -> الانتقال للمنصة والتتويج
-      this.state = ENGINE_STATES.PODIUM;
-      this.stateStartedAt = nowMs;
-      this.deadlineAt = 0;
-      return { ok: true, state: this.state, finished: true };
-    }
-
-    this.state = ENGINE_STATES.QUESTION;
-    this.stateStartedAt = nowMs;
-    this.deadlineAt = nowMs + this.timePerQuestion * 1000;
-    this.roundAnswers.clear();
-    return { ok: true, state: this.state, qIndex: this.currentQIndex, nextAlarmAt: this.deadlineAt };
-  }
-
-  // إنهاء السؤال الحالي والانتقال للنتيجة (REVEAL)
-  revealQuestion(nowMs = Date.now()) {
-    if (this.state !== ENGINE_STATES.QUESTION && this.state !== ENGINE_STATES.PAUSED) {
-      return { ok: false, error: 'لا يمكن كشف السؤال خارج حالة السؤال' };
-    }
-
-    // احتساب من لم يجب كإجابة خاطئة
-    const currentQ = this.getCurrentQuestionRaw();
-    const correctIdx = currentQ ? currentQ.correct : 0;
-
-    for (const [id, player] of this.players.entries()) {
-      if (player.isHost) continue;
-      if (!this.roundAnswers.has(id)) {
-        player.streak = 0;
-        player.wrongCount++;
-        const timeoutRecord = {
-          qIndex: this.currentQIndex,
-          qid: currentQ ? currentQ.qid : '',
-          choiceIndex: -1,
-          answeredAt: nowMs,
-          durationMs: this.timePerQuestion * 1000,
-          isCorrect: false,
-          pointsAwarded: 0
-        };
-        this.roundAnswers.set(id, timeoutRecord);
-        if (!player.rounds) player.rounds = [];
-        player.rounds.push(timeoutRecord);
-      }
-    }
-
-    this.state = ENGINE_STATES.REVEAL;
-    this.stateStartedAt = nowMs;
-    this.deadlineAt = nowMs + this.revealDuration * 1000;
-    return { ok: true, state: this.state, nextAlarmAt: this.deadlineAt };
-  }
-
-  // تسليم إجابة طالب
-  submitAnswer(playerId, choiceIndex, nowMs = Date.now()) {
-    if (this.state !== ENGINE_STATES.QUESTION) {
-      return { ok: false, error: 'الوقت انتهى أو اللعبة ليست في طور استقبال الإجابات' };
-    }
-    const player = this.players.get(playerId);
-    if (!player) return { ok: false, error: 'اللاعب غير مسجل' };
-    if (player.isHost) return { ok: false, error: 'المضيف لا يشارك في الإجابة' };
-    if (this.roundAnswers.has(playerId)) return { ok: false, error: 'تم تسليم إجابتك بالفعل' };
-
-    choiceIndex = +choiceIndex;
-    const currentQ = this.getCurrentQuestionRaw();
-    if (!currentQ) return { ok: false, error: 'لا يوجد سؤال حالي' };
-
-    const durationMs = Math.max(100, nowMs - this.stateStartedAt);
-    const totalMs = this.timePerQuestion * 1000;
-    const remainingMs = Math.max(0, totalMs - durationMs);
-    const isCorrect = choiceIndex === currentQ.correct;
-
-    let pointsAwarded = 0;
-    if (isCorrect) {
-      // معادلة النقاط القياسية: 500 أساس + ما يصل إلى 500 للسرعة + حافز التتالي
-      const speedRatio = Math.max(0, Math.min(1, remainingMs / totalMs));
-      const speedPoints = Math.round(speedRatio * 500);
-      player.streak = (player.streak || 0) + 1;
-      if (player.streak > (player.maxStreak || 0)) player.maxStreak = player.streak;
-      const streakBonus = Math.min(300, (player.streak - 1) * 50);
-      pointsAwarded = 500 + speedPoints + streakBonus;
-
-      player.score += pointsAwarded;
-      player.gold += Math.round(pointsAwarded / 10);
-      player.correctCount++;
-    } else {
-      player.streak = 0;
-      player.wrongCount++;
-    }
-
-    const ansRecord = {
-      qIndex: this.currentQIndex,
-      qid: currentQ.qid,
-      choiceIndex,
-      answeredAt: nowMs,
-      durationMs,
-      isCorrect,
-      pointsAwarded
-    };
-    this.roundAnswers.set(playerId, ansRecord);
-    if (!player.rounds) player.rounds = [];
-    player.rounds.push(ansRecord);
-
-    // تحقق هل أجاب جميع الطلاب المتصلين؟
-    const activeStudents = [...this.players.values()].filter(p => !p.isHost && p.connected);
-    const allAnswered = activeStudents.length > 0 && activeStudents.every(p => this.roundAnswers.has(p.id));
-
-    return {
-      ok: true,
-      isCorrect,
-      pointsAwarded,
-      allAnswered
-    };
-  }
-
-  // إيقاف مؤقت / استئناف
-  pause(hostId, nowMs = Date.now()) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة' };
-    if (this.state === ENGINE_STATES.PAUSED) return { ok: false, error: 'اللعبة متوقفة بالفعل' };
-    if (this.state !== ENGINE_STATES.QUESTION && this.state !== ENGINE_STATES.REVEAL) {
-      return { ok: false, error: 'لا يمكن الإيقاف في هذه الحالة' };
-    }
-
-    this.previousState = this.state;
-    this.pausedRemainingMs = Math.max(0, this.deadlineAt - nowMs);
-    this.state = ENGINE_STATES.PAUSED;
-    this.deadlineAt = 0;
-    return { ok: true, state: this.state };
-  }
-
-  resume(hostId, nowMs = Date.now()) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة' };
-    if (this.state !== ENGINE_STATES.PAUSED) return { ok: false, error: 'اللعبة ليست متوقفة' };
-
-    this.state = this.previousState || ENGINE_STATES.QUESTION;
-    this.previousState = null;
-    this.deadlineAt = nowMs + Math.max(1000, this.pausedRemainingMs);
-    this.stateStartedAt = nowMs;
-    return { ok: true, state: this.state, nextAlarmAt: this.deadlineAt };
-  }
-
-  // تخطي السؤال فورياً
-  skip(hostId, nowMs = Date.now()) {
-    if (hostId !== this.hostId) return { ok: false, error: 'صلاحية المضيف مطلوبة' };
-    if (this.state !== ENGINE_STATES.QUESTION && this.state !== ENGINE_STATES.PAUSED) {
-      return { ok: false, error: 'لا يوجد سؤال نشط لتخطيه' };
-    }
-    return this.revealQuestion(nowMs);
-  }
-
-  // مؤقت التنبيه (Alarms)
-  tick(nowMs = Date.now()) {
-    if (this.state === ENGINE_STATES.PAUSED || this.state === ENGINE_STATES.LOBBY || this.state === ENGINE_STATES.PODIUM) {
-      return { transitioned: false };
-    }
-    if (this.deadlineAt && nowMs >= this.deadlineAt) {
-      if (this.state === ENGINE_STATES.STARTING) {
-        const res = this.nextQuestion(nowMs);
-        return { transitioned: true, state: this.state, ...res };
-      }
-      if (this.state === ENGINE_STATES.QUESTION) {
-        const res = this.revealQuestion(nowMs);
-        return { transitioned: true, state: this.state, ...res };
-      }
-      if (this.state === ENGINE_STATES.REVEAL) {
-        const res = this.nextQuestion(nowMs);
-        return { transitioned: true, state: this.state, ...res };
-      }
-    }
-    return { transitioned: false, nextAlarmAt: this.deadlineAt };
-  }
-
-  // السؤال الحالي الخام (مع الإجابة الصحيحة - داخلي فقط)
-  getCurrentQuestionRaw() {
-    if (this.currentQIndex < 0 || this.currentQIndex >= this.questions.length) return null;
-    return this.questions[this.currentQIndex];
-  }
-
-  // السؤال المنقح للعميل (يمنع تماماً إرسال الإجابة الصحيحة أثناء طور السؤال)
-  getSanitizedQuestion(isHost = false) {
-    const raw = this.getCurrentQuestionRaw();
-    if (!raw) return null;
-
-    const base = {
-      index: this.currentQIndex,
-      total: this.questions.length,
-      qid: raw.qid,
-      stem: raw.stem,
-      choices: raw.choices,
-      difficulty: raw.difficulty || 'متوسطة'
-    };
-
-    // الإجابة الصحيحة لا تُرسل أبداً أثناء طور السؤال إلا إذا كنا في طور REVEAL أو PODIUM
-    if (this.state === ENGINE_STATES.REVEAL || this.state === ENGINE_STATES.PODIUM) {
-      base.correct = raw.correct;
-      base.answer = raw.choices[raw.correct] || '';
-    } else if (isHost) {
-      // المعلم يرى الإجابة الصحيحة في شاشته للإرشاد فقط
-      base.hostHintCorrect = raw.correct;
-    }
-    return base;
-  }
-
-  // لوحة الصدارة والمتصدرين
-  getLeaderboard() {
-    const list = [...this.players.values()]
-      .filter(p => !p.isHost)
-      .map(p => ({
-        id: p.id,
-        name: p.name,
-        avatar: p.avatar,
-        score: p.score,
-        streak: p.streak,
-        maxStreak: p.maxStreak || 0,
-        correctCount: p.correctCount,
-        wrongCount: p.wrongCount,
-        connected: p.connected
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    list.forEach((p, idx) => {
-      p.rank = idx + 1;
-    });
-    return list;
-  }
-
-  // حالة الغرفة الكاملة للعميل وفق هويته (طالب / معلم)
-  getStateFor(playerId, nowMs = Date.now()) {
-    const isHost = playerId === this.hostId;
-    const player = this.players.get(playerId) || null;
-    const remainingMs = this.state === ENGINE_STATES.PAUSED ? this.pausedRemainingMs : Math.max(0, this.deadlineAt - nowMs);
-
-    const out = {
-      code: this.code,
-      state: this.state,
-      mode: this.mode,
-      isHost,
-      locked: this.locked,
-      totalQuestions: this.questions.length,
-      currentQIndex: this.currentQIndex,
-      remainingSeconds: Math.ceil(remainingMs / 1000),
-      remainingMs,
-      question: this.getSanitizedQuestion(isHost),
-      leaderboard: this.getLeaderboard(),
-      playersCount: [...this.players.values()].filter(p => !p.isHost).length,
-      activeCount: [...this.players.values()].filter(p => !p.isHost && p.connected).length
-    };
-
-    // إحصائيات الإجابات للمعلم في طور REVEAL
-    if (this.state === ENGINE_STATES.REVEAL || this.state === ENGINE_STATES.PODIUM) {
-      const counts = [0, 0, 0, 0];
-      for (const ans of this.roundAnswers.values()) {
-        if (ans.choiceIndex >= 0 && ans.choiceIndex < counts.length) {
-          counts[ans.choiceIndex]++;
-        }
-      }
-      out.choiceCounts = counts;
-      if (out.question) {
-        out.question.choiceCounts = counts;
-      }
-    }
-
-    // معلومات خاصة باللاعب الطالب
-    if (player && !isHost) {
-      out.me = {
-        id: player.id,
-        name: player.name,
-        avatar: player.avatar,
-        score: player.score,
-        gold: player.gold,
-        streak: player.streak,
-        hasAnswered: this.roundAnswers.has(playerId)
-      };
-      if (this.roundAnswers.has(playerId) && (this.state === ENGINE_STATES.REVEAL || this.state === ENGINE_STATES.PODIUM)) {
-        const myAns = this.roundAnswers.get(playerId);
-        out.myRoundResult = {
-          choiceIndex: myAns.choiceIndex,
-          isCorrect: myAns.isCorrect,
-          pointsAwarded: myAns.pointsAwarded,
-          durationMs: myAns.durationMs
-        };
-      }
+  static cleanQuestions(list) {
+    const out = [];
+    for (const q of list || []) {
+      if (!q) continue;
+      const choices = (Array.isArray(q.choices) ? q.choices : []).map(c => cleanText(c, 300)).filter(Boolean).slice(0, 4);
+      const correct = Number(q.correct);
+      const stem = cleanText(q.stem, 1000);
+      if (!stem || choices.length < 2 || !Number.isInteger(correct) || correct < 0 || correct >= choices.length) continue;
+      out.push({ qid: String(q.qid != null ? q.qid : out.length), stem, choices, correct });
+      if (out.length >= 300) break;
     }
     return out;
   }
 
-  // تسلسل وحفظ الحالة في SQLite / DO Storage
-  serialize() {
+  // ---------- اللاعبون ----------
+  nameTaken(name) {
+    const n = cleanText(name, 30).toLowerCase();
+    for (const p of this.players.values()) if (p.name.toLowerCase() === n) return true;
+    return false;
+  }
+
+  // يتحقق قبل إصدار رمز اللاعب: هل يمكن لهذا الاسم أن يدخل الآن؟
+  canJoin(name) {
+    const clean = cleanText(name, 30);
+    if (!clean) return { ok: false, error: 'اكتب اسمك للدخول.' };
+    if (this.state === ENGINE_STATES.ENDED) return { ok: false, error: 'انتهت هذه اللعبة.' };
+    if (this.locked) return { ok: false, error: 'المعلم أغلق الغرفة أمام لاعبين جدد.' };
+    if (this.state === ENGINE_STATES.PLAYING && !this.lateJoin) return { ok: false, error: 'بدأت اللعبة ولا يُسمح بالانضمام المتأخر.' };
+    if (this.players.size >= MAX_PLAYERS) return { ok: false, error: 'الغرفة ممتلئة.' };
+    if (this.nameTaken(clean)) return { ok: false, error: 'هذا الاسم مستخدم في الغرفة، اختر اسمًا آخر.' };
+    return { ok: true, name: clean };
+  }
+
+  addPlayer(pid, info = {}, now = Date.now()) {
+    if (this.kicked.has(pid)) return { ok: false, error: 'تم استبعادك من هذه الغرفة.' };
+    if (this.players.has(pid)) {
+      this.players.get(pid).connected = true;
+      return { ok: true, reconnected: true };
+    }
+    const chk = this.canJoin(info.name);
+    if (!chk.ok) return chk;
+    const p = {
+      id: pid,
+      name: chk.name,
+      avatar: cleanText(info.avatar || '🦅', 8) || '🦅',
+      classId: info.classId ? String(info.classId).slice(0, 20) : null,
+      did: info.did ? String(info.did).slice(0, 64) : null,
+      gold: 0,
+      correct: 0,
+      answered: 0,
+      streak: 0,
+      order: [],
+      pos: 0,
+      cur: null,
+      chest: null,
+      lastAnsAt: 0,
+      answers: [],
+      joinedAt: now,
+      connected: false,
+      v: 0
+    };
+    this.players.set(pid, p);
+    if (this.state === ENGINE_STATES.PLAYING) this._nextQ(p);
+    this._event('join', { name: p.name, avatar: p.avatar }, now);
+    return { ok: true, player: p };
+  }
+
+  connect(pid) {
+    const p = this.players.get(pid);
+    if (!p) return { ok: false, error: 'اللاعب غير مسجل في الغرفة.' };
+    p.connected = true;
+    return { ok: true };
+  }
+
+  leave(pid) {
+    const p = this.players.get(pid);
+    if (p) p.connected = false;
+  }
+
+  kick(pid) {
+    const p = this.players.get(pid);
+    if (!p) return { ok: false };
+    this.players.delete(pid);
+    this.kicked.add(pid);
+    return { ok: true, name: p.name };
+  }
+
+  setLock(locked) { this.locked = !!locked; }
+
+  // ---------- دورة اللعبة ----------
+  start(now = Date.now()) {
+    if (this.state !== ENGINE_STATES.LOBBY) return { ok: false, error: 'اللعبة بدأت بالفعل.' };
+    if (this.players.size < 1) return { ok: false, error: 'انتظر انضمام طالب واحد على الأقل قبل البدء.' };
+    if (!this.questions.length) return { ok: false, error: 'لا توجد أسئلة في هذه الغرفة.' };
+    this.state = ENGINE_STATES.PLAYING;
+    this.startedAt = now;
+    // سباق الذهب ينتهي بالوقت؛ سباق الإجابات ينتهي بالهدف أو بسقف 30 دقيقة
+    this.endsAt = now + (this.mode === 'gold' ? this.durationSec : 1800) * 1000;
+    for (const p of this.players.values()) this._nextQ(p);
+    this._event('start', {}, now);
+    return { ok: true };
+  }
+
+  end(now = Date.now(), reason = 'host') {
+    if (this.state === ENGINE_STATES.ENDED) return { ok: false };
+    this.state = ENGINE_STATES.ENDED;
+    this.endedAt = now;
+    for (const p of this.players.values()) { p.chest = null; p.cur = null; }
+    const top = this.leaderboard()[0];
+    if (!this.winnerId && top) this.winnerId = top.id;
+    this._event('end', { reason }, now);
+    return { ok: true };
+  }
+
+  tick(now = Date.now()) {
+    if (this.state === ENGINE_STATES.PLAYING && this.endsAt && now >= this.endsAt) {
+      this.end(now, 'time');
+      return { ended: true };
+    }
+    return { ended: false };
+  }
+
+  _nextQ(p) {
+    const n = this.questions.length;
+    if (!n) { p.cur = null; return; }
+    if (!p.order.length || p.pos >= p.order.length) {
+      const prev = p.cur;
+      p.order = shuffled(n, this.rnd);
+      // لا يتكرر نفس السؤال مرتين متتاليتين عند إعادة الخلط
+      if (n > 1 && p.order[0] === prev) { p.order.push(p.order.shift()); }
+      p.pos = 0;
+    }
+    p.cur = p.order[p.pos++];
+  }
+
+  questionFor(pid) {
+    const p = this.players.get(pid);
+    if (!p || this.state !== ENGINE_STATES.PLAYING || p.chest || p.cur == null) return null;
+    const q = this.questions[p.cur];
+    if (!q) return null;
+    return { i: p.cur, n: p.answered + 1, stem: q.stem, choices: q.choices.slice() };
+  }
+
+  answer(pid, qIndex, choice, now = Date.now()) {
+    if (this.state !== ENGINE_STATES.PLAYING) return { ok: false, error: 'اللعبة ليست قيد التشغيل.' };
+    const p = this.players.get(pid);
+    if (!p) return { ok: false, error: 'اللاعب غير موجود.' };
+    if (p.chest) return { ok: false, error: 'افتح صندوقًا أولًا.' };
+    if (p.cur == null || Number(qIndex) !== p.cur) return { ok: false, error: 'هذا ليس سؤالك الحالي.', resync: true };
+    if (now - p.lastAnsAt < MIN_ANSWER_GAP_MS) return { ok: false, error: 'تمهّل قليلًا.' };
+    const q = this.questions[p.cur];
+    const c = Number(choice);
+    if (!Number.isInteger(c) || c < 0 || c >= q.choices.length) return { ok: false, error: 'اختيار غير صالح.' };
+
+    const isCorrect = c === q.correct;
+    p.answered++;
+    p.lastAnsAt = now;
+    if (p.answers.length < MAX_ANSWERS_LOG) p.answers.push({ qid: q.qid, chosen: c, ok: isCorrect ? 1 : 0 });
+    if (isCorrect) { p.correct++; p.streak++; } else { p.streak = 0; }
+    p.v++;
+
+    const res = { ok: true, correct: isCorrect, correctIndex: q.correct, changed: [p.id], chest: false, ended: false };
+
+    if (this.mode === 'gold') {
+      if (isCorrect) { p.chest = this._rollChest(); res.chest = true; }
+      else this._nextQ(p);
+    } else {
+      // سباق الإجابات: النقاط = عدد الإجابات الصحيحة، والفائز أول من يبلغ الهدف
+      p.gold = p.correct;
+      if (isCorrect && p.correct >= this.goal) {
+        this.winnerId = p.id;
+        this._event('goal', { name: p.name, avatar: p.avatar }, now);
+        this.end(now, 'goal');
+        res.ended = true;
+      } else {
+        this._nextQ(p);
+      }
+    }
+    return res;
+  }
+
+  _pick() {
+    let r = this.rnd() * CHEST_TOTAL_W;
+    for (const c of CHEST_TABLE) { if ((r -= c.w) < 0) return { k: c.k, n: c.n }; }
+    return { k: 'gain', n: 10 };
+  }
+
+  _rollChest() { return [this._pick(), this._pick(), this._pick()]; }
+
+  // فتح أحد الصناديق الثلاثة بعد الإجابة الصحيحة (سباق الذهب)
+  openChest(pid, idx, now = Date.now()) {
+    if (this.state !== ENGINE_STATES.PLAYING) return { ok: false, error: 'اللعبة ليست قيد التشغيل.' };
+    const p = this.players.get(pid);
+    if (!p || !p.chest) return { ok: false, error: 'لا يوجد صندوق لفتحه.' };
+    const i = Number(idx);
+    if (!Number.isInteger(i) || i < 0 || i > 2) return { ok: false, error: 'صندوق غير صالح.' };
+
+    const options = p.chest;
+    const pick = options[i];
+    const before = p.gold;
+    const changed = [p.id];
+    const outcome = { k: pick.k, n: pick.n, delta: 0 };
+
+    if (pick.k === 'gain') {
+      p.gold += pick.n;
+    } else if (pick.k === 'mult') {
+      p.gold = p.gold * pick.n;
+    } else if (pick.k === 'lose') {
+      p.gold -= Math.floor(p.gold * pick.n / 100);
+    } else if (pick.k === 'steal') {
+      const victims = [...this.players.values()].filter(x => x.id !== p.id && x.gold > 0);
+      if (victims.length) {
+        const t = victims[Math.floor(this.rnd() * victims.length)];
+        const amt = Math.max(1, Math.floor(t.gold * pick.n / 100));
+        t.gold -= amt; p.gold += amt; t.v++;
+        outcome.target = t.name; outcome.targetId = t.id; outcome.amount = amt;
+        changed.push(t.id);
+        this._event('steal', { name: p.name, avatar: p.avatar, target: t.name, amount: amt }, now);
+      } else {
+        outcome.k = 'none'; outcome.note = 'لا يوجد من تسرق منه بعد';
+      }
+    } else if (pick.k === 'swap') {
+      const richer = [...this.players.values()].filter(x => x.id !== p.id && x.gold > p.gold).sort((a, b) => b.gold - a.gold)[0];
+      if (richer) {
+        const g = richer.gold; richer.gold = p.gold; p.gold = g; richer.v++;
+        outcome.target = richer.name; outcome.targetId = richer.id; outcome.amount = g;
+        changed.push(richer.id);
+        this._event('swap', { name: p.name, avatar: p.avatar, target: richer.name }, now);
+      } else {
+        outcome.k = 'none'; outcome.note = 'أنت في الصدارة، لا أحد تبدّل معه';
+      }
+    }
+    if (p.gold < 0) p.gold = 0;
+    outcome.delta = p.gold - before;
+    if (pick.k === 'gain' && pick.n >= 75) this._event('jackpot', { name: p.name, avatar: p.avatar, amount: pick.n }, now);
+    if (pick.k === 'mult' && pick.n === 3 && outcome.delta > 0) this._event('triple', { name: p.name, avatar: p.avatar }, now);
+
+    p.chest = null;
+    p.v++;
+    this._nextQ(p);
+    return { ok: true, outcome, options, picked: i, changed };
+  }
+
+  // ---------- العرض ----------
+  scoreOf(p) { return this.mode === 'race' ? p.correct : p.gold; }
+
+  leaderboard() {
+    return [...this.players.values()].sort((a, b) =>
+      (this.scoreOf(b) - this.scoreOf(a)) || (b.correct - a.correct) || (a.answered - b.answered) || (a.joinedAt - b.joinedAt));
+  }
+
+  rankOf(pid) {
+    const lb = this.leaderboard();
+    const i = lb.findIndex(p => p.id === pid);
+    return i < 0 ? null : i + 1;
+  }
+
+  pub(p) {
+    return { id: p.id, name: p.name, avatar: p.avatar, gold: p.gold, correct: p.correct, answered: p.answered, connected: !!p.connected };
+  }
+
+  meta(now) {
     return {
-      code: this.code,
-      hostId: this.hostId,
-      hostName: this.hostName,
-      courseKey: this.courseKey,
-      mode: this.mode,
-      timePerQuestion: this.timePerQuestion,
-      revealDuration: this.revealDuration,
-      startingDuration: this.startingDuration,
-      maxPlayers: this.maxPlayers,
-      questions: this.questions,
-      currentQIndex: this.currentQIndex,
-      state: this.state,
-      previousState: this.previousState,
-      stateStartedAt: this.stateStartedAt,
-      deadlineAt: this.deadlineAt,
-      pausedRemainingMs: this.pausedRemainingMs,
-      locked: this.locked,
-      kickedIds: [...this.kickedIds],
-      players: [...this.players.entries()],
-      roundAnswers: [...this.roundAnswers.entries()]
+      state: this.state, code: this.code, mode: this.mode, goal: this.goal, durationSec: this.durationSec,
+      title: this.title, hostName: this.hostName, locked: this.locked, lateJoin: this.lateJoin,
+      startedAt: this.startedAt, endsAt: this.endsAt, endedAt: this.endedAt, now: now || Date.now(),
+      qCount: this.questions.length, playersCount: this.players.size, winnerId: this.winnerId
     };
   }
 
-  // استعادة الحالة من التخزين
-  static deserialize(data) {
-    if (!data) return null;
-    const engine = new ArenaEngine({
-      code: data.code,
-      hostId: data.hostId,
-      hostName: data.hostName,
-      courseKey: data.courseKey,
-      mode: data.mode,
-      timePerQuestion: data.timePerQuestion,
-      revealDuration: data.revealDuration,
-      startingDuration: data.startingDuration,
-      maxPlayers: data.maxPlayers,
-      questions: data.questions
+  hostView(now = Date.now()) {
+    return Object.assign(this.meta(now), {
+      role: 'host',
+      players: this.leaderboard().map(p => this.pub(p)),
+      feed: this.feed.slice(-12)
     });
+  }
 
-    engine.currentQIndex = data.currentQIndex;
-    engine.state = data.state;
-    engine.previousState = data.previousState;
-    engine.stateStartedAt = data.stateStartedAt;
-    engine.deadlineAt = data.deadlineAt;
-    engine.pausedRemainingMs = data.pausedRemainingMs;
-    engine.locked = !!data.locked;
-    engine.kickedIds = new Set(data.kickedIds || []);
-    engine.players = new Map(data.players || []);
-    engine.roundAnswers = new Map(data.roundAnswers || []);
-    return engine;
+  playerView(pid, now = Date.now()) {
+    const p = this.players.get(pid);
+    const v = Object.assign(this.meta(now), { role: 'student' });
+    if (!p) return Object.assign(v, { me: null });
+    v.me = Object.assign(this.pub(p), { rank: this.rankOf(pid), chest: !!p.chest, streak: p.streak });
+    v.question = this.questionFor(pid);
+    if (this.state === ENGINE_STATES.LOBBY) {
+      v.lobby = [...this.players.values()].map(x => ({ name: x.name, avatar: x.avatar }));
+    }
+    if (this.state === ENGINE_STATES.ENDED) {
+      v.top = this.leaderboard().slice(0, 5).map(x => this.pub(x));
+    }
+    return v;
+  }
+
+  _event(type, data, now) {
+    this.feedSeq++;
+    this.feed.push(Object.assign({ id: this.feedSeq, t: type, at: now || Date.now() }, data));
+    if (this.feed.length > FEED_MAX) this.feed.splice(0, this.feed.length - FEED_MAX);
+  }
+
+  lastEvents(sinceId) { return this.feed.filter(e => e.id > sinceId); }
+
+  // ---------- الحفظ والاستعادة ----------
+  snapshot(pid) {
+    const p = this.players.get(pid);
+    if (!p) return null;
+    return {
+      v: p.v, gold: p.gold, correct: p.correct, answered: p.answered, streak: p.streak,
+      order: p.order, pos: p.pos, cur: p.cur, chest: p.chest, lastAnsAt: p.lastAnsAt, answers: p.answers
+    };
+  }
+
+  // دمج حالة لاعب محفوظة في مرفق مقبسه إن كانت أحدث من المخزّن (حماية من فقد الذاكرة عند السبات)
+  restorePlayer(pid, snap) {
+    const p = this.players.get(pid);
+    if (!p || !snap || !(snap.v > p.v)) return false;
+    Object.assign(p, {
+      v: snap.v, gold: snap.gold, correct: snap.correct, answered: snap.answered, streak: snap.streak,
+      order: snap.order || p.order, pos: snap.pos, cur: snap.cur, chest: snap.chest || null,
+      lastAnsAt: snap.lastAnsAt || 0, answers: snap.answers || p.answers
+    });
+    return true;
+  }
+
+  serialize() {
+    return {
+      code: this.code, hostId: this.hostId, hostUserId: this.hostUserId, hostName: this.hostName, title: this.title,
+      courseKey: this.courseKey, mode: this.mode, durationSec: this.durationSec, goal: this.goal, lateJoin: this.lateJoin,
+      questions: this.questions, state: this.state, locked: this.locked, createdAt: this.createdAt,
+      startedAt: this.startedAt, endsAt: this.endsAt, endedAt: this.endedAt, winnerId: this.winnerId, resultsSaved: this.resultsSaved,
+      players: [...this.players.values()], kicked: [...this.kicked], feed: this.feed, feedSeq: this.feedSeq
+    };
+  }
+
+  static deserialize(s) {
+    if (!s) return null;
+    const e = new ArenaEngine({
+      code: s.code, hostId: s.hostId, hostUserId: s.hostUserId, hostName: s.hostName, title: s.title,
+      courseKey: s.courseKey, mode: s.mode, durationSec: s.durationSec, goal: s.goal, lateJoin: s.lateJoin, now: s.createdAt
+    });
+    e.questions = s.questions || [];
+    e.state = s.state || ENGINE_STATES.LOBBY;
+    e.locked = !!s.locked;
+    e.startedAt = s.startedAt || null;
+    e.endsAt = s.endsAt || null;
+    e.endedAt = s.endedAt || null;
+    e.winnerId = s.winnerId || null;
+    e.resultsSaved = !!s.resultsSaved;
+    e.players = new Map((s.players || []).map(p => [p.id, p]));
+    e.kicked = new Set(s.kicked || []);
+    e.feed = s.feed || [];
+    e.feedSeq = s.feedSeq || 0;
+    return e;
   }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ArenaEngine, ENGINE_STATES };
+  module.exports = { ArenaEngine, ENGINE_STATES, MIN_ANSWER_GAP_MS, MAX_PLAYERS };
 }

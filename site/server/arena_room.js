@@ -1,473 +1,372 @@
 // site/server/arena_room.js
-// Durable Object مع WebSocket Hibernation لإدارة غرف ساحة التحدي المباشرة
-// متوافق تماماً مع Cloudflare Workers DO SQLite & WebSocket Hibernation API.
+// Durable Object لغرف «ساحة التحدي» المباشرة مع WebSocket Hibernation.
+// - حالة كل لاعب تُنسخ في مرفق مقبسه (serializeAttachment) عند كل تغيير، فلا تضيع عند سبات الغرفة.
+// - الحفظ في التخزين مجمّع (كل بضع ثوانٍ عبر المنبه) لتوفير حصة الخطة المجانية.
+// - المنبه الواحد يخدم: الحفظ المؤجل، انتهاء الوقت، وتنظيف الغرفة بعد انتهائها.
 
 const { ArenaEngine, ENGINE_STATES } = require('./arena_engine.js');
+
+const ROOM_FLUSH_MS = 8000;              // أقصى تأخير لحفظ الحالة في التخزين
+const ROOM_IDLE_TTL_MS = 6 * 3600000;    // غرفة لم تبدأ تُحذف بعد 6 ساعات
+const ROOM_ENDED_TTL_MS = 2 * 3600000;   // غرفة منتهية تُحذف بعد ساعتين
+
+function jres(obj, status) {
+  return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+}
 
 class ArenaRoom {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
-    this.engine = null; // يُحمّل من التخزين (ctx.storage) عند الحاجة
+    this.engine = null;
     this.hostToken = null;
-    this.playerTokens = new Map(); // token -> { playerId, name, avatar, classId, registeredAt }
+    this.tokens = null;        // playerToken -> playerId
+    this.dirty = false;
+    this.flushAt = 0;
+    // نبضة الإبقاء من الجوال (ping) يرد عليها Cloudflare مباشرة دون إيقاظ الغرفة أو احتساب طلب
+    try {
+      if (typeof WebSocketRequestResponsePair !== 'undefined' && ctx && typeof ctx.setWebSocketAutoResponse === 'function') {
+        ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+      }
+    } catch (e) {}
   }
 
-  // تحميل أو استعادة المحرك والرموز من التخزين الدائم
   async getEngine() {
     if (this.engine) return this.engine;
-    const [savedState, savedHostToken, savedPlayerTokens] = await Promise.all([
-      this.ctx.storage.get('engine_state'),
+    const [saved, ht, tk] = await Promise.all([
+      this.ctx.storage.get('engine'),
       this.ctx.storage.get('host_token'),
-      this.ctx.storage.get('player_tokens')
+      this.ctx.storage.get('tokens')
     ]);
-
-    if (savedState) {
-      this.engine = ArenaEngine.deserialize(savedState);
-
-      // دمج إجابات السؤال الحالي من مرفقات مقابس الطلاب (WebSocket Hibernation attachments)
-      // لحماية النقاط من الضياع عند سبات الـ DO قبل انتهاء وقت السؤال (Zero storage writes)
-      if (this.engine && this.engine.state === ENGINE_STATES.QUESTION && this.ctx && typeof this.ctx.getWebSockets === 'function') {
-        try {
-          const sockets = this.ctx.getWebSockets();
-          for (const s of sockets) {
-            const att = s.deserializeAttachment ? s.deserializeAttachment() : null;
-            if (att && att.role === 'student' && att.playerId && att.answers) {
-              const ans = att.answers[this.engine.currentQIndex];
-              if (ans && ans.choice !== undefined && !this.engine.roundAnswers.has(att.playerId)) {
-                this.engine.submitAnswer(att.playerId, ans.choice, ans.atMs || Date.now());
-              }
-            }
-          }
-        } catch (e) {}
+    this.hostToken = ht || null;
+    this.tokens = new Map(Array.isArray(tk) ? tk : []);
+    if (!saved) return null;
+    this.engine = ArenaEngine.deserialize(saved);
+    // استعادة أحدث حالة لكل لاعب من مرفق مقبسه (قد تكون أحدث من آخر حفظ قبل السبات)
+    let restored = false;
+    try {
+      for (const ws of this.ctx.getWebSockets()) {
+        const att = ws.deserializeAttachment ? ws.deserializeAttachment() : null;
+        if (att && att.role === 'student' && att.snap && this.engine.restorePlayer(att.playerId, att.snap)) restored = true;
+        if (att && att.playerId && this.engine.players.has(att.playerId)) this.engine.players.get(att.playerId).connected = true;
       }
-    }
-    if (savedHostToken) {
-      this.hostToken = savedHostToken;
-    }
-    if (savedPlayerTokens && Array.isArray(savedPlayerTokens)) {
-      this.playerTokens = new Map(savedPlayerTokens);
-    }
+    } catch (e) {}
+    if (restored) this.markDirty();
     return this.engine;
   }
 
-  // حفظ المحرك والرموز إلى التخزين الدائم وضبط المنبه (Alarm)
-  async saveEngine() {
+  async save() {
     if (!this.engine) return;
-    await Promise.all([
-      this.ctx.storage.put('engine_state', this.engine.serialize()),
-      this.hostToken ? this.ctx.storage.put('host_token', this.hostToken) : Promise.resolve(),
-      this.ctx.storage.put('player_tokens', Array.from(this.playerTokens.entries()))
-    ]);
-    if (this.engine.deadlineAt && this.engine.deadlineAt > Date.now()) {
-      await this.ctx.storage.setAlarm(this.engine.deadlineAt);
+    await this.ctx.storage.put({
+      engine: this.engine.serialize(),
+      host_token: this.hostToken,
+      tokens: Array.from((this.tokens || new Map()).entries())
+    });
+    this.dirty = false;
+    this.flushAt = 0;
+    await this.schedule();
+  }
+
+  markDirty() {
+    this.dirty = true;
+    if (!this.flushAt) this.flushAt = Date.now() + ROOM_FLUSH_MS;
+  }
+
+  // ضبط المنبه على أقرب حدث قادم (حفظ مؤجل / انتهاء الوقت / تنظيف)
+  async schedule() {
+    const e = this.engine;
+    if (!e) return;
+    const now = Date.now();
+    const times = [];
+    if (this.dirty && this.flushAt) times.push(this.flushAt);
+    if (e.state === ENGINE_STATES.PLAYING && e.endsAt) times.push(e.endsAt);
+    if (e.state === ENGINE_STATES.LOBBY) times.push(e.createdAt + ROOM_IDLE_TTL_MS);
+    if (e.state === ENGINE_STATES.ENDED) times.push((e.endedAt || now) + ROOM_ENDED_TTL_MS);
+    if (!times.length) return;
+    await this.ctx.storage.setAlarm(Math.max(now + 50, Math.min(...times)));
+  }
+
+  socketsOf(tag) {
+    try { return this.ctx.getWebSockets(tag); } catch (e) { return []; }
+  }
+
+  send(ws, obj) {
+    try { ws.send(JSON.stringify(obj)); } catch (e) {}
+  }
+
+  // نسخ حالة اللاعب في مرفق مقبسه (مجاني ولا يستهلك كتابة تخزين)
+  syncAttachment(pid) {
+    const snap = this.engine.snapshot(pid);
+    for (const ws of this.socketsOf('player:' + pid)) {
+      try {
+        const att = ws.deserializeAttachment() || {};
+        att.snap = snap;
+        ws.serializeAttachment(att);
+      } catch (e) {}
     }
   }
 
-  // معالجة طلبات HTTP والترقية إلى WebSocket
+  sendPlayer(pid, extra) {
+    const view = this.engine.playerView(pid, Date.now());
+    for (const ws of this.socketsOf('player:' + pid)) this.send(ws, Object.assign({ type: 'sync', state: view }, extra || {}));
+  }
+
+  sendHostFull() {
+    const view = this.engine.hostView(Date.now());
+    for (const ws of this.socketsOf('host')) this.send(ws, { type: 'sync', state: view });
+  }
+
+  // تحديث خفيف للمعلم: اللاعبون الذين تغيّروا + الأحداث الجديدة
+  sendHostDelta(changedIds, sinceFeedId) {
+    const e = this.engine;
+    const players = changedIds.map(id => e.players.get(id)).filter(Boolean).map(p => e.pub(p));
+    const feed = e.lastEvents(sinceFeedId || 0);
+    const msg = { type: 'delta', players, feed, now: Date.now(), playersCount: e.players.size };
+    for (const ws of this.socketsOf('host')) this.send(ws, msg);
+  }
+
+  broadcastAll() {
+    this.sendHostFull();
+    for (const p of this.engine.players.values()) this.sendPlayer(p.id);
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
-    const pathname = url.pathname;
+    const path = url.pathname;
 
-    // 1) نقطة إنشاء/تهيئة الغرفة عبر HTTP (تصدر رمز المضيف السري وتمنع تكرار الغرف النشطة)
-    if (pathname === '/init' && request.method === 'POST') {
-      const existingEngine = await this.getEngine();
-      if (existingEngine && existingEngine.state !== ENGINE_STATES.PODIUM) {
-        return new Response(JSON.stringify({ error: 'الغرفة نشطة بالفعل' }), {
-          status: 409,
-          headers: { 'Content-Type': 'application/json' }
-        });
+    if (path === '/init' && request.method === 'POST') {
+      const existing = await this.getEngine();
+      if (existing && existing.state !== ENGINE_STATES.ENDED && Date.now() - existing.createdAt < ROOM_IDLE_TTL_MS) {
+        return jres({ error: 'الغرفة مستخدمة' }, 409);
       }
-      const config = await request.json();
-      this.engine = new ArenaEngine(config);
-      this.hostToken = String(config.hostToken || '');
-      this.playerTokens = new Map();
-      this._persistedToD1 = false;
-      await this.saveEngine();
-      return new Response(JSON.stringify({ ok: true, code: this.engine.code }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const cfg = await request.json();
+      await this.ctx.storage.deleteAll();
+      this.engine = new ArenaEngine(Object.assign({}, cfg, { now: Date.now() }));
+      this.hostToken = String(cfg.hostToken || '');
+      this.tokens = new Map();
+      this._persisted = false;
+      await this.save();
+      return jres({ ok: true, code: this.engine.code });
     }
 
-    // 2) نقطة تسجيل لاعب وإصدار رمز موقّع للـ WebSocket
-    if (pathname === '/register-player' && request.method === 'POST') {
-      const engine = await this.getEngine();
-      if (!engine) return new Response(JSON.stringify({ error: 'الغرفة غير موجودة' }), { status: 404 });
-      if (engine.state !== ENGINE_STATES.LOBBY) return new Response(JSON.stringify({ error: 'اللعبة بدأت بالفعل' }), { status: 400 });
-      if (engine.locked) return new Response(JSON.stringify({ error: 'الغرفة مغلقة' }), { status: 400 });
-
-      const { playerId, playerToken, name, avatar, classId, did } = await request.json();
-      if (!playerId || !playerToken) return new Response(JSON.stringify({ error: 'بيانات ناقصة' }), { status: 400 });
-
-      // تنظيف الاسم وحد أقصى 30 حرفاً
-      const cleanName = String(name || '').replace(/<[^>]*>/g, '').trim().slice(0, 30);
-      if (!cleanName) return new Response(JSON.stringify({ error: 'الاسم مطلوب' }), { status: 400 });
-
-      this.playerTokens.set(playerToken, {
-        playerId,
-        name: cleanName,
-        avatar: String(avatar || '🦅').slice(0, 10),
-        classId: classId ? String(classId).trim() : null,
-        did: did ? String(did).trim() : null,
-        registeredAt: Date.now()
-      });
-
-      await this.saveEngine();
-      return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+    if (path === '/info' && request.method === 'GET') {
+      const e = await this.getEngine();
+      if (!e) return jres({ error: 'الغرفة غير موجودة أو انتهت' }, 404);
+      return jres(Object.assign({ ok: true }, e.meta(Date.now())));
     }
 
-    // 3) نقطة الاستعلام عن حالة الغرفة عبر HTTP
-    if (pathname === '/info' && request.method === 'GET') {
-      const engine = await this.getEngine();
-      if (!engine) return new Response(JSON.stringify({ error: 'الغرفة غير موجودة' }), { status: 404 });
-      return new Response(JSON.stringify({
-        ok: true,
-        code: engine.code,
-        state: engine.state,
-        playersCount: [...engine.players.values()].filter(p => !p.isHost).length,
-        locked: engine.locked
-      }), { headers: { 'Content-Type': 'application/json' } });
+    if (path === '/host-token' && request.method === 'POST') {
+      const e = await this.getEngine();
+      if (!e) return jres({ error: 'الغرفة غير موجودة' }, 404);
+      const b = await request.json().catch(() => ({}));
+      if (e.hostUserId == null || Number(b.userId) !== e.hostUserId) return jres({ error: 'هذه الغرفة ليست لك' }, 403);
+      return jres({ ok: true, hostToken: this.hostToken });
     }
 
-    // 4) ترقية الاتصال إلى WebSocket مع التحقق الصارم من الرموز (حظر أخذ role أو playerId من query string)
-    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-      const engine = await this.getEngine();
-      if (!engine) {
-        return new Response('الغرفة غير مهيأة', { status: 404 });
-      }
+    if (path === '/register' && request.method === 'POST') {
+      const e = await this.getEngine();
+      if (!e) return jres({ error: 'لا توجد غرفة بهذا الرقم' }, 404);
+      const b = await request.json().catch(() => ({}));
+      if (!b.playerId || !b.playerToken) return jres({ error: 'بيانات ناقصة' }, 400);
+      const feedBefore = e.feedSeq;
+      const r = e.addPlayer(b.playerId, { name: b.name, avatar: b.avatar, classId: b.classId, did: b.did }, Date.now());
+      if (!r.ok) return jres({ error: r.error }, 400);
+      this.tokens.set(b.playerToken, b.playerId);
+      // التسجيل يُحفظ فورًا (حدث نادر) حتى لا يضيع رمز اللاعب
+      await this.save();
+      this.sendHostDelta([b.playerId], feedBefore);
+      if (e.state === ENGINE_STATES.LOBBY) for (const p of e.players.values()) if (p.id !== b.playerId) this.sendPlayer(p.id);
+      return jres({ ok: true, name: e.players.get(b.playerId).name });
+    }
 
-      const token = url.searchParams.get('token');
-      if (!token) {
-        return new Response('رمز المصادقة مطلوب للاتصال بالساحة المباشرة', { status: 401 });
-      }
+    if ((request.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
+      const e = await this.getEngine();
+      if (!e) return new Response('الغرفة غير موجودة', { status: 404 });
+      const token = url.searchParams.get('token') || '';
+      let role, playerId;
+      if (this.hostToken && token === this.hostToken) { role = 'host'; playerId = e.hostId; }
+      else if (this.tokens.has(token)) { role = 'student'; playerId = this.tokens.get(token); }
+      else return new Response('رمز الدخول غير صالح', { status: 401 });
 
-      let role = null, playerId = null, name = null, avatar = null, classId = null, did = null;
-      if (this.hostToken && token === this.hostToken) {
-        // مصادقة المضيف (المعلم)
-        role = 'host';
-        playerId = engine.hostId;
-        name = engine.hostName;
-        avatar = '👑';
-      } else if (this.playerTokens.has(token)) {
-        // مصادقة الطالب عبر رمزه الموقّع
-        const reg = this.playerTokens.get(token);
-        role = 'student';
-        playerId = reg.playerId;
-        name = reg.name;
-        avatar = reg.avatar;
-        classId = reg.classId || null;
-        did = reg.did || null;
-      } else {
-        return new Response('رمز المصادقة غير صالح أو منتهي الصلاحية', { status: 401 });
-      }
+      if (role === 'student' && !e.players.has(playerId)) return new Response('تم استبعادك من الغرفة', { status: 403 });
 
       const pair = new WebSocketPair();
-      const [client, server] = [pair[0], pair[1]];
+      const client = pair[0], server = pair[1];
+      const tags = role === 'host' ? ['host'] : ['student', 'player:' + playerId];
+      this.ctx.acceptWebSocket(server, tags);
+      server.serializeAttachment({ role, playerId, snap: role === 'student' ? e.snapshot(playerId) : null });
 
-      // حفظ بيانات اللاعب داخل المرفق المتسلسل للـ WebSocket (يصمد أثناء السبات ولا يُحفظ في الذاكرة العشوائية للكلاس)
-      const attachment = { playerId, role, name, avatar, classId, did, joinedAt: Date.now() };
-      server.serializeAttachment(attachment);
-
-      // قبول المقبس في نظام السبات
-      this.ctx.acceptWebSocket(server, [role, `player:${playerId}`]);
-
-      // تسجيل انضمام اللاعب في المحرك
-      const joinRes = engine.join(playerId, { name, avatar, classId, did });
-      if (!joinRes.ok && !joinRes.reconnected) {
-        server.send(JSON.stringify({ type: 'error', error: joinRes.error }));
-        server.close(4003, joinRes.error);
-        return new Response(null, { status: 101, webSocket: client });
+      if (role === 'student') {
+        const feedBefore = e.feedSeq;
+        e.connect(playerId);
+        this.send(server, { type: 'sync', state: e.playerView(playerId, Date.now()) });
+        this.sendHostDelta([playerId], feedBefore);
+      } else {
+        this.send(server, { type: 'sync', state: e.hostView(Date.now()) });
       }
-
-      await this.saveEngine();
-
-      // إرسال الحالة الحالية للعميل المتصل فوراً
-      server.send(JSON.stringify({
-        type: 'sync',
-        state: engine.getStateFor(playerId)
-      }));
-
-      // إشعار جميع المتصلين بوجود تحديث
-      await this.broadcastState();
-
       return new Response(null, { status: 101, webSocket: client });
     }
 
     return new Response('Not found', { status: 404 });
   }
 
-  // وصول رسالة من عميل (تُوقظ الـ DO تلقائياً عبر Hibernation)
   async webSocketMessage(ws, message) {
-    const engine = await this.getEngine();
-    if (!engine) return;
-
-    const attachment = ws.deserializeAttachment();
-    if (!attachment || !attachment.playerId) return;
-
+    if (message === 'ping') { try { ws.send('pong'); } catch (err) {} return; }
+    const e = await this.getEngine();
+    if (!e) return;
+    const att = ws.deserializeAttachment() || {};
     let data;
-    try {
-      data = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message));
-    } catch (e) {
-      ws.send(JSON.stringify({ type: 'error', error: 'تنسيق رسالة غير صالح' }));
+    try { data = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); }
+    catch (err) { return this.send(ws, { type: 'error', error: 'رسالة غير صالحة' }); }
+
+    const now = Date.now();
+    const isHost = att.role === 'host';
+    const pid = att.playerId;
+    const feedBefore = e.feedSeq;
+
+    // انتهاء الوقت أثناء وصول رسالة (قبل أن يوقظنا المنبه)
+    if (e.tick(now).ended) { await this.finish(); return; }
+
+    if (data.action === 'ping') return this.send(ws, { type: 'pong', now });
+
+    if (isHost) {
+      if (data.action === 'start') {
+        const r = e.start(now);
+        if (!r.ok) return this.send(ws, { type: 'error', error: r.error });
+        await this.save();
+        for (const p of e.players.values()) this.syncAttachment(p.id);
+        this.broadcastAll();
+        return;
+      }
+      if (data.action === 'end') { if (e.end(now, 'host').ok) await this.finish(); return; }
+      if (data.action === 'lock') { e.setLock(!!data.locked); await this.save(); this.sendHostFull(); return; }
+      if (data.action === 'latejoin') { e.lateJoin = !!data.on; await this.save(); this.sendHostFull(); return; }
+      if (data.action === 'kick' && data.playerId) {
+        const r = e.kick(String(data.playerId));
+        if (r.ok) {
+          for (const s of this.socketsOf('player:' + data.playerId)) {
+            this.send(s, { type: 'kicked' });
+            try { s.close(4001, 'kicked'); } catch (err) {}
+          }
+          await this.save();
+          this.broadcastAll();
+        }
+        return;
+      }
+      return this.send(ws, { type: 'error', error: 'إجراء غير معروف' });
+    }
+
+    // ---- الطالب ----
+    if (data.action === 'answer') {
+      const r = e.answer(pid, data.q, data.choice, now);
+      if (!r.ok) {
+        if (r.resync) this.sendPlayer(pid);
+        return this.send(ws, { type: 'error', error: r.error, soft: true });
+      }
+      this.afterChange(r.changed);
+      if (r.ended) { await this.finish(); return; }
+      this.sendPlayer(pid, { result: { correct: r.correct, correctIndex: r.correctIndex, chest: r.chest } });
+      this.sendHostDelta(r.changed, feedBefore);
+      await this.schedule();
       return;
     }
 
-    const { playerId, role } = attachment;
-    const isHost = role === 'host';
-    const nowMs = Date.now();
-    let stateChanged = false;
-
-    switch (data.action) {
-      case 'ping':
-        ws.send(JSON.stringify({ type: 'pong', at: nowMs }));
-        break;
-
-      case 'start':
-        if (isHost) {
-          const res = engine.start(playerId, nowMs);
-          if (res.ok) stateChanged = true;
-          else ws.send(JSON.stringify({ type: 'error', error: res.error }));
-        }
-        break;
-
-      case 'answer':
-        if (!isHost) {
-          // حساب سرعة الإجابة بوقت الخادم فقط (nowMs)
-          const res = engine.submitAnswer(playerId, data.choiceIndex, nowMs);
-          if (res.ok) {
-            // حفظ الإجابة في مرفق المقبس (WebSocket Hibernation attachment)
-            // لحمايتها من الضياع عند سبات الـ DO (Zero storage cost)
-            try {
-              const att = ws.deserializeAttachment ? ws.deserializeAttachment() : null;
-              if (att) {
-                att.answers = att.answers || {};
-                att.answers[engine.currentQIndex] = {
-                  choice: data.choiceIndex,
-                  atMs: nowMs
-                };
-                if (typeof ws.serializeAttachment === 'function') {
-                  ws.serializeAttachment(att);
-                }
-              }
-            } catch (e) {}
-
-            ws.send(JSON.stringify({
-              type: 'answer_ack',
-              choiceIndex: data.choiceIndex,
-              isCorrect: res.isCorrect,
-              pointsAwarded: res.pointsAwarded
-            }));
-            // حماية DO: لا نحفظ في storage عند كل إجابة فردية (تبقى في الذاكرة ومرفق المقبس)
-            // إذا أجاب الجميع ننتقل لطور REVEAL فوراً (وهذا انتقال حالة يستوجب الحفظ)
-            if (res.allAnswered) {
-              engine.revealQuestion(nowMs);
-              stateChanged = true;
-            } else {
-              // بث التحديث للمتصلين دون كتابة إلى SQLite
-              await this.broadcastState();
-            }
-          } else {
-            ws.send(JSON.stringify({ type: 'error', error: res.error }));
-          }
-        }
-        break;
-
-      case 'pause':
-        if (isHost) {
-          const res = engine.pause(playerId, nowMs);
-          if (res.ok) stateChanged = true;
-        }
-        break;
-
-      case 'resume':
-        if (isHost) {
-          const res = engine.resume(playerId, nowMs);
-          if (res.ok) stateChanged = true;
-        }
-        break;
-
-      case 'skip':
-        if (isHost) {
-          const res = engine.skip(playerId, nowMs);
-          if (res.ok) stateChanged = true;
-        }
-        break;
-
-      case 'kick':
-        if (isHost && data.targetPlayerId) {
-          const res = engine.kick(data.targetPlayerId, playerId);
-          if (res.ok) {
-            // طرد مقبس اللاعب المستهدف وإغلاقه
-            const targetSockets = this.ctx.getWebSockets(`player:${data.targetPlayerId}`);
-            for (const s of targetSockets) {
-              s.send(JSON.stringify({ type: 'kicked', reason: 'تم استبعادك من قبل المعلم' }));
-              s.close(4001, 'kicked');
-            }
-            stateChanged = true;
-          }
-        }
-        break;
-
-      case 'lock':
-        if (isHost) {
-          engine.setLock(!!data.locked, playerId);
-          stateChanged = true;
-        }
-        break;
-
-      default:
-        ws.send(JSON.stringify({ type: 'error', error: 'إجراء غير معروف' }));
-    }
-
-    if (stateChanged) {
-      if (engine.state === ENGINE_STATES.PODIUM) {
-        await this.persistLiveResultsToD1();
-        await this.saveEngine();
-        await this.broadcastState();
-        await this.ctx.storage.setAlarm(Date.now() + 3600000); // تنظيف التخزين بعد ساعة
-        return;
+    if (data.action === 'chest') {
+      const r = e.openChest(pid, data.idx, now);
+      if (!r.ok) return this.send(ws, { type: 'error', error: r.error, soft: true });
+      this.afterChange(r.changed);
+      this.sendPlayer(pid, { chestResult: { outcome: r.outcome, options: r.options, picked: r.picked } });
+      for (const id of r.changed) {
+        if (id !== pid) this.sendPlayer(id, { hit: { by: e.players.get(pid).name, k: r.outcome.k, amount: r.outcome.amount || 0 } });
       }
-      await this.saveEngine();
-      await this.broadcastState();
+      this.sendHostDelta(r.changed, feedBefore);
+      await this.schedule();
+      return;
     }
+
+    this.send(ws, { type: 'error', error: 'إجراء غير معروف' });
   }
 
-  // انقطاع الاتصال (Hibernation close)
-  async webSocketClose(ws, code, reason, wasClean) {
-    const attachment = ws.deserializeAttachment();
-    if (attachment && attachment.playerId) {
-      const engine = await this.getEngine();
-      if (engine) {
-        engine.leave(attachment.playerId);
-        await this.saveEngine();
-        await this.broadcastState();
-      }
-    }
+  afterChange(ids) {
+    for (const id of ids) this.syncAttachment(id);
+    this.markDirty();
   }
 
-  async webSocketError(ws, error) {
-    await this.webSocketClose(ws, 1006, 'error', false);
+  async finish() {
+    await this.persistResults();
+    await this.save();
+    this.broadcastAll();
   }
 
-  // منبه المؤقتات الدقيق بدون setTimeout (Durable Object Alarms)
+  async webSocketClose(ws) {
+    const att = ws.deserializeAttachment ? ws.deserializeAttachment() : null;
+    if (!att || att.role !== 'student') return;
+    const e = await this.getEngine();
+    if (!e || !e.players.has(att.playerId)) return;
+    // قد يبقى للاعب مقبس آخر مفتوح (تبويب ثانٍ أو إعادة اتصال سريعة)
+    const still = this.socketsOf('player:' + att.playerId).filter(s => s !== ws && s.readyState === 1);
+    if (still.length) return;
+    e.leave(att.playerId);
+    this.sendHostDelta([att.playerId], e.feedSeq);
+  }
+
+  async webSocketError(ws) { return this.webSocketClose(ws); }
+
   async alarm() {
-    const engine = await this.getEngine();
-    if (!engine) return;
-
-    if (engine.state === ENGINE_STATES.PODIUM) {
-      // حذف بيانات التخزين بالكامل بعد انتهاء اللعبة بساعة واحدة
-      await this.ctx.storage.deleteAll();
-      this.engine = null;
-      this.hostToken = null;
-      this.playerTokens.clear();
-      return;
-    }
-
-    const res = engine.tick(Date.now());
-    if (res.transitioned) {
-      if (engine.state === ENGINE_STATES.PODIUM) {
-        await this.persistLiveResultsToD1();
-        await this.saveEngine();
-        await this.broadcastState();
-        await this.ctx.storage.setAlarm(Date.now() + 3600000); // تنظيف التخزين بعد ساعة
-        return;
-      }
-      await this.saveEngine();
-      await this.broadcastState();
-    } else if (res.nextAlarmAt && res.nextAlarmAt > Date.now()) {
-      await this.ctx.storage.setAlarm(res.nextAlarmAt);
-    }
+    const e = await this.getEngine();
+    if (!e) return;
+    const now = Date.now();
+    if (e.state === ENGINE_STATES.LOBBY && now >= e.createdAt + ROOM_IDLE_TTL_MS) return this.wipe();
+    if (e.state === ENGINE_STATES.ENDED && now >= (e.endedAt || now) + ROOM_ENDED_TTL_MS) return this.wipe();
+    if (e.tick(now).ended) return this.finish();
+    if (this.dirty) return this.save();
+    return this.schedule();
   }
 
-  // 3هـ: حفظ نتائج اللعبة الحية في D1 من الخادم مباشرة وتحديث محفظة الطلاب مع مراعاة حد الطوارئ
-  async persistLiveResultsToD1() {
-    if (!this.env || !this.env.DB || !this.engine) return;
-    if (this._persistedToD1) return;
-    this._persistedToD1 = true;
+  async wipe() {
+    for (const ws of this.ctx.getWebSockets()) { try { ws.close(1000, 'expired'); } catch (e) {} }
+    await this.ctx.storage.deleteAll();
+    this.engine = null; this.hostToken = null; this.tokens = new Map(); this.dirty = false;
+  }
 
+  // حفظ نتائج اللعبة في D1 مرة واحدة عند انتهائها (صف واحد لكل طالب)
+  async persistResults() {
+    const e = this.engine;
+    if (!e || !this.env || !this.env.DB || e.resultsSaved) return;
+    e.resultsSaved = true;
+    this.markDirty();
     try {
       const DB = this.env.DB;
       const nowSec = Math.floor(Date.now() / 1000);
       const dayKey = new Date().toISOString().slice(0, 10);
-
-      // فحص حد الطوارئ اليومي (20,000 جلسة كحد أقصى)
-      const usageRow = await DB.prepare('SELECT session_count FROM arena_daily_usage WHERE day_key = ?').bind(dayKey).first();
-      const currentCount = usageRow ? (usageRow.session_count || 0) : 0;
-      if (currentCount >= 20000) return;
-
-      const nonHostStudents = [...this.engine.players.values()].filter(p => !p.isHost);
-      if (!nonHostStudents.length) return;
-
-      const sessionsToInsert = [];
-      const walletUpdates = [];
-      let savedCount = 0;
-
-      for (const st of nonHostStudents) {
-        if (currentCount + savedCount >= 20000) break;
+      const usage = await DB.prepare('SELECT session_count FROM arena_daily_usage WHERE day_key = ?').bind(dayKey).first();
+      const used = usage ? (usage.session_count || 0) : 0;
+      if (used >= 20000) return;
+      const students = [...e.players.values()].filter(p => p.answered > 0);
+      const stmts = [];
+      let n = 0;
+      for (const p of students) {
+        if (used + n >= 20000) break;
         const sid = 'as_live_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-        const answersList = (st.rounds || []).map(r => ({
-          qid: String(r.qid || '').trim(),
-          chosen: r.choiceIndex !== undefined ? +r.choiceIndex : -1,
-          ok: r.isCorrect ? 1 : 0
-        }));
-        const answersJson = JSON.stringify(answersList);
-        const totalQ = this.engine.questions.length;
-        const correctQ = st.correctCount || 0;
-        const durSec = Math.max(0, Math.floor((Date.now() - (st.joinedAt || Date.now())) / 1000));
-        const courseKey = this.engine.courseKey || 'arena_live';
-        const classCode = st.classId || null;
-        const did = st.did || null;
-        const score = Math.min(1000, st.score || 0);
-        const gold = Math.min(200, Math.floor(score / 10));
-
-        const hostUserId = parseInt(String(this.engine.hostId || '').replace(/^u_/, ''), 10) || null;
-        sessionsToInsert.push(
-          DB.prepare(
-            'INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, answers_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(sid, hostUserId, st.name, classCode, courseKey, 'live', score, gold, totalQ, correctQ, durSec, answersJson, nowSec)
-        );
-
-        if (classCode && did && gold > 0) {
-          const studentKey = classCode + ':' + did;
-          walletUpdates.push(
-            DB.prepare(
-              "INSERT INTO arena_student_wallet (student_key, class_id, did, balance, total_earned, active_avatar, updated_at) VALUES (?, ?, ?, ?, ?, 'falcon', ?) ON CONFLICT(student_key) DO UPDATE SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?"
-            ).bind(studentKey, classCode, did, gold, gold, nowSec, gold, gold, nowSec)
-          );
+        const score = Math.min(100000, e.scoreOf(p));
+        const reward = Math.min(200, Math.floor(e.mode === 'race' ? p.correct * 5 : p.gold / 20));
+        const durSec = Math.max(0, Math.floor(((e.endedAt || Date.now()) - Math.max(p.joinedAt, e.startedAt || p.joinedAt)) / 1000));
+        stmts.push(DB.prepare('INSERT INTO arena_sessions (id, user_id, student_name, class_id, course_key, mode, score, gold, total_q, correct_q, duration_sec, answers_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(sid, e.hostUserId, p.name, p.classId, e.courseKey || 'arena_live', 'live_' + e.mode, score, reward, p.answered, p.correct, durSec, JSON.stringify(p.answers.slice(0, 200)), nowSec));
+        if (p.classId && p.did && reward > 0) {
+          const key = p.classId + ':' + p.did;
+          stmts.push(DB.prepare("INSERT INTO arena_student_wallet (student_key, class_id, did, balance, total_earned, active_avatar, updated_at) VALUES (?, ?, ?, ?, ?, 'falcon', ?) ON CONFLICT(student_key) DO UPDATE SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?")
+            .bind(key, p.classId, p.did, reward, reward, nowSec, reward, reward, nowSec));
         }
-        savedCount++;
+        n++;
       }
-
-      if (sessionsToInsert.length) {
-        const incUsage = DB.prepare(
-          'INSERT INTO arena_daily_usage (day_key, session_count, updated_at) VALUES (?, ?, ?) ON CONFLICT(day_key) DO UPDATE SET session_count = session_count + ?, updated_at = ?'
-        ).bind(dayKey, savedCount, nowSec, savedCount, nowSec);
-
-        await DB.batch([...sessionsToInsert, ...walletUpdates, incUsage]);
+      if (n) {
+        stmts.push(DB.prepare('INSERT INTO arena_daily_usage (day_key, session_count, updated_at) VALUES (?, ?, ?) ON CONFLICT(day_key) DO UPDATE SET session_count = session_count + ?, updated_at = ?')
+          .bind(dayKey, n, nowSec, n, nowSec));
+        await DB.batch(stmts);
       }
-    } catch (e) {
-      // لا نوقف عمل الغرفة أو المقابس في حال تعثرت كتابة D1
-    }
-  }
-
-  // بث الحالة المنقحة لكل مقبس وفق صلاحياته
-  async broadcastState() {
-    const engine = await this.getEngine();
-    if (!engine) return;
-
-    const sockets = this.ctx.getWebSockets();
-    const nowMs = Date.now();
-
-    for (const ws of sockets) {
-      try {
-        const attachment = ws.deserializeAttachment();
-        const pId = attachment ? attachment.playerId : 'guest';
-        // getStateFor ينقح السؤال تلقائياً ويخفي الإجابة الصحيحة أثناء طور السؤال
-        const state = engine.getStateFor(pId, nowMs);
-        ws.send(JSON.stringify({ type: 'sync', state }));
-      } catch (err) {
-        // مقبس متعثر
-      }
+    } catch (err) {
+      // تعثر D1 لا يوقف الغرفة
     }
   }
 }
